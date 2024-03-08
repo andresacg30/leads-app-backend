@@ -1,3 +1,6 @@
-__pycache__
-.vscode
-.envrc
+.venv/
+__pycache__/
+.vscode/
+.pytest_cache/
+app.db
+.env
