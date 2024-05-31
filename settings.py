@@ -10,7 +10,7 @@ load_dotenv(os.path.join(basedir, ".env"))
 
 
 class Settings(BaseSettings):
-    mongodb_url: str = os.environ.get("MONGO_URI")
+    mongodb_url: str = os.environ.get("MONGO_URL")
 
 
 settings = Settings()
