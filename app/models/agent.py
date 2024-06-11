@@ -8,13 +8,45 @@ from typing import List, Optional, Annotated
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
+class CRMModel(BaseModel):
+    """
+    Container for a single CRM record.
+    """
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    name: str = Field(...)
+    url: str = Field(...)
+    integration_details: Optional[dict] = Field(default=None)
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_schema_extra={
+            "example": {
+                "name": "Ringy",
+                "url": "www.ringy.com",
+                "integration_details": {
+                    "auth_token": "value1",
+                    "sid": "value2"
+                }
+            } 
+        }
+    )
+
+
+class CRMCollection(BaseModel):
+    """
+    A container holding a list of `CRMModel` instances.
+
+    This exists because providing a top-level array in a JSON response can be a [vulnerability](https://haacked.com/archive/2009/06/25/json-hijacking.aspx/)
+    """
+    CRMs: List[CRMModel]
+
+
 class AgentCredentials(BaseModel):
     """
     A container holding the data needed to deliver a lead to a Agent.
     """
     id_token: Optional[str] = Field(default=None)
     password: Optional[str] = Field(default=None)
-
 
 class AgentModel(BaseModel):
     """
@@ -26,7 +58,7 @@ class AgentModel(BaseModel):
     email: EmailStr = Field(...)
     phone: str = Field(...)
     states_with_license: List = Field(...)
-    CRM: Optional[PyObjectId] = Field(default=None)
+    CRM: CRMModel = Field(default_factory=CRMModel)
     created_time: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     campaigns: List[PyObjectId] = Field(default_factory=list)
     credentials: AgentCredentials = Field(default_factory=AgentCredentials)
@@ -94,3 +126,4 @@ class AgentCollection(BaseModel):
     This exists because providing a top-level array in a JSON response can be a [vulnerability](https://haacked.com/archive/2009/06/25/json-hijacking.aspx/)
     """
     agents: List[AgentModel]
+

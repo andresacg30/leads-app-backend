@@ -17,12 +17,16 @@ class LeadModel(BaseModel):
     last_name: str = Field(...)
     email: EmailStr = Field(...)
     phone: str = Field(...)
-    date_of_birth: datetime.datetime = Field(...)
+    state: str = Field(...)
     origin: str = Field(...)
-    buyer: Optional[PyObjectId] = Field(default=None)
+    buyer_id: Optional[PyObjectId] = Field(default=None)
+    second_chance_buyer_id: Optional[PyObjectId] = Field(default=None)
     created_time: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-    campaigns: List[PyObjectId] = Field(default_factory=list)
-    custom_fields: dict = Field(default_factory=dict)
+    lead_sold_time: Optional[datetime.datetime] = Field(default=None)
+    second_chance_lead_sold_time: Optional[datetime.datetime] = Field(default=None)
+    campaign_id: PyObjectId = Field(...)
+    is_second_chance: bool = Field(default=False)
+    custom_fields: Optional[dict] = Field(default=None)  # dict = Field(default_factory=dict)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -32,10 +36,15 @@ class LeadModel(BaseModel):
                 "last_name": "Doe",
                 "email": "janedoe@mail.com",
                 "phone": "555-555-5555",
-                "date_of_birth": "2020-01-01T00:00:00.000Z",
+                "state": "CA",
                 "origin": "facebook",
-                "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e"],
-                "buyer": "5f9c0a9e9c6d4b1e9c6d4b1e",
+                "campaign_id": "5f9c0a9e9c6d4b1e9c6d4b1e",
+                "buyer_id": "5f9c0a9e9c6d4b1e9c6d4b1e",
+                "second_chance_buyer_id": "5f9c0a9e9c6d4b1e9c6d4b1e",
+                "created_time": "2020-01-01T00:00:00.000Z",
+                "lead_sold_time": "2020-01-01T00:00:00.000Z",
+                "second_chance_lead_sold_time": "2020-01-01T00:00:00.000Z",
+                "is_second_chance": False,
                 "custom_fields": {
                     "field1": "value1",
                     "field2": "value2"
@@ -53,11 +62,15 @@ class UpdateLeadModel(BaseModel):
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
-    date_of_birth: Optional[datetime.datetime] = None
+    state: Optional[str] = None
     origin: Optional[str] = None
-    buyer: Optional[PyObjectId] = Field(default=None)
+    buyer_id: Optional[PyObjectId] = Field(default=None)
+    second_chance_buyer_id: Optional[PyObjectId] = Field(default=None)
     created_time: Optional[datetime.datetime] = None
-    campaigns: Optional[List[PyObjectId]] = None
+    lead_sold_time: Optional[datetime.datetime] = None
+    second_chance_lead_sold_time: Optional[datetime.datetime] = None
+    campaign_id: PyObjectId = None
+    is_second_chance: Optional[bool] = None
     custom_fields: Optional[dict] = None
     model_config = ConfigDict(
         populate_by_name=True,
@@ -67,13 +80,17 @@ class UpdateLeadModel(BaseModel):
             "example": {
                 "first_name": "Jane",
                 "last_name": "Doe",
-                "email": "jane@example.com",
+                "email": "janedoe@mail.com",
                 "phone": "555-555-5555",
-                "date_of_birth": "2020-01-01T00:00:00.000Z",
+                "state": "CA",
                 "origin": "facebook",
-                "buyer": "5f9c0a9e9c6d4b1e9c6d4b1e",
+                "campaign_id": "5f9c0a9e9c6d4b1e9c6d4b1e",
+                "buyer_id": "5f9c0a9e9c6d4b1e9c6d4b1e",
+                "second_chance_buyer_id": "5f9c0a9e9c6d4b1e9c6d4b1e",
                 "created_time": "2020-01-01T00:00:00.000Z",
-                "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e", "5f9c0a9e9c6d4b1e9c6d4b1e"],
+                "lead_sold_time": "2020-01-01T00:00:00.000Z",
+                "second_chance_lead_sold_time": "2020-01-01T00:00:00.000Z",
+                "is_second_chance": False,
                 "custom_fields": {
                     "field1": "value1",
                     "field2": "value2"
