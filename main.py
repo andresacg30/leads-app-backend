@@ -4,7 +4,9 @@ from fastapi import FastAPI
 
 from app.routes import agent, lead, crm, invoice
 
-app = FastAPI()
+app = FastAPI(
+    title="LeadConex API"
+)
 app.include_router(agent.router)
 app.include_router(lead.router)
 app.include_router(crm.router)
