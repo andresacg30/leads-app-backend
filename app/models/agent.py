@@ -27,7 +27,7 @@ class CRMModel(BaseModel):
                     "auth_token": "value1",
                     "sid": "value2"
                 }
-            } 
+            }
         }
     )
 
@@ -47,6 +47,7 @@ class AgentCredentials(BaseModel):
     """
     id_token: Optional[str] = Field(default=None)
     password: Optional[str] = Field(default=None)
+
 
 class AgentModel(BaseModel):
     """
@@ -72,7 +73,14 @@ class AgentModel(BaseModel):
                 "email": "janedoe@example.com",
                 "phone": "555-555-5555",
                 "states_with_license": ["CA", "NY"],
-                "CRM": "Ringy",
+                "CRM": {
+                    "name": "Ringy",
+                    "url": "www.ringy.com",
+                    "integration_details": {
+                        "auth_token": "value1",
+                        "sid": "value2"
+                        }
+                },
                 "credentials": {
                     "id_token": "value1",
                     "password": "value2"
@@ -107,7 +115,14 @@ class UpdateAgentModel(BaseModel):
                 "email": "janedoe@example.com",
                 "phone": "555-555-5555",
                 "states_with_license": ["CA", "NY"],
-                "CRM": "Ringy",
+                "CRM": {
+                    "name": "Ringy",
+                    "url": "www.ringy.com",
+                    "integration_details": {
+                        "auth_token": "value1",
+                        "sid": "value2"
+                        }
+                },
                 "creation_time": "2020-01-01T00:00:00.000Z",
                 "credentials": {
                     "id_token": "value1",
@@ -126,4 +141,3 @@ class AgentCollection(BaseModel):
     This exists because providing a top-level array in a JSON response can be a [vulnerability](https://haacked.com/archive/2009/06/25/json-hijacking.aspx/)
     """
     agents: List[AgentModel]
-
