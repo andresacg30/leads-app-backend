@@ -2,14 +2,13 @@ import os
 import uvicorn
 from fastapi import FastAPI
 
-from app.routes import agent, lead, crm, invoice
+from app.routes import agent, lead, invoice
 
 app = FastAPI(
     title="LeadConex API"
 )
 app.include_router(agent.router)
 app.include_router(lead.router)
-app.include_router(crm.router)
 app.include_router(invoice.router)
 
 

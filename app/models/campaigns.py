@@ -2,9 +2,10 @@ import datetime
 from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.functional_validators import BeforeValidator
-from typing import List,Optional, Annotated
+from typing import List, Optional, Annotated
 
 PyObjectID = Annotated[str, BeforeValidator(str)]
+
 
 class CampaignModel(BaseModel):
     """
@@ -26,6 +27,7 @@ class CampaignModel(BaseModel):
         }
     )
 
+
 class UpdateCampaignModel(BaseModel):
     """
     A set of optional updates to be made to a Campaign document in the database.
@@ -42,9 +44,10 @@ class UpdateCampaignModel(BaseModel):
                 "name": "Campaign 1",
                 "active": True,
                 "start_date": "2020-01-01"
-            } 
+            }
         }
     )
+
 
 class CampaignCollection(BaseModel):
     """

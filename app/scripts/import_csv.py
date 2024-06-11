@@ -21,7 +21,7 @@ async def clean_data_for_agent_model(data):
             agent_query: dict = await db["agent"].find_one(
                 {"email": {"$regex": row['Email'], "$options": "i"}}
             )
-            if agent_query != None:
+            if agent_query is not None:
                 existing_campaigns = set(agent_query['campaigns'])
                 updated_campaigns = list(existing_campaigns | {row['campaign_id']})
                 agent_query['campaigns'] = updated_campaigns
@@ -95,11 +95,13 @@ def clean_data_for_lead_model(data):
             print("Error while cleaning lead model. Error: {}".format(e))
     return lead_list
 
+
 collection_model_mapping = {
     "agent": clean_data_for_agent_model,
     "campaign": clean_data_for_campaign_model,
     "lead": clean_data_for_lead_model
 }
+
 
 async def clean_data(db_collection, file):
     try:
@@ -112,17 +114,19 @@ async def clean_data(db_collection, file):
             ("Function not found for {}".format(db_collection))
             return None
     except Exception as e:
-        print("Error while cleaning data:")
-    
+        print(f"Error while cleaning data: {e}")
+
+
 def extract_extra_fields_for_lead(row, start_column):
     headers = row.index
 
-    relevant_values = filter(row.iloc[start_column - 1:], lambda x: x != None)
+    relevant_values = filter(row.iloc[start_column - 1:], lambda x: x is not None)
     relevant_headers = headers[start_column - 1:]
 
     extra_fields = dict(zip(relevant_headers, relevant_values))
 
     return extra_fields
+
 
 async def import_csv(file, db_collection):
     try:
@@ -134,3 +138,9 @@ async def import_csv(file, db_collection):
             print("No data to import.")
     except Exception as e:
         print(f"Error importing CSV data: {e}")
+
+
+def utcnow():
+    print("RIGHT NOW")
+
+

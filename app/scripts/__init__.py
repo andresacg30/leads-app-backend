@@ -1,1 +1,1 @@
-from .import_csv import *
+from app.scripts.import_csv import *
