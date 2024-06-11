@@ -45,7 +45,7 @@ class AgentCredentials(BaseModel):
     """
     A container holding the data needed to deliver a lead to a Agent.
     """
-    id_token: Optional[str] = Field(default=None)
+    username: Optional[str] = Field(default=None)
     password: Optional[str] = Field(default=None)
 
 
@@ -82,7 +82,7 @@ class AgentModel(BaseModel):
                         }
                 },
                 "credentials": {
-                    "id_token": "value1",
+                    "username": "value1",
                     "password": "value2"
                 },
                 "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e"]
@@ -125,7 +125,7 @@ class UpdateAgentModel(BaseModel):
                 },
                 "creation_time": "2020-01-01T00:00:00.000Z",
                 "credentials": {
-                    "id_token": "value1",
+                    "username": "value1",
                     "password": "value2"
                 },
                 "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e", "324sddsds"]

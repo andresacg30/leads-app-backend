@@ -142,5 +142,3 @@ async def import_csv(file, db_collection):
 
 def utcnow():
     print("RIGHT NOW")
-
-
