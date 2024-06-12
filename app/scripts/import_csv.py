@@ -54,7 +54,7 @@ async def clean_data_for_agent_model(data):
     return agent_list
 
 
-async def clean_data_for_campaign_model(data):
+def clean_data_for_campaign_model(data):
     campaign_list = []
     for _, row in data.iterrows():
         try:
@@ -63,7 +63,7 @@ async def clean_data_for_campaign_model(data):
                 active=bool(row['active']),
                 start_date=pd.to_datetime(row['start_date']),
             )
-            await campaign_list.append(campaign_to_clean.model_dump(by_alias=True, exclude=["id"]))
+            campaign_list.append(campaign_to_clean.model_dump(by_alias=True, exclude=["id"]))
         except Exception as e:
             print("Error while cleaning campaign model. Error: {}".format(e))
     return campaign_list
@@ -103,12 +103,12 @@ collection_model_mapping = {
 }
 
 
-async def clean_data(db_collection, file):
+def clean_data(db_collection, file):
     try:
         df = pd.read_csv(file)
         function = collection_model_mapping.get(db_collection)
         if function:
-            cleaned_data = await function(df)
+            cleaned_data = function(df)
             return cleaned_data
         else:
             ("Function not found for {}".format(db_collection))
@@ -130,7 +130,7 @@ def extract_extra_fields_for_lead(row, start_column):
 
 async def import_csv(file, db_collection):
     try:
-        data = await clean_data(db_collection, file)  # cleaned data
+        data = clean_data(db_collection, file)  # cleaned data
         if data:
             collection = db[db_collection]
             await collection.insert_many(data)
@@ -138,7 +138,3 @@ async def import_csv(file, db_collection):
             print("No data to import.")
     except Exception as e:
         print(f"Error importing CSV data: {e}")
-
-
-def utcnow():
-    print("RIGHT NOW")

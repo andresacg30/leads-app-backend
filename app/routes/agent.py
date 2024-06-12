@@ -3,6 +3,8 @@ from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
 from pymongo import ReturnDocument
 
+import app.controllers.agent as agent_controller
+
 from app.db import db
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
 
@@ -24,6 +26,17 @@ async def create_agent(agent: AgentModel = Body(...)):
 
     A unique `id` will be created and provided in the response.
     """
+    agent_in_db_found = await agent_controller.get_agent_by_email(agent.email)
+    if agent_in_db_found:
+        agent_in_db_campaigns = await agent_controller.get_enrolled_campaigns(agent_in_db_found['_id'])
+        is_duplicate = agent.campaigns[0] in agent_in_db_campaigns
+        if is_duplicate:
+            raise HTTPException(status_code=409, detail="Agent already exists")
+        else:
+            agent_in_db_campaigns.append(agent.campaigns[0])
+            agent_in_db_found['campaigns'] = agent_in_db_campaigns
+            await agent_controller.update_campaigns_for_agent(agent_in_db_found['_id'], agent_in_db_campaigns)
+            return agent_in_db_found
     new_agent = await agent_collection.insert_one(
         agent.model_dump(by_alias=True, exclude=["id"])
     )
