@@ -120,7 +120,7 @@ async def clean_data(db_collection, file):
 def extract_extra_fields_for_lead(row, start_column):
     headers = row.index
 
-    relevant_values = filter(lambda x: x is not None, row.iloc[start_column - 1:])
+    relevant_values = row.iloc[start_column - 1:]
     relevant_headers = headers[start_column - 1:]
 
     extra_fields = dict(zip(relevant_headers, relevant_values))
@@ -138,7 +138,3 @@ async def import_csv(file, db_collection):
             print("No data to import.")
     except Exception as e:
         print(f"Error importing CSV data: {e}")
-
-
-def utcnow():
-    print("RIGHT NOW")
