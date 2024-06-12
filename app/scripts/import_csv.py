@@ -120,7 +120,7 @@ async def clean_data(db_collection, file):
 def extract_extra_fields_for_lead(row, start_column):
     headers = row.index
 
-    relevant_values = filter(row.iloc[start_column - 1:], lambda x: x is not None)
+    relevant_values = filter(lambda x: x is not None, row.iloc[start_column - 1:])
     relevant_headers = headers[start_column - 1:]
 
     extra_fields = dict(zip(relevant_headers, relevant_values))

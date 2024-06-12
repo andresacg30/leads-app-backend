@@ -12,7 +12,6 @@ class CRMModel(BaseModel):
     """
     Container for a single CRM record.
     """
-    id: Optional[PyObjectId] = Field(alias="_id", default=None)
     name: str = Field(...)
     url: str = Field(...)
     integration_details: Optional[dict] = Field(default=None)
