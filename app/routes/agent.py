@@ -7,6 +7,7 @@ import app.controllers.agent as agent_controller
 
 from app.db import db
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
+from app.tools import mappings
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
@@ -37,6 +38,7 @@ async def create_agent(agent: AgentModel = Body(...)):
             agent_in_db_found['campaigns'] = agent_in_db_campaigns
             await agent_controller.update_campaigns_for_agent(agent_in_db_found['_id'], agent_in_db_campaigns)
             return agent_in_db_found
+    agent.CRM.url = mappings.crm_url_mappings[agent.CRM.name]
     new_agent = await agent_collection.insert_one(
         agent.model_dump(by_alias=True, exclude=["id"])
     )
