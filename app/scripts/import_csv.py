@@ -130,7 +130,7 @@ def extract_extra_fields_for_lead(row, start_column):
 
 async def import_csv(file, db_collection):
     try:
-        data = clean_data(db_collection, file)  # cleaned data
+        data = await clean_data(db_collection, file)  # cleaned data
         if data:
             collection = db[db_collection]
             await collection.insert_many(data)
