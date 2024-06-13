@@ -20,3 +20,8 @@ async def update_campaigns_for_agent(agent_id, campaigns):
         {"_id": agent_id}, {"$set": {"campaigns": campaigns}}
     )
     return updated_agent
+
+
+def format_state_list(states):
+    state_list = states[0].split(',')
+    return state_list

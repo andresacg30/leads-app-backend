@@ -39,6 +39,8 @@ async def create_agent(agent: AgentModel = Body(...)):
             await agent_controller.update_campaigns_for_agent(agent_in_db_found['_id'], agent_in_db_campaigns)
             return agent_in_db_found
     agent.CRM.url = mappings.crm_url_mappings[agent.CRM.name]
+    if len(agent.states_with_license) == 1:
+        agent.states_with_license = agent_controller.format_state_list(agent.states_with_license)
     new_agent = await agent_collection.insert_one(
         agent.model_dump(by_alias=True, exclude=["id"])
     )
