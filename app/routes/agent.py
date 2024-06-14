@@ -116,9 +116,24 @@ async def delete_agent(id: str):
     """
     Remove a single agent record from the database.
     """
-    delete_result = await agent_collection.delete_one({"_id": ObjectId(id)})
+    delete_result = await agent_collection.delete_one({"_id": ObjectId(id)})  # make it a controller
 
     if delete_result.deleted_count == 1:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     raise HTTPException(status_code=404, detail=f"Agent {id} not found")
+
+
+@router.get(
+    "/get-agent-id-by-email/{email}",
+    response_description="Get agent id by email",
+    response_model_by_alias=False
+)
+async def get_agent_id_by_email(email: str):
+    """
+    Get the record for a specific agent, looked up by `email`.
+    """
+    agent = await agent_controller.get_agent_by_email(email)
+    if agent:
+        return {"id": str(agent["_id"])}
+    raise HTTPException(status_code=404, detail=f"Agent {email} not found")
