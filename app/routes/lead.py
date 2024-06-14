@@ -5,6 +5,7 @@ from pymongo import ReturnDocument
 
 from app.db import db
 from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
+from app.tools import mappings
 
 
 router = APIRouter(prefix="/api/lead", tags=["lead"])
@@ -23,6 +24,10 @@ async def create_lead(lead: LeadModel = Body(...)):
 
     A unique `id` will be created and provided in the response.
     """
+    for state, state_variations in mappings.state_mappings.items():
+        if lead.state.lower() in state_variations:
+            lead.state = state
+            break
     new_lead = await lead_collection.insert_one(
         lead.model_dump(by_alias=True, exclude=["id"])
     )
