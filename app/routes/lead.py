@@ -14,7 +14,6 @@ lead_collection = db["lead"]
 @router.post(
     "/",
     response_description="Add new lead",
-    response_model=LeadModel,
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=False
 )
@@ -27,8 +26,7 @@ async def create_lead(lead: LeadModel = Body(...)):
     new_lead = await lead_collection.insert_one(
         lead.model_dump(by_alias=True, exclude=["id"])
     )
-    created_lead = await lead_collection.find_one({"_id": new_lead.inserted_id})
-    return created_lead
+    return {"id": str(new_lead.inserted_id)}
 
 
 @router.get(
@@ -66,7 +64,6 @@ async def show_lead(id: str):
 @router.put(
     "/",
     response_description="Update a lead",
-    response_model=LeadModel,
     response_model_by_alias=False
 )
 async def update_lead(id: str, lead: UpdateLeadModel = Body(...)):
@@ -92,7 +89,7 @@ async def update_lead(id: str, lead: UpdateLeadModel = Body(...)):
             raise HTTPException(status_code=404, detail=f"Lead {id} not found")
 
     if (existing_lead := await lead_collection.find_one({"_id": id})) is not None:
-        return existing_lead
+        return {"id": existing_lead["_id"]}
 
     raise HTTPException(status_code=404, detail=f"Lead {id} not found")
 

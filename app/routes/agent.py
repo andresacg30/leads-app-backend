@@ -17,7 +17,6 @@ agent_collection = db["agent"]
 @router.post(
     "/",
     response_description="Add new agent",
-    response_model=AgentModel,
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=False
 )
@@ -37,15 +36,14 @@ async def create_agent(agent: AgentModel = Body(...)):
             agent_in_db_campaigns.append(agent.campaigns[0])
             agent_in_db_found['campaigns'] = agent_in_db_campaigns
             await agent_controller.update_campaigns_for_agent(agent_in_db_found['_id'], agent_in_db_campaigns)
-            return agent_in_db_found
+            return agent_in_db_found["_id"]
     agent.CRM.url = mappings.crm_url_mappings[agent.CRM.name]
     if len(agent.states_with_license) == 1:
         agent.states_with_license = agent_controller.format_state_list(agent.states_with_license)
     new_agent = await agent_collection.insert_one(
         agent.model_dump(by_alias=True, exclude=["id"])
     )
-    created_agent = await agent_collection.find_one({"_id": new_agent.inserted_id})
-    return created_agent
+    return {"id": str(new_agent.inserted_id)}
 
 
 @router.get(
@@ -83,7 +81,6 @@ async def show_agent(id: str):
 @router.put(
     "/",
     response_description="Update a agent",
-    response_model=AgentModel,
     response_model_by_alias=False
 )
 async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
@@ -109,7 +106,7 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
             raise HTTPException(status_code=404, detail=f"Agent {id} not found")
 
     if (existing_agent := await agent_collection.find_one({"_id": id})) is not None:
-        return existing_agent
+        return {"id": existing_agent['_id']}
 
     raise HTTPException(status_code=404, detail=f"Agent {id} not found")
 
