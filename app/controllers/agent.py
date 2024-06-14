@@ -23,5 +23,5 @@ async def update_campaigns_for_agent(agent_id, campaigns):
 
 
 def format_state_list(states):
-    state_list = states[0].split(',')
+    state_list = states[0].split(', ')
     return state_list
