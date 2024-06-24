@@ -6,9 +6,14 @@ from app.db import db
 agent_collection = db["agent"]
 
 
+class AgentNotFoundError(Exception):
+    pass
+
+
 async def get_agent_by_field(field, value):
     if field == "full_name":
-        first_name, last_name = value.split(' ')
+        first_name = value.split(' ')[0]
+        last_name = value.split(' ')[1:]
         agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
         if agent is None:
             agents = await agent_collection.find().to_list(None)
@@ -20,7 +25,7 @@ async def get_agent_by_field(field, value):
                 return agent
             else:
                 # send notification
-                return None
+                raise AgentNotFoundError(f"Agent with full name {value} not found")
     agent = await agent_collection.find_one({field: value})
     return agent
 
