@@ -129,15 +129,9 @@ async def delete_agent(id: str):
     response_description="Get agent id by specified field",
     response_model_by_alias=False
 )
-async def get_agent_id_by_field(field: str, value: str):
+async def get_agent_id_by_field(**kwargs):
     """
-    Get the id for a specific agent, looked up by a specified field.
+    Get the record for a specific agent, looked up by `field` and `value`.
     """
-    accepted_fields = ["email", "phone_number", "first_name", "last_name", "full_name"]
-    if field not in accepted_fields:
-        raise HTTPException(status_code=400, detail="Invalid field")
-    try:
-        found_agent = await agent_controller.get_agent_by_field(field, value)
-        return {"id": str(found_agent["_id"])}
-    except agent_controller.AgentNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    agent = await agent_controller.get_agent_by_field(**kwargs)
+    return {"id": str(agent["_id"])}

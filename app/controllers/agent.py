@@ -10,7 +10,8 @@ class AgentNotFoundError(Exception):
     pass
 
 
-async def get_agent_by_field(field, value):
+async def get_agent_by_field(**kwargs):
+    field, value = kwargs.items()[0]
     if field == "full_name":
         first_name = value.split(' ')[0]
         last_name = " ".join(value.split(' ')[1:])
