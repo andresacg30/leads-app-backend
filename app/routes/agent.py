@@ -125,8 +125,8 @@ async def delete_agent(id: str):
 
 
 @router.get(
-    "/find",
-    response_description="Get agent id by email",
+    "/find/",
+    response_description="Get agent id by specified field",
     response_model_by_alias=False
 )
 async def get_agent_id_by_field(field: str, value: str):
