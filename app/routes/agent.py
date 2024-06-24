@@ -133,7 +133,7 @@ async def get_agent_id_by_field(field: str, value: str):
     """
     Get the id for a specific agent, looked up by a specified field.
     """
-    accepted_fields = ["email", "phone_number", "first_name", "last_name"]
+    accepted_fields = ["email", "phone_number", "first_name", "last_name", "full_name"]
     if field not in accepted_fields:
         raise HTTPException(status_code=400, detail="Invalid field")
     found_agent = agent_controller.get_agent_by_field(field, value)

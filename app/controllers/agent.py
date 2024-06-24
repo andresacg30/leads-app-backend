@@ -5,6 +5,9 @@ agent_collection = db["agent"]
 
 
 async def get_agent_by_field(field, value):
+    if field == "full_name":
+        first_name, last_name = value.split(' ')
+        agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
     agent = await agent_collection.find_one({field: value})
     return agent
 
