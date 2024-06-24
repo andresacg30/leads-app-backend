@@ -1,3 +1,5 @@
+import difflib
+
 from app.db import db
 
 
@@ -8,6 +10,17 @@ async def get_agent_by_field(field, value):
     if field == "full_name":
         first_name, last_name = value.split(' ')
         agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
+        if agent is None:
+            agents = await agent_collection.find().to_list(None)
+            full_names = [f"{a['first_name']} {a['last_name']}" for a in agents]
+            closest_match = difflib.get_close_matches(value, full_names, n=1)
+            if closest_match:
+                first_name, last_name = closest_match[0].split(' ')
+                agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
+                return agent
+            else:
+                # send notification
+                return None
     agent = await agent_collection.find_one({field: value})
     return agent
 
