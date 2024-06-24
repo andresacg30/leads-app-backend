@@ -9,6 +9,11 @@ async def get_agent_by_email(email):
     return agent
 
 
+async def get_agent_by_name(name):
+    agent = await agent_collection.find_one({"name": name})
+    return agent
+
+
 async def get_enrolled_campaigns(agent_id):
     agent = await agent_collection.find_one({"_id": agent_id})
     enrolled_campaigns = agent['campaigns']

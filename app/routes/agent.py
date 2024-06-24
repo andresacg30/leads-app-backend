@@ -131,9 +131,24 @@ async def delete_agent(id: str):
 )
 async def get_agent_id_by_email(email: str):
     """
-    Get the record for a specific agent, looked up by `email`.
+    Get the id for a specific agent, looked up by `email`.
     """
     agent = await agent_controller.get_agent_by_email(email)
     if agent:
         return {"id": str(agent["_id"])}
     raise HTTPException(status_code=404, detail=f"Agent {email} not found")
+
+
+@router.get(
+    "/get-agent-id-by-name/{name}",
+    response_description="Get agent id by name",
+    response_model_by_alias=False
+)
+async def get_agent_id_by_name(name: str):
+    """
+    Get the id for a specific agent, looked up by `name`.
+    """
+    agent = await agent_controller.get_agent_by_name(name)
+    if agent:
+        return {"id": str(agent["_id"])}
+    raise HTTPException(status_code=404, detail=f"Agent {name} not found")
