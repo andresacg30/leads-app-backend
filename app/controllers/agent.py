@@ -20,12 +20,15 @@ async def get_agent_by_field(field, value):
             full_names = [f"{a['first_name']} {a['last_name']}" for a in agents]
             closest_match = difflib.get_close_matches(value, full_names, n=1)
             if closest_match:
-                first_name, last_name = closest_match[0].split(' ')
+                first_name = closest_match[0].split(' ')[0]
+                last_name = closest_match[0].split(' ')[1:][0]
                 agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
+                if not agent:
+                    raise AgentNotFoundError(f"Agent with full name {value} not found")
                 return agent
             else:
                 # send notification
-                raise AgentNotFoundError(f"Agent with full name {value} not found")
+                raise AgentNotFoundError(f"No close match for agent with full name {value}")
     agent = await agent_collection.find_one({field: value})
     return agent
 
