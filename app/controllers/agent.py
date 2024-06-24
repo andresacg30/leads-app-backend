@@ -13,7 +13,7 @@ class AgentNotFoundError(Exception):
 async def get_agent_by_field(field, value):
     if field == "full_name":
         first_name = value.split(' ')[0]
-        last_name = value.split(' ')[1:][0]
+        last_name = " ".join(value.split(' ')[1:])
         agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
         if agent is None:
             agents = await agent_collection.find().to_list(None)
@@ -21,7 +21,7 @@ async def get_agent_by_field(field, value):
             closest_match = difflib.get_close_matches(value, full_names, n=1)
             if closest_match:
                 first_name = closest_match[0].split(' ')[0]
-                last_name = closest_match[0].split(' ')[1:][0]
+                last_name = " ".join(closest_match.split(' ')[1:])
                 agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
                 if not agent:
                     raise AgentNotFoundError(f"Agent with full name {value} not found")
@@ -29,6 +29,7 @@ async def get_agent_by_field(field, value):
             else:
                 # send notification
                 raise AgentNotFoundError(f"No close match for agent with full name {value}")
+        return agent
     agent = await agent_collection.find_one({field: value})
     return agent
 
