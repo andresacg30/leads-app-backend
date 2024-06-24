@@ -10,7 +10,9 @@ async def get_agent_by_email(email):
 
 
 async def get_agent_by_name(name):
-    agent = await agent_collection.find_one({"name": name})
+    first_name = name.split(' ')[0]
+    last_name = name.split(' ')[1]
+    agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
     return agent
 
 
