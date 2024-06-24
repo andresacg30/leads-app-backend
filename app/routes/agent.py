@@ -136,5 +136,5 @@ async def get_agent_id_by_field(field: str, value: str):
     accepted_fields = ["email", "phone_number", "first_name", "last_name", "full_name"]
     if field not in accepted_fields:
         raise HTTPException(status_code=400, detail="Invalid field")
-    found_agent = agent_controller.get_agent_by_field(field, value)
+    found_agent = await agent_controller.get_agent_by_field(field, value)
     return {"id": str(found_agent["_id"])}
