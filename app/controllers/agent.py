@@ -4,15 +4,8 @@ from app.db import db
 agent_collection = db["agent"]
 
 
-async def get_agent_by_email(email):
-    agent = await agent_collection.find_one({"email": email})
-    return agent
-
-
-async def get_agent_by_name(name):
-    first_name = name.split(' ')[0]
-    last_name = name.split(' ')[1]
-    agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
+async def get_agent_by_field(field, value):
+    agent = await agent_collection.find_one({field: value})
     return agent
 
 

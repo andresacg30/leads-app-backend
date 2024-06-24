@@ -125,30 +125,16 @@ async def delete_agent(id: str):
 
 
 @router.get(
-    "/get-agent-id-by-email/{email}",
+    "/find",
     response_description="Get agent id by email",
     response_model_by_alias=False
 )
-async def get_agent_id_by_email(email: str):
+async def get_agent_id_by_field(field: str, value: str):
     """
-    Get the id for a specific agent, looked up by `email`.
+    Get the id for a specific agent, looked up by a specified field.
     """
-    agent = await agent_controller.get_agent_by_email(email)
-    if agent:
-        return {"id": str(agent["_id"])}
-    raise HTTPException(status_code=404, detail=f"Agent {email} not found")
-
-
-@router.get(
-    "/get-agent-id-by-name/{name}",
-    response_description="Get agent id by name",
-    response_model_by_alias=False
-)
-async def get_agent_id_by_name(name: str):
-    """
-    Get the id for a specific agent, looked up by `name`.
-    """
-    agent = await agent_controller.get_agent_by_name(name)
-    if agent:
-        return {"id": str(agent["_id"])}
-    raise HTTPException(status_code=404, detail=f"Agent {name} not found")
+    accepted_fields = ["email", "phone_number", "first_name", "last_name"]
+    if field not in accepted_fields:
+        raise HTTPException(status_code=400, detail="Invalid field")
+    found_agent = agent_controller.get_agent_by_field(field, value)
+    return {"id": str(found_agent["_id"])}
