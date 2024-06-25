@@ -1,7 +1,8 @@
 from bson import ObjectId
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
-from pymongo import ReturnDocument
+
+import app.controllers.lead as lead_controller
 
 from app.db import db
 from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
@@ -78,25 +79,13 @@ async def update_lead(id: str, lead: UpdateLeadModel = Body(...)):
     Only the provided fields will be updated.
     Any missing or `null` fields will be ignored.
     """
-    lead = {k: v for k, v in lead.model_dump(by_alias=True).items() if v is not None}
 
-    if len(lead) >= 1:
-        update_result = await lead_collection.find_one_and_update(
-            {"_id": ObjectId(id)},
-            {"$set": lead},
-            return_document=ReturnDocument.AFTER,
-        )
+    try:
+        updated_lead = await lead_controller.update_lead(id, lead)
+        return {"id": str(updated_lead["_id"])}
 
-        if update_result is not None:
-            return update_result
-
-        else:
-            raise HTTPException(status_code=404, detail=f"Lead {id} not found")
-
-    if (existing_lead := await lead_collection.find_one({"_id": id})) is not None:
-        return {"id": existing_lead["_id"]}
-
-    raise HTTPException(status_code=404, detail=f"Lead {id} not found")
+    except lead_controller.LeadNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.delete("/", response_description="Delete a lead")
