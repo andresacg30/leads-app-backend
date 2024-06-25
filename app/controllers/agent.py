@@ -11,27 +11,35 @@ class AgentNotFoundError(Exception):
 
 
 async def get_agent_by_field(**kwargs):
-    field, value = kwargs.items()[0]
-    if field == "full_name":
-        first_name = value.split(' ')[0]
-        last_name = " ".join(value.split(' ')[1:])
+    # Filter out None values from kwargs
+    query = {k: v for k, v in kwargs.items() if v is not None}
+
+    if "full_name" in query:
+        full_name = query.pop("full_name")
+        first_name = full_name.split(' ')[0]
+        last_name = " ".join(full_name.split(' ')[1:])
         agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
         if agent is None:
             agents = await agent_collection.find().to_list(None)
             full_names = [f"{a['first_name']} {a['last_name']}" for a in agents]
-            closest_match = difflib.get_close_matches(value, full_names, n=1)
+            closest_match = difflib.get_close_matches(full_name, full_names, n=1)
             if closest_match:
                 first_name = closest_match[0].split(' ')[0]
                 last_name = " ".join(closest_match[0].split(' ')[1:])
                 agent = await agent_collection.find_one({"first_name": first_name, "last_name": last_name})
                 if not agent:
-                    raise AgentNotFoundError(f"Agent with full name {value} not found")
+                    raise AgentNotFoundError(f"Agent with full name {full_name} not found")
                 return agent
             else:
                 # send notification
-                raise AgentNotFoundError(f"No close match for agent with full name {value}")
+                raise AgentNotFoundError(f"No close match for agent with full name {full_name}")
         return agent
-    agent = await agent_collection.find_one({field: value})
+
+    agent = await agent_collection.find_one(query)
+
+    if not agent:
+        raise AgentNotFoundError("Agent not found with the provided information.")
+
     return agent
 
 
