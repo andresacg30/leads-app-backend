@@ -1,1 +1,2 @@
-from app.scripts.import_csv import *
+import app.scripts.agents_import
+import app.scripts.leads_import
