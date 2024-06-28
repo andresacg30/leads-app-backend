@@ -15,44 +15,42 @@ sys.path.append('../../app')
 
 
 def format_time(time):
+    if pd.isna(time):
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", time) or re.fullmatch(r"\d{4}/\d{2}/\d{2}", time) or re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2}", time) or re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", time) or re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}", time) or re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}T\d{2}:\d{2}:\d{2}", time) or re.fullmatch(r"\d{2}-\d{2}-\d{4}T\d{2}:\d{2}:\d{2}.000", time) or re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", time) or re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", time):
+        if re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2}", time):
+            month, day, year = map(int, time.split('/'))
+            year += 2000
+            time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
+        elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", time):
+            month, day, year = map(int, time.split('/'))
+            time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
+        elif re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}", time):
+            month, day, year = map(int, time.split('-'))
+            time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
+        elif re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}T\d{2}:\d{2}:\d{2}", time):
+            date, time_part = time.split('T')
+            month, day, year = map(int, date.split('-'))
+            time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}.000"
+        elif re.fullmatch(r"\d{2}-\d{2}-\d{4}T\d{2}:\d{2}:\d{2}.000", time):
+            date, time_part = time.split('T')
+            month, day, year = map(int, date.split('-'))
+            time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}"
+        elif re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", time):
+            time = time[:-1]
+        elif re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", time):
+            date, time_part = time.split(' ')
+            day, month, year = map(int, date.split('/'))
+            time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}.000"
     try:
-        if pd.isna(time):
-            return None
-        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", time) or re.fullmatch(r"\d{4}/\d{2}/\d{2}", time) or re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2}", time) or re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", time) or re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}", time) or re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}T\d{2}:\d{2}:\d{2}", time) or re.fullmatch(r"\d{2}-\d{2}-\d{4}T\d{2}:\d{2}:\d{2}.000", time) or re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", time) or re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", time):
-            if re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2}", time):
-                month, day, year = map(int, time.split('/'))
-                year += 2000
-                time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
-            elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", time):
-                month, day, year = map(int, time.split('/'))
-                time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
-            elif re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}", time):
-                month, day, year = map(int, time.split('-'))
-                time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
-            elif re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}T\d{2}:\d{2}:\d{2}", time):
-                date, time_part = time.split('T')
-                month, day, year = map(int, date.split('-'))
-                time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}.000"
-            elif re.fullmatch(r"\d{2}-\d{2}-\d{4}T\d{2}:\d{2}:\d{2}.000", time):
-                date, time_part = time.split('T')
-                month, day, year = map(int, date.split('-'))
-                time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}"
-            elif re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", time):
-                time = time[:-1]
-            elif re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", time):
-                date, time_part = time.split(' ')
-                day, month, year = map(int, date.split('/'))
-                time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}.000"
-        try:
-            dt = datetime.datetime.fromisoformat(time)
-            est_time = dt.astimezone(ZoneInfo("US/Eastern"))
-            utc_time = est_time.astimezone(ZoneInfo("UTC"))
-            formatted_time = utc_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-            return formatted_time
-        except Exception:
-            print(f"Error while formatting time {time}")
+        dt = datetime.datetime.fromisoformat(time)
+        est_time = dt.astimezone(ZoneInfo("US/Eastern"))
+        utc_time = est_time.astimezone(ZoneInfo("UTC"))
+        formatted_time = utc_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        return formatted_time
     except Exception:
-        print(f"Error while sadasdas time {lead}")
+        print(f"Error while formatting time {time}")
+
 
 
 def format_state(state):

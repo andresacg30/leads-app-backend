@@ -21,8 +21,7 @@ class CampaignModel(BaseModel):
         json_schema_extra={
             "example": {
                 "name": "Campaign 1",
-                "active": True,
-                "start_date": "2020-01-01"
+                "active": True
             }
         }
     )
@@ -34,7 +33,7 @@ class UpdateCampaignModel(BaseModel):
     """
     name: Optional[str] = None
     active: Optional[bool] = None
-    start_date: Optional[datetime.date] = None
+    start_date: Optional[datetime.datetime] = None
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -43,7 +42,7 @@ class UpdateCampaignModel(BaseModel):
             "example": {
                 "name": "Campaign 1",
                 "active": True,
-                "start_date": "2020-01-01"
+                "start_date": "2020-01-01T00:00:00.000Z"
             }
         }
     )
