@@ -26,7 +26,7 @@ class LeadModel(BaseModel):
     second_chance_lead_sold_time: Optional[datetime.datetime] = Field(default=None)
     campaign_id: PyObjectId = Field(...)
     is_second_chance: bool = Field(default=False)
-    custom_fields: Optional[dict] = Field(default=None)  # dict = Field(default_factory=dict)
+    custom_fields: Optional[dict] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
