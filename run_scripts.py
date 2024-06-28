@@ -1,4 +1,4 @@
-import app.scripts.agents_import as agents_import
+# import app.scripts.agents_import as agents_import
 import app.scripts.leads_import as leads_import
 import sys
 import asyncio

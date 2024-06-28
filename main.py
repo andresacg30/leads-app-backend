@@ -2,7 +2,7 @@ import os
 import uvicorn
 from fastapi import FastAPI
 
-from app.routes import agent, lead, invoice
+from app.routes import agent, lead, invoice, campaign
 
 app = FastAPI(
     title="LeadConex API"
@@ -10,6 +10,7 @@ app = FastAPI(
 app.include_router(agent.router)
 app.include_router(lead.router)
 app.include_router(invoice.router)
+app.include_router(campaign.router)
 
 
 if __name__ == "__main__":
