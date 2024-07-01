@@ -7,7 +7,7 @@ import app.controllers.agent as agent_controller
 
 from app.db import db
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
-from app.tools import mappings
+from app.tools import mappings, formatters
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
@@ -39,7 +39,7 @@ async def create_agent(agent: AgentModel = Body(...)):
             return {"id": str(agent_in_db_found["_id"])}
     agent.CRM.url = mappings.crm_url_mappings[agent.CRM.name]
     if len(agent.states_with_license) == 1:
-        agent.states_with_license = agent_controller.format_state_list(agent.states_with_license)
+        agent.states_with_license = formatters.format_state_list(agent.states_with_license)
     new_agent = await agent_collection.insert_one(
         agent.model_dump(by_alias=True, exclude=["id"])
     )
