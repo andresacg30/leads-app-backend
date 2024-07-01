@@ -4,6 +4,7 @@ from bson import ObjectId
 from pymongo import ReturnDocument
 
 from app.db import db
+from app.controllers import agent as agent_controller
 
 
 lead_collection = db["lead"]
@@ -36,3 +37,19 @@ async def update_lead(id, lead):
 
     if (existing_lead := await lead_collection.find_one({"_id": id})) is not None:
         return existing_lead
+
+
+async def get_lead_by_field(**kwargs):
+    query = {k: v for k, v in kwargs.items() if v is not None}
+
+    if "buyer_name" in query:
+        try:
+            buyer_id = await agent_controller.get_agent_by_field(full_name=query.pop("buyer_name"))
+            query["buyer_id"] = str(buyer_id["_id"])
+        except agent_controller.AgentNotFoundError as e:
+            raise LeadNotFoundError(str(e))
+    lead = await lead_collection.find_one(query)
+    if not lead:
+        raise LeadNotFoundError("Lead not found with the provided information.")
+
+    return lead

@@ -52,14 +52,11 @@ def format_time(time):
         print(f"Error while formatting time {time}")
 
 
-
 def format_state(state):
     try:
         for formatted_state, state_variations in state_mappings.items():
             if state.lower() in state_variations:
                 return formatted_state
-            else:
-                return ""
     except Exception:
         print(f"Error while formatting state {state}")
 
