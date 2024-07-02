@@ -1,4 +1,3 @@
-from bson import ObjectId
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
 
@@ -87,21 +86,14 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
     Only the provided fields will be updated.
     Any missing or `null` fields will be ignored.
     """
-    agent = {k: v for k, v in agent.model_dump(by_alias=True).items() if v is not None}
+    try:
+        updated_agent = await agent_controller.update_agent(id, agent)
+        return {"id": str(updated_agent["_id"])}
 
-    if len(agent) >= 1:
-        update_result = agent_controller.update_agent(id=id, agent=agent)
-
-        if update_result is not None:
-            return update_result
-
-        else:
-            raise HTTPException(status_code=404, detail=f"Agent {id} not found")
-
-    if (existing_agent := await agent_collection.find_one({"_id": id})) is not None:
-        return {"id": existing_agent['_id']}
-
-    raise HTTPException(status_code=404, detail=f"Agent {id} not found")
+    except agent_controller.AgentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except agent_controller.AgentIdInvalidError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/", response_description="Delete a agent")
@@ -109,7 +101,7 @@ async def delete_agent(id: str):
     """
     Remove a single agent record from the database.
     """
-    delete_result =  agent_controller.delete_agent(id=id)
+    delete_result = await agent_controller.delete_agent(id=id)
 
     if delete_result.deleted_count == 1:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -128,6 +120,8 @@ async def get_agent_id_by_field(
     """
     Get the id for a specific agent, looked up by a specified field.
     """
+    if first_name and not last_name or last_name and not first_name:
+        raise HTTPException(status_code=400, detail="First name and last name must be provided together")
     try:
         agent = await agent_controller.get_agent_by_field(
             email=email, phone_number=phone_number, first_name=first_name, last_name=last_name, full_name=full_name
