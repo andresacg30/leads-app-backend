@@ -1,12 +1,22 @@
+import bson
 import difflib
 
+from bson import ObjectId
+import bson.errors
+from pymongo import ReturnDocument
+
 from app.db import db
+from app.models.agent import AgentModel, UpdateAgentModel
 
 
 agent_collection = db["agent"]
 
 
 class AgentNotFoundError(Exception):
+    pass
+
+
+class AgentIdInvalidError(Exception):
     pass
 
 
@@ -44,9 +54,12 @@ async def get_agent_by_field(**kwargs):
 
 
 async def get_enrolled_campaigns(agent_id):
-    agent = await agent_collection.find_one({"_id": agent_id})
-    enrolled_campaigns = agent['campaigns']
-    return enrolled_campaigns
+    try:
+        agent = await agent_collection.find_one({"_id": ObjectId(agent_id)})
+        enrolled_campaigns = agent['campaigns']
+        return enrolled_campaigns
+    except bson.errors.InvalidId:
+        raise AgentIdInvalidError(f"Invalid id {agent_id} on get enrolled campaigns function / create agent route.")
 
 
 async def update_campaigns_for_agent(agent_id, campaigns):
@@ -54,3 +67,54 @@ async def update_campaigns_for_agent(agent_id, campaigns):
         {"_id": agent_id}, {"$set": {"campaigns": campaigns}}
     )
     return updated_agent
+
+
+async def create_agent(agent: AgentModel):
+    created_agent = await agent_collection.insert_one(
+        agent.model_dump(by_alias=True, exclude=["id"])
+    )
+    return created_agent
+
+
+async def get_all_agents(page, limit):
+    agents = await agent_collection.find().skip((page - 1) * limit).limit(limit).to_list(limit)
+    return agents
+
+
+async def get_agent(id):
+    try:
+        agent_in_db = await agent_collection.find_one({"_id": ObjectId(id)})
+        return agent_in_db
+    except bson.errors.InvalidId:
+        raise AgentIdInvalidError(f"Invalid id {id} on get agent route.")
+
+
+async def update_agent(id, agent: UpdateAgentModel):
+    try:
+        agent = {k: v for k, v in agent.model_dump(by_alias=True).items() if v is not None}
+
+        if len(agent) >= 1:
+            update_result = await agent_collection.find_one_and_update(
+                {"_id": ObjectId(id)},
+                {"$set": agent},
+                return_document=ReturnDocument.AFTER,
+            )
+
+            if update_result is not None:
+                return update_result
+
+            else:
+                raise AgentNotFoundError(f"Agent with id {id} not found")
+
+        if (existing_agent := await agent_collection.find_one({"_id": id})) is not None:
+            return existing_agent
+    except bson.errors.InvalidId:
+        raise AgentIdInvalidError(f"Invalid id {id} on update agent route.")
+
+
+async def delete_agent(id):
+    try:
+        result = await agent_collection.delete_one({"_id": ObjectId(id)})
+        return result
+    except bson.errors.InvalidId:
+        raise AgentIdInvalidError(f"Invalid id {id} on delete agent route.")
