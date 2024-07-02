@@ -1,7 +1,6 @@
 from bson import ObjectId
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
-from pymongo import ReturnDocument
 
 import app.controllers.agent as agent_controller
 
@@ -26,7 +25,7 @@ async def create_agent(agent: AgentModel = Body(...)):
 
     A unique `id` will be created and provided in the response.
     """
-    agent_in_db_found = await agent_controller.get_agent_by_email(agent.email)
+    agent_in_db_found = await agent_controller.get_agent_by_field(email=agent.email)
     if agent_in_db_found:
         agent_in_db_campaigns = await agent_controller.get_enrolled_campaigns(agent_in_db_found['_id'])
         is_duplicate = agent.campaigns[0] in agent_in_db_campaigns
@@ -40,9 +39,7 @@ async def create_agent(agent: AgentModel = Body(...)):
     agent.CRM.url = mappings.crm_url_mappings[agent.CRM.name]
     if len(agent.states_with_license) == 1:
         agent.states_with_license = formatters.format_state_list(agent.states_with_license)
-    new_agent = await agent_collection.insert_one(
-        agent.model_dump(by_alias=True, exclude=["id"])
-    )
+    new_agent = await agent_controller.create_agent(agent=agent)
     return {"id": str(new_agent.inserted_id)}
 
 
@@ -56,7 +53,7 @@ async def list_agents(page: int = 1, limit: int = 10):
     """
     List all of the agent data in the database within the specified page and limit.
     """
-    agents = await agent_collection.find().skip((page - 1) * limit).limit(limit).to_list(limit)
+    agents = await agent_controller.get_all_agents(page=page, limit=limit)
     return AgentCollection(agents=agents)
 
 
@@ -71,7 +68,7 @@ async def show_agent(id: str):
     Get the record for a specific agent, looked up by `id`.
     """
     if (
-        agent := await agent_collection.find_one({"_id": ObjectId(id)})
+        agent := await agent_controller.get_agent(id=id)
     ) is not None:
         return agent
 
@@ -93,11 +90,7 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
     agent = {k: v for k, v in agent.model_dump(by_alias=True).items() if v is not None}
 
     if len(agent) >= 1:
-        update_result = await agent_collection.find_one_and_update(
-            {"_id": ObjectId(id)},
-            {"$set": agent},
-            return_document=ReturnDocument.AFTER,
-        )
+        update_result = agent_controller.update_agent(id=id, agent=agent)
 
         if update_result is not None:
             return update_result
@@ -116,7 +109,7 @@ async def delete_agent(id: str):
     """
     Remove a single agent record from the database.
     """
-    delete_result = await agent_collection.delete_one({"_id": ObjectId(id)})  # make it a controller
+    delete_result =  agent_controller.delete_agent(id=id)
 
     if delete_result.deleted_count == 1:
         return Response(status_code=status.HTTP_204_NO_CONTENT)

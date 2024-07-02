@@ -5,6 +5,7 @@ from pymongo import ReturnDocument
 
 from app.db import db
 from app.controllers import agent as agent_controller
+from app.models import lead
 
 
 lead_collection = db["lead"]
@@ -53,3 +54,29 @@ async def get_lead_by_field(**kwargs):
         raise LeadNotFoundError("Lead not found with the provided information.")
 
     return lead
+
+
+async def create_lead(lead: lead.LeadModel):
+    new_lead = await lead_collection.insert_one(
+        lead.model_dump(by_alias=True, exclude=["id"])
+    )
+    return new_lead
+
+
+async def get_all_leads(page, limit):
+    leads = await lead_collection.find().skip((page - 1) * limit).limit(limit).to_list(limit)
+    return leads
+
+
+async def get_one_lead(id):
+    if (
+        lead := await lead_collection.find_one({"_id": ObjectId(id)})
+    ) is not None:
+        return lead
+
+    raise LeadNotFoundError(f"Lead with id {id} not found")
+
+
+async def delete_lead(id):
+    delete_result = await lead_collection.delete_one({"_id": ObjectId(id)})
+    return delete_result

@@ -29,9 +29,7 @@ async def create_lead(lead: LeadModel = Body(...)):
         if lead.state.lower() in state_variations:
             lead.state = state
             break
-    new_lead = await lead_collection.insert_one(
-        lead.model_dump(by_alias=True, exclude=["id"])
-    )
+    new_lead = await lead_controller.create_lead(lead)
     return {"id": str(new_lead.inserted_id)}
 
 
@@ -45,7 +43,7 @@ async def list_leads(page: int = 1, limit: int = 10):
     """
     List all of the lead data in the database within the specified page and limit.
     """
-    leads = await lead_collection.find().skip((page - 1) * limit).limit(limit).to_list(limit)
+    leads = await lead_controller.get_all_leads(page=page, limit=limit)
     return LeadCollection(leads=leads)
 
 
@@ -59,12 +57,12 @@ async def show_lead(id: str):
     """
     Get the record for a specific lead, looked up by `id`.
     """
-    if (
-        lead := await lead_collection.find_one({"_id": ObjectId(id)})
-    ) is not None:
+    try:
+        lead = await lead_controller.get_one_lead(id)
         return lead
 
-    raise HTTPException(status_code=404, detail=f"Lead {id} not found")
+    except lead_controller.LeadNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.put(
@@ -93,7 +91,7 @@ async def delete_lead(id: str):
     """
     Remove a single lead record from the database.
     """
-    delete_result = await lead_collection.delete_one({"_id": ObjectId(id)})
+    delete_result = await lead_controller.delete_lead(id)
 
     if delete_result.deleted_count == 1:
         return Response(status_code=status.HTTP_204_NO_CONTENT)

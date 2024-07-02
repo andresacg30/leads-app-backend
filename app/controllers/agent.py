@@ -1,6 +1,10 @@
 import difflib
 
+from bson import ObjectId
+from pymongo import ReturnDocument
+
 from app.db import db
+from app.models.agent import AgentModel, UpdateAgentModel
 
 
 agent_collection = db["agent"]
@@ -54,3 +58,34 @@ async def update_campaigns_for_agent(agent_id, campaigns):
         {"_id": agent_id}, {"$set": {"campaigns": campaigns}}
     )
     return updated_agent
+
+
+async def create_agent(agent: AgentModel):
+    created_agent = await agent_collection.insert_one(
+        agent.model_dump(by_alias=True, exclude=["id"])
+    )
+    return created_agent
+
+
+async def get_all_agents(page, limit):
+    agents = await agent_collection.find().skip((page - 1) * limit).limit(limit).to_list(limit)
+    return agents
+
+
+async def get_agent(id):
+    agent_in_db = await agent_collection.find_one({"_id": ObjectId(id)})
+    return agent_in_db
+
+
+async def update_agent(id, agent: UpdateAgentModel):
+    result = await agent_collection.find_one_and_update(
+            {"_id": ObjectId(id)},
+            {"$set": agent},
+            return_document=ReturnDocument.AFTER,
+        )
+    return result
+
+
+async def delete_agent(id):
+    result = await agent_collection.delete_one({"_id": ObjectId(id)})
+    return result

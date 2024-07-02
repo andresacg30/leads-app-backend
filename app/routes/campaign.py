@@ -3,6 +3,8 @@ from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
 from pymongo import ReturnDocument
 
+import app.controllers.campaign as campaign_controller
+
 from app.db import db
 from app.models.campaign import CampaignModel, UpdateCampaignModel, CampaignCollection
 
@@ -23,9 +25,7 @@ async def create_campaign(campaign: CampaignModel = Body(...)):
 
     A unique `id` will be created and provided in the response.
     """
-    new_campaign = await campaign_collection.insert_one(
-        campaign.model_dump(by_alias=True, exclude=["id"])
-    )
+    new_campaign = await campaign_controller.create_campaign(campaign)
     return {"id": str(new_campaign.inserted_id)}
 
 
@@ -39,7 +39,7 @@ async def list_campaigns(page: int = 1, limit: int = 10):
     """
     List all of the campaign data in the database within the specified page and limit.
     """
-    campaigns = await campaign_collection.find().skip((page - 1) * limit).limit(limit).to_list(limit)
+    campaigns = await campaign_controller.get_campaigns(page=page, limit=limit)
     return CampaignCollection(campaigns=campaigns)
 
 
@@ -53,12 +53,12 @@ async def show_campaign(id: str):
     """
     Get the record for a specific campaign, looked up by `id`.
     """
-    if (
-        campaign := await campaign_collection.find_one({"_id": ObjectId(id)})
-    ) is not None:
+    try:
+        campaign = await campaign_controller.get_one_campaign(id)
         return campaign
 
-    raise HTTPException(status_code=404, detail=f"Campaign {id} not found")
+    except campaign_controller.CampaignNotFoundError as e:
+        raise HTTPException(status_code=404, detail=f"Campaign {id} not found")
 
 
 @router.put(
@@ -77,11 +77,7 @@ async def update_campaign(id: str, campaign: UpdateCampaignModel = Body(...)):
     campaign = {k: v for k, v in campaign.model_dump(by_alias=True).items() if v is not None}
 
     if len(campaign) >= 1:
-        update_result = await campaign_collection.find_one_and_update(
-            {"_id": ObjectId(id)},
-            {"$set": campaign},
-            return_document=ReturnDocument.AFTER,
-        )
+        update_result = await campaign_controller.update_campaign(id=id, campaign=campaign)
 
         if update_result is not None:
             return update_result
@@ -100,7 +96,7 @@ async def delete_campaign(id: str):
     """
     Remove a single campaign record from the database.
     """
-    delete_result = await campaign_collection.delete_one({"_id": ObjectId(id)})
+    delete_result = await campaign_controller.delete_campaign(id=id)
 
     if delete_result.deleted_count == 1:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
