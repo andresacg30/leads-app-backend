@@ -50,7 +50,6 @@ async def update_lead(id, lead):
 
 async def get_lead_by_field(**kwargs):
     query = {k: v for k, v in kwargs.items() if v is not None}
-
     if "buyer_name" in query:
         try:
             buyer_id = await agent_controller.get_agent_by_field(full_name=query.pop("buyer_name"))

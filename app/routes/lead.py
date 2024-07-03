@@ -106,12 +106,14 @@ async def delete_lead(id: str):
     response_description="Search lead id by email and/or buyer name",
     response_model_by_alias=False
 )
-async def find_leads(email: str, buyer_name: str = None):
+async def find_leads(
+    email: str, buyer_name: str = None, campaign_id: str = None
+):
     """
     Search for leads by email and/or buyer name.
     """
     try:
-        lead = await lead_controller.get_lead_by_field(email=email, buyer_name=buyer_name)
+        lead = await lead_controller.get_lead_by_field(email=email, buyer_name=buyer_name, campaign_id=campaign_id)
         return {"id": str(lead["_id"])}
 
     except lead_controller.LeadNotFoundError as e:
