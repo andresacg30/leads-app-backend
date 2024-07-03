@@ -7,6 +7,7 @@ from pymongo import ReturnDocument
 from app.db import db
 from app.controllers import agent as agent_controller
 from app.models import lead
+from app.tools import formatters as formatter
 
 
 lead_collection = db["lead"]
@@ -29,6 +30,30 @@ async def update_lead(id, lead):
             lead["second_chance_lead_sold_time"] = datetime.datetime.utcnow()
         if "lead_sold_by_agent_time" in lead:
             lead["lead_sold_by_agent_time"] = datetime.datetime.utcnow()
+        if len(lead) >= 1:
+            update_result = await lead_collection.find_one_and_update(
+                {"_id": ObjectId(id)},
+                {"$set": lead},
+                return_document=ReturnDocument.AFTER,
+            )
+
+            if update_result is not None:
+                return update_result
+
+            else:
+                raise LeadNotFoundError(f"Lead with id {id} not found")
+
+        if (existing_lead := await lead_collection.find_one({"_id": id})) is not None:
+            return existing_lead
+    except bson.errors.InvalidId:
+        raise LeadIdInvalidError(f"Invalid id {id} on update lead route")
+
+
+async def update_lead_from_ghl(id, lead):
+    try:
+        lead = {k: v for k, v in lead.model_dump(by_alias=True).items() if v is not None}
+        if "created_time" in lead:
+            lead["created_time"] = formatter.format_time(lead["created_time"])
         if len(lead) >= 1:
             update_result = await lead_collection.find_one_and_update(
                 {"_id": ObjectId(id)},

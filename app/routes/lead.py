@@ -118,3 +118,26 @@ async def find_leads(
 
     except lead_controller.LeadNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put(
+    "/ghl",
+    response_description="Update a lead",
+    response_model_by_alias=False
+)
+async def update_lead_from_ghl(id: str, lead: UpdateLeadModel = Body(...)):
+    """
+    Update individual fields of an existing lead record.
+
+    Only the provided fields will be updated.
+    Any missing or `null` fields will be ignored.
+    """
+
+    try:
+        updated_lead = await lead_controller.update_lead_from_ghl(id, lead)
+        return {"id": str(updated_lead["_id"])}
+
+    except lead_controller.LeadNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except lead_controller.LeadIdInvalidError as e:
+        raise HTTPException(status_code=400, detail=str(e))
