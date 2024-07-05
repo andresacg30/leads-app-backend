@@ -5,7 +5,7 @@ from fastapi.responses import Response
 import app.controllers.lead as lead_controller
 
 from app.db import db
-from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection, UpdateInvalidLeadModel
+from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
 from app.tools import mappings
 
 
