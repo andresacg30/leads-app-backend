@@ -110,3 +110,20 @@ class LeadCollection(BaseModel):
     This exists because providing a top-level array in a JSON response can be a [vulnerability](https://haacked.com/archive/2009/06/25/json-hijacking.aspx/)
     """
     leads: List[LeadModel]
+
+
+class UpdateInvalidLeadModel(BaseModel):
+    """
+    A model with the ID of the lead to be marked as invalid.
+    """
+    id: PyObjectId = Field(...)
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str},
+        json_schema_extra={
+            "example": {
+                "id": "5f9c0a9e9c6d4b1e9c6d4b1e"
+            }
+        }
+    )

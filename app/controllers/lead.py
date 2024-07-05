@@ -118,3 +118,18 @@ async def delete_lead(id):
         return delete_result
     except bson.errors.InvalidId:
         raise LeadIdInvalidError(f"Invalid id {id} on delete lead route")
+
+
+async def update_invalid_lead(lead_id):
+    try:
+        update_result = await lead_collection.find_one_and_update(
+            {"_id": ObjectId(lead_id)},
+            {"$set": {"custom_fields.invalid": "yes"}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if update_result is not None:
+            return update_result
+        else:
+            raise LeadNotFoundError(f"Lead with id {lead_id} not found")
+    except bson.errors.InvalidId:
+        raise LeadIdInvalidError(f"Invalid id {lead_id} on update invalid lead route")

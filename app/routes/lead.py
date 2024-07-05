@@ -5,7 +5,7 @@ from fastapi.responses import Response
 import app.controllers.lead as lead_controller
 
 from app.db import db
-from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
+from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection, UpdateInvalidLeadModel
 from app.tools import mappings
 
 
@@ -141,3 +141,19 @@ async def update_lead_from_ghl(id: str, lead: UpdateLeadModel = Body(...)):
         raise HTTPException(status_code=404, detail=str(e))
     except lead_controller.LeadIdInvalidError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post(
+    "/update-invalid-lead",
+    response_description="Update invalid lead",
+    response_model_by_alias=False
+)
+async def update_invalid_leads(lead: UpdateInvalidLeadModel = Body(...)):
+    """
+    Update invalid leads.
+    """
+    try:
+        updated_lead = await lead_controller.update_invalid_lead(lead_id=lead.id)
+        return {"message": f"Invalid lead updated: {updated_lead['_id']}"}
+    except lead_controller.LeadNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
