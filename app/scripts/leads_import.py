@@ -3,6 +3,8 @@ import re
 import sys
 import pandas as pd
 
+from pymongo import UpdateOne
+from bson import ObjectId
 from zoneinfo import ZoneInfo
 
 from app.db import db
@@ -17,39 +19,25 @@ sys.path.append('../../app')
 def format_time(time):
     if pd.isna(time):
         return None
-    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", time) or re.fullmatch(r"\d{4}/\d{2}/\d{2}", time) or re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2}", time) or re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", time) or re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}", time) or re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}T\d{2}:\d{2}:\d{2}", time) or re.fullmatch(r"\d{2}-\d{2}-\d{4}T\d{2}:\d{2}:\d{2}.000", time) or re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", time) or re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", time):
-        if re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2}", time):
-            month, day, year = map(int, time.split('/'))
-            year += 2000
-            time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
-        elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", time):
-            month, day, year = map(int, time.split('/'))
-            time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
-        elif re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}", time):
-            month, day, year = map(int, time.split('-'))
-            time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
-        elif re.fullmatch(r"\d{1,2}-\d{1,2}-\d{4}T\d{2}:\d{2}:\d{2}", time):
-            date, time_part = time.split('T')
-            month, day, year = map(int, date.split('-'))
-            time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}.000"
-        elif re.fullmatch(r"\d{2}-\d{2}-\d{4}T\d{2}:\d{2}:\d{2}.000", time):
-            date, time_part = time.split('T')
-            month, day, year = map(int, date.split('-'))
-            time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}"
-        elif re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", time):
-            time = time[:-1]
-        elif re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", time):
-            date, time_part = time.split(' ')
-            day, month, year = map(int, date.split('/'))
-            time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}.000"
+    if re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", time):
+        date, time_part = time.split(' ')
+        month, day, year = map(int, date.split('/'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}.000"
+    elif re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", time):
+        time = f"{time}.000"
+    elif re.fullmatch(r"\d{2}-\d{2}-\d{4}", time):
+        month, day, year = map(int, time.split('-'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
+    elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2,4}", time):
+        month, day, year = map(int, time.split('/'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
     try:
         dt = datetime.datetime.fromisoformat(time)
         est_time = dt.astimezone(ZoneInfo("US/Eastern"))
         utc_time = est_time.astimezone(ZoneInfo("UTC"))
-        formatted_time = utc_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        return formatted_time
-    except Exception:
-        print(f"Error while formatting time {time}")
+        return utc_time
+    except Exception as e:
+        print(f"{e}")
 
 
 def format_state(state):
@@ -75,6 +63,7 @@ def format_custom_fields(row, start_column=12):
 def format_lead(lead):
     custom_fields_dict = format_custom_fields(lead)
     formatted_lead = {}
+    formatted_lead["id"] = ObjectId(lead["_id"])
     formatted_lead['first_name'] = lead["first_name"] if not pd.isna(lead["first_name"]) else ""
     formatted_lead["last_name"] = lead["last_name"] if not pd.isna(lead["last_name"]) else ""
     formatted_lead["email"] = str(lead["email"]).strip() if not pd.isna(lead["email"]) else "noemail@leadconex.com"
@@ -96,9 +85,14 @@ def format_lead(lead):
 
 async def send_to_db(file, db_collection):
     leads = pd.read_csv(file)
-    leads_to_insert = []
+    operations = []
     for _, lead in leads.iterrows():
         formatted_lead = format_lead(lead)
-        leads_to_insert.append(formatted_lead.model_dump(by_alias=True, exclude=["id"]))
-    collection = db[db_collection]
-    await collection.insert_many(leads_to_insert)
+        # leads_to_insert.append(formatted_lead.model_dump(by_alias=True, exclude=["id"]))
+        filter_condition = {"_id": ObjectId(formatted_lead.id)}
+        operations.append(UpdateOne(filter_condition, {"$set": formatted_lead.model_dump(by_alias=True, exclude=["id"])}, upsert=True))
+    try:
+        collection = db[db_collection]
+        await collection.bulk_write(operations)
+    except Exception as e:
+        print(f"Error while sending to db {e}")
