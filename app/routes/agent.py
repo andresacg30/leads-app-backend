@@ -24,7 +24,10 @@ async def create_agent(agent: AgentModel = Body(...)):
 
     A unique `id` will be created and provided in the response.
     """
-    agent_in_db_found = await agent_controller.get_agent_by_field(email=agent.email)
+    try:
+        agent_in_db_found = await agent_controller.get_agent_by_field(email=agent.email)
+    except agent_controller.AgentNotFoundError:
+        agent_in_db_found = None
     if agent_in_db_found:
         agent_in_db_campaigns = await agent_controller.get_enrolled_campaigns(agent_in_db_found['_id'])
         is_duplicate = agent.campaigns[0] in agent_in_db_campaigns
