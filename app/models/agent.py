@@ -62,6 +62,7 @@ class AgentModel(BaseModel):
     created_time: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     campaigns: List[PyObjectId] = Field(default_factory=list)
     credentials: AgentCredentials = Field(default_factory=AgentCredentials)
+    custom_fields: Optional[dict] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -84,7 +85,8 @@ class AgentModel(BaseModel):
                     "username": "value1",
                     "password": "value2"
                 },
-                "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e"]
+                "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e"],
+                "custom_fields": {}
             }
         }
     )
@@ -103,6 +105,7 @@ class UpdateAgentModel(BaseModel):
     creation_time: Optional[datetime.datetime] = None
     campaigns: Optional[List[PyObjectId]] = None
     credentials: Optional[AgentCredentials] = None
+    custom_fields: Optional[dict] = None
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -127,7 +130,8 @@ class UpdateAgentModel(BaseModel):
                     "username": "value1",
                     "password": "value2"
                 },
-                "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e", "324sddsds"]
+                "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e", "324sddsds"],
+                "custom_fields": {}
             }
         }
     )
