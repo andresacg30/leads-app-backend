@@ -63,14 +63,13 @@ def format_custom_fields(row, start_column=12):
 def format_lead(lead):
     custom_fields_dict = format_custom_fields(lead)
     formatted_lead = {}
-    formatted_lead["id"] = ObjectId(lead["_id"])
     formatted_lead['first_name'] = lead["first_name"] if not pd.isna(lead["first_name"]) else ""
     formatted_lead["last_name"] = lead["last_name"] if not pd.isna(lead["last_name"]) else ""
     formatted_lead["email"] = str(lead["email"]).strip() if not pd.isna(lead["email"]) else "noemail@leadconex.com"
     formatted_lead["phone"] = str(lead["phone"]) if not pd.isna(lead["phone"]) else ""
     formatted_lead["created_time"] = format_time(lead["created_time"])
     formatted_lead["campaign_id"] = lead["campaign_id"]
-    formatted_lead["state"] = format_state(lead["state"]) if not pd.isna(lead["state"]) else ""
+    formatted_lead["state"] = format_state(lead["state"].lstrip().rstrip()) if not pd.isna(lead["state"]) else ""
     formatted_lead["custom_fields"] = custom_fields_dict
     formatted_lead["origin"] = "facebook"
     if not pd.isna(lead["buyer_id"]) :
@@ -79,20 +78,23 @@ def format_lead(lead):
     if not pd.isna(lead["second_chance_buyer_id"]):
         formatted_lead["second_chance_buyer_id"] = PyObjectId(str(lead["second_chance_buyer_id"]))
         formatted_lead["second_chance_lead_sold_time"] = format_time(lead["second_chance_lead_sold_time"])
-    lead = LeadModel(**formatted_lead)
+    try:
+        lead = LeadModel(**formatted_lead)
+    except Exception as e:
+        raise Exception(f"Error while formatting lead {formatted_lead.get('email')}")
     return lead
 
 
 async def send_to_db(file, db_collection):
     leads = pd.read_csv(file)
-    operations = []
+    leads_to_insert = []
     for _, lead in leads.iterrows():
         formatted_lead = format_lead(lead)
-        # leads_to_insert.append(formatted_lead.model_dump(by_alias=True, exclude=["id"]))
-        filter_condition = {"_id": ObjectId(formatted_lead.id)}
-        operations.append(UpdateOne(filter_condition, {"$set": formatted_lead.model_dump(by_alias=True, exclude=["id"])}, upsert=True))
+        leads_to_insert.append(formatted_lead.model_dump(by_alias=True, exclude=["id"]))
+        #filter_condition = {"_id": ObjectId(formatted_lead.id)}
+        #operations.append(UpdateOne(filter_condition, {"$set": formatted_lead.model_dump(by_alias=True, exclude=["id"])}, upsert=True))
     try:
         collection = db[db_collection]
-        await collection.bulk_write(operations)
+        await collection.insert_many(leads_to_insert)
     except Exception as e:
         print(f"Error while sending to db {e}")
