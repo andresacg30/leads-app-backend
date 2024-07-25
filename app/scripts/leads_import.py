@@ -46,9 +46,21 @@ def format_sold_time(time):
     if re.fullmatch(r"\d{2}-\d{2}-\d{4}", time):
         month, day, year = map(int, time.split('-'))
         time = f"{year:04d}-{month:02d}-{day:02d}T04:00:00.000"
+    elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", time):
+        year, month, day = map(int, time.split('-'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T04:00:00.000"
     elif re.fullmatch(r"\d{2}/\d{2}/\d{4}", time):
         month, day, year = map(int, time.split('/'))
         time = f"{year:04d}-{month:02d}-{day:02d}T04:00:00.000"
+    elif re.fullmatch(r"\d{4}/\d{2}/\d{2}", time):
+        year, month, day = map(int, time.split('/'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T04:00:00.000"
+    elif re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z", time):
+        time = time[:-1]
+    elif re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", time):
+        date, time_part = time.split(' ')
+        day, month, year = map(int, date.split('/'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}.000"
     return time
 
 
