@@ -16,7 +16,7 @@ from app.models.agent import PyObjectId
 sys.path.append('../../app')
 
 
-def format_time(time):
+def format_created_time(time):
     if pd.isna(time):
         return None
     if re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", time):
@@ -27,10 +27,10 @@ def format_time(time):
         time = time[:-1]
     elif re.fullmatch(r"\d{2}-\d{2}-\d{4}", time):
         month, day, year = map(int, time.split('-'))
-        time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
+        time = f"{year:04d}-{month:02d}-{day:02d}T04:00:00.000"
     elif re.fullmatch(r"\d{2}/\d{2}/\d{4}", time):
         month, day, year = map(int, time.split('/'))
-        time = f"{year:04d}-{month:02d}-{day:02d}T00:00:00.000"
+        time = f"{year:04d}-{month:02d}-{day:02d}T04:00:00.000"
     try:
         dt = datetime.datetime.fromisoformat(time)
         est_time = dt.astimezone(ZoneInfo("US/Eastern"))
@@ -38,6 +38,18 @@ def format_time(time):
         return utc_time
     except Exception as e:
         print(f"{e}")
+
+
+def format_sold_time(time):
+    if pd.isna(time):
+        return None
+    if re.fullmatch(r"\d{2}-\d{2}-\d{4}", time):
+        month, day, year = map(int, time.split('-'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T04:00:00.000"
+    elif re.fullmatch(r"\d{2}/\d{2}/\d{4}", time):
+        month, day, year = map(int, time.split('/'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T04:00:00.000"
+    return time
 
 
 def format_state(state):
@@ -67,21 +79,21 @@ def format_lead(lead):
     formatted_lead["last_name"] = lead["last_name"] if not pd.isna(lead["last_name"]) else ""
     formatted_lead["email"] = str(lead["email"]).strip() if not pd.isna(lead["email"]) else "noemail@leadconex.com"
     formatted_lead["phone"] = str(lead["phone"]) if not pd.isna(lead["phone"]) else ""
-    formatted_lead["created_time"] = format_time(lead["created_time"])
+    formatted_lead["created_time"] = format_created_time(lead["created_time"])
     formatted_lead["campaign_id"] = lead["campaign_id"]
     formatted_lead["state"] = format_state(lead["state"].lstrip().rstrip()) if not pd.isna(lead["state"]) else ""
     formatted_lead["custom_fields"] = custom_fields_dict
     formatted_lead["origin"] = "facebook"
     if not pd.isna(lead["buyer_id"]) :
         formatted_lead["buyer_id"] = PyObjectId(str(lead["buyer_id"]))
-        formatted_lead["lead_sold_time"] = format_time(lead["lead_sold_time"])
+        formatted_lead["lead_sold_time"] = format_sold_time(lead["lead_sold_time"])
     if not pd.isna(lead["second_chance_buyer_id"]):
         formatted_lead["second_chance_buyer_id"] = PyObjectId(str(lead["second_chance_buyer_id"]))
-        formatted_lead["second_chance_lead_sold_time"] = format_time(lead["second_chance_lead_sold_time"])
+        formatted_lead["second_chance_lead_sold_time"] = format_sold_time(lead["second_chance_lead_sold_time"])
     try:
         lead = LeadModel(**formatted_lead)
     except Exception as e:
-        raise Exception(f"Error while formatting lead {formatted_lead.get('email')}")
+        raise Exception(f"Error while formatting lead {formatted_lead.get('email')}, error {e}")
     return lead
 
 
