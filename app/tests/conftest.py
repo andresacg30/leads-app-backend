@@ -20,7 +20,9 @@ def override_get_settings():
 @pytest.fixture(scope="module")
 def test_client():
     app.dependency_overrides[get_settings] = override_get_settings
-    Database.initialize(test_settings)
+    db = Database
+    db.initialize(test_settings)
     client = TestClient(app)
     yield client
     app.dependency_overrides = {}
+    db.client.close()

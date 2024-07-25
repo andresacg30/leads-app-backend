@@ -2,7 +2,7 @@ def test_create_agent(test_client):
     agent = {
                 "first_name": "Jane",
                 "last_name": "Doe",
-                "email": "janedoec@example.com",
+                "email": "janedodc@example.com",
                 "phone": "555-555-5555",
                 "states_with_license": ["CA", "NY"],
                 "CRM": {
