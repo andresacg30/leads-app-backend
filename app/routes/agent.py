@@ -3,13 +3,11 @@ from fastapi.responses import Response
 
 import app.controllers.agent as agent_controller
 
-from app.db import db
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
 from app.tools import mappings, formatters
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
-agent_collection = db["agent"]
 
 
 @router.post(

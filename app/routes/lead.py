@@ -1,16 +1,13 @@
-from bson import ObjectId
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
 
 import app.controllers.lead as lead_controller
 
-from app.db import db
 from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
 from app.tools import mappings
 
 
 router = APIRouter(prefix="/api/lead", tags=["lead"])
-lead_collection = db["lead"]
 
 
 @router.post(

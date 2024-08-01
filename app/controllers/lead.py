@@ -3,14 +3,18 @@ import datetime
 
 from bson import ObjectId
 from pymongo import ReturnDocument
+from motor.core import AgnosticCollection
 
-from app.db import db
+
+from app.db import Database
 from app.controllers import agent as agent_controller
 from app.models import lead
 from app.tools import formatters as formatter
 
 
-lead_collection = db["lead"]
+def get_lead_collection() -> AgnosticCollection:
+    db = Database.get_db()
+    return db["lead"]
 
 
 class LeadNotFoundError(Exception):
@@ -22,6 +26,7 @@ class LeadIdInvalidError(Exception):
 
 
 async def update_lead(id, lead):
+    lead_collection = get_lead_collection()
     try:
         lead = {k: v for k, v in lead.model_dump(by_alias=True).items() if v is not None}
         if "buyer_id" in lead:
@@ -50,6 +55,7 @@ async def update_lead(id, lead):
 
 
 async def update_lead_from_ghl(id, lead):
+    lead_collection = get_lead_collection()
     try:
         lead = {k: v for k, v in lead.model_dump(by_alias=True).items() if v is not None}
         if "created_time" in lead:
@@ -74,6 +80,7 @@ async def update_lead_from_ghl(id, lead):
 
 
 async def get_lead_by_field(**kwargs):
+    lead_collection = get_lead_collection()
     query = {k: v for k, v in kwargs.items() if v is not None}
     if "buyer_name" in query:
         try:
@@ -89,6 +96,7 @@ async def get_lead_by_field(**kwargs):
 
 
 async def create_lead(lead: lead.LeadModel):
+    lead_collection = get_lead_collection()
     new_lead = await lead_collection.insert_one(
         lead.model_dump(by_alias=True, exclude=["id"])
     )
@@ -96,11 +104,13 @@ async def create_lead(lead: lead.LeadModel):
 
 
 async def get_all_leads(page, limit):
+    lead_collection = get_lead_collection()
     leads = await lead_collection.find().skip((page - 1) * limit).limit(limit).to_list(limit)
     return leads
 
 
 async def get_one_lead(id):
+    lead_collection = get_lead_collection()
     try:
         if (
             lead := await lead_collection.find_one({"_id": ObjectId(id)})
@@ -113,6 +123,7 @@ async def get_one_lead(id):
 
 
 async def delete_lead(id):
+    lead_collection = get_lead_collection()
     try:
         delete_result = await lead_collection.delete_one({"_id": ObjectId(id)})
         return delete_result

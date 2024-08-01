@@ -1,28 +1,22 @@
 import pytest
 from fastapi.testclient import TestClient
 from main import app
-from settings import get_settings, Settings
 from app.db import Database
 
 
-class TestSettings(Settings):
-    environment: str = "test"
-    mongodb_url: str = "mongodb://localhost:27017"
+class TestSettings:
+    testing: bool = True
+    mongodb_name: str = "test_db"
 
 
 test_settings = TestSettings()
 
 
-def override_get_settings():
-    return test_settings
-
-
 @pytest.fixture(scope="module")
 def test_client():
-    app.dependency_overrides[get_settings] = override_get_settings
-    db = Database
-    db.initialize(test_settings)
+    Database._instance = None
+    Database(settings=test_settings)
     client = TestClient(app)
     yield client
     app.dependency_overrides = {}
-    db.client.close()
+    Database._instance.client.close()
