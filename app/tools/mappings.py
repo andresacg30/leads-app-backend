@@ -57,5 +57,6 @@ state_mappings = {
     "North Dakota": ["north dakota", "north_dakota", "nd"],
     "Arkansas": ["arkansas", "ar"],
     "Idaho": ["idaho", "id"],
-    "South Dakota": ["south dakota", "south_dakota", "sd"]
+    "South Dakota": ["south dakota", "south_dakota", "sd"],
+    "District of Columbia": ["district of columbia", "district_of_columbia", "dc"]
     }

@@ -19,9 +19,13 @@ sys.path.append('../../app')
 def format_created_time(time):
     if pd.isna(time):
         return None
-    if re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}", time):
+    if re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{1,2}:\d{2}:\d{2}", time):
         date, time_part = time.split(' ')
-        month, day, year = map(int, date.split('/'))
+        hour, minute, second = map(str, time_part.split(':'))
+        if len(hour) == 1:
+            hour = f"0{hour}"
+        time_part = f"{hour}:{minute}:{second}"
+        day, month, year = map(int, date.split('/'))
         time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}.000"
     elif re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z", time):
         time = time[:-1]
@@ -31,6 +35,17 @@ def format_created_time(time):
     elif re.fullmatch(r"\d{2}/\d{2}/\d{4}", time):
         month, day, year = map(int, time.split('/'))
         time = f"{year:04d}-{month:02d}-{day:02d}T04:00:00.000"
+    elif re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{1,2}:\d{2}:\d{2}.\d{3}", time):
+        date_part, time_part = time.split('T')
+        hour, minute, second = map(str, time_part.split(':'))
+        if len(hour) == 1:
+            hour = f"0{hour}"
+        time_part = f"{hour}:{minute}:{second}"
+        year, day, month = map(int, date_part.split('-'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}"
+        dt = datetime.datetime.fromisoformat(time)
+        est_time = dt.astimezone(ZoneInfo("US/Eastern"))
+        time = est_time.astimezone(ZoneInfo("UTC"))
     try:
         dt = datetime.datetime.fromisoformat(time)
         est_time = dt.astimezone(ZoneInfo("US/Eastern"))
