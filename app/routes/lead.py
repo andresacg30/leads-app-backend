@@ -80,7 +80,8 @@ async def update_lead(id: str, lead: UpdateLeadModel = Body(...)):
     """
 
     try:
-        lead.email = lead.email.lower()
+        if lead.email:
+            lead.email = lead.email.lower()
         updated_lead = await lead_controller.update_lead(id, lead)
         return {"id": str(updated_lead["_id"])}
 
@@ -115,7 +116,8 @@ async def find_leads(
     Search for leads by email and/or buyer name.
     """
     try:
-        email = email.lower()
+        if email:
+            email = email.lower()
         lead = await lead_controller.get_lead_by_field(email=email, buyer_name=buyer_name, campaign_id=campaign_id)
         return {"id": str(lead["_id"])}
 
