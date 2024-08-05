@@ -139,7 +139,8 @@ async def update_lead_from_ghl(id: str, lead: UpdateLeadModel = Body(...)):
     """
 
     try:
-        lead.email = lead.email.lower()
+        if lead.email:
+            lead.email = lead.email.lower()
         updated_lead = await lead_controller.update_lead_from_ghl(id, lead)
         return {"id": str(updated_lead["_id"])}
 
