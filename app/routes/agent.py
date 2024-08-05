@@ -91,7 +91,8 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
     Any missing or `null` fields will be ignored.
     """
     try:
-        agent.email = agent.email.lower()
+        if agent.email:
+            agent.email = agent.email.lower()
         updated_agent = await agent_controller.update_agent(id, agent)
         return {"id": str(updated_agent["_id"])}
 
@@ -128,7 +129,8 @@ async def get_agent_id_by_field(
     if first_name and not last_name or last_name and not first_name:
         raise HTTPException(status_code=400, detail="First name and last name must be provided together")
     try:
-        email = email.lower()
+        if email:
+            email = email.lower()
         agent = await agent_controller.get_agent_by_field(
             email=email, phone_number=phone_number, first_name=first_name, last_name=last_name, full_name=full_name
         )
