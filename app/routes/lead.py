@@ -29,6 +29,7 @@ async def create_lead(lead: LeadModel = Body(...)):
         if lead.state.lower() in state_variations:
             lead.state = state
             break
+    lead.email = lead.email.lower()
     new_lead = await lead_controller.create_lead(lead)
     return {"id": str(new_lead.inserted_id)}
 
@@ -79,6 +80,7 @@ async def update_lead(id: str, lead: UpdateLeadModel = Body(...)):
     """
 
     try:
+        lead.email = lead.email.lower()
         updated_lead = await lead_controller.update_lead(id, lead)
         return {"id": str(updated_lead["_id"])}
 
@@ -113,6 +115,7 @@ async def find_leads(
     Search for leads by email and/or buyer name.
     """
     try:
+        email = email.lower()
         lead = await lead_controller.get_lead_by_field(email=email, buyer_name=buyer_name, campaign_id=campaign_id)
         return {"id": str(lead["_id"])}
 
@@ -134,6 +137,7 @@ async def update_lead_from_ghl(id: str, lead: UpdateLeadModel = Body(...)):
     """
 
     try:
+        lead.email = lead.email.lower()
         updated_lead = await lead_controller.update_lead_from_ghl(id, lead)
         return {"id": str(updated_lead["_id"])}
 

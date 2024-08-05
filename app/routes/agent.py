@@ -41,6 +41,7 @@ async def create_agent(agent: AgentModel = Body(...)):
     agent.CRM.url = mappings.crm_url_mappings[agent.CRM.name]
     if len(agent.states_with_license) == 1:
         agent.states_with_license = formatters.format_state_list(agent.states_with_license)
+    agent.email = agent.email.lower()
     new_agent = await agent_controller.create_agent(agent=agent)
     return {"id": str(new_agent.inserted_id)}
 
@@ -90,6 +91,7 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
     Any missing or `null` fields will be ignored.
     """
     try:
+        agent.email = agent.email.lower()
         updated_agent = await agent_controller.update_agent(id, agent)
         return {"id": str(updated_agent["_id"])}
 
@@ -126,6 +128,7 @@ async def get_agent_id_by_field(
     if first_name and not last_name or last_name and not first_name:
         raise HTTPException(status_code=400, detail="First name and last name must be provided together")
     try:
+        email = email.lower()
         agent = await agent_controller.get_agent_by_field(
             email=email, phone_number=phone_number, first_name=first_name, last_name=last_name, full_name=full_name
         )
