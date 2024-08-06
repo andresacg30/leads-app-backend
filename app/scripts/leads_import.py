@@ -46,6 +46,19 @@ def format_created_time(time):
         dt = datetime.datetime.fromisoformat(time)
         est_time = dt.astimezone(ZoneInfo("US/Eastern"))
         time = est_time.astimezone(ZoneInfo("UTC"))
+    elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4} \d{2}:\d{2}", time):
+        date, time_part = time.split(' ')
+        day, month, year = map(int, date.split('/'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}:00.000"
+    elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2} \d{2}:\d{2}", time):
+        date, time_part = time.split(' ')
+        day, month, year = map(int, date.split('/'))
+        time = f"20{year:02d}-{month:02d}-{day:02d}T{time_part}:00.000"
+    elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2} \d{1}:\d{2}", time):
+        date, time_part = time.split(' ')
+        hour, minute = map(str, time_part.split(':'))
+        day, month, year = map(int, date.split('/'))
+        time = f"20{year:02d}-{month:02d}-{day:02d}T0{hour}:{minute}:00.000"
     try:
         dt = datetime.datetime.fromisoformat(time)
         est_time = dt.astimezone(ZoneInfo("US/Eastern"))
@@ -76,6 +89,31 @@ def format_sold_time(time):
         date, time_part = time.split(' ')
         day, month, year = map(int, date.split('/'))
         time = f"{year:04d}-{month:02d}-{day:02d}T{time_part}.000"
+    elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{4}", time):
+        month, day, year = map(int, time.split('/'))
+        time = f"{year:04d}-{month:02d}-{day:02d}T04:00.000"
+    elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2}", time):
+        month, day, year = map(int, time.split('/'))
+        time = f"20{year:02d}-{month:02d}-{day:02d}T04:00:00.000"
+    elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2} \d{2}:\d{2}", time):
+        date, time_part = time.split(' ')
+        month, day, year = map(int, date.split('/'))
+        if month > 12:
+            print("")
+        time = f"20{year:02d}-{month:02d}-{day:02d}T{time_part}:00.000"
+        dt = datetime.datetime.fromisoformat(time)
+        est_time = dt.astimezone(ZoneInfo("US/Eastern"))
+        time = est_time.astimezone(ZoneInfo("UTC"))
+    elif re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2} \d{1}:\d{2}", time):
+        date, time_part = time.split(' ')
+        hour, minute = map(str, time_part.split(':'))
+        month, day, year = map(int, date.split('/'))
+        if month > 12:
+            print("")
+        time = f"20{year:02d}-{month:02d}-{day:02d}T0{hour}:{minute}:00.000"
+        dt = datetime.datetime.fromisoformat(time)
+        est_time = dt.astimezone(ZoneInfo("US/Eastern"))
+        time = est_time.astimezone(ZoneInfo("UTC"))
     return time
 
 
@@ -113,10 +151,10 @@ def format_lead(lead):
     formatted_lead["origin"] = "facebook"
     if not pd.isna(lead["buyer_id"]) :
         formatted_lead["buyer_id"] = PyObjectId(str(lead["buyer_id"]))
-        formatted_lead["lead_sold_time"] = format_sold_time(lead["lead_sold_time"])
+        formatted_lead["lead_sold_time"] = format_sold_time(lead["lead_sold_time"]) if not pd.isna(lead["lead_sold_time"]) else None
     if not pd.isna(lead["second_chance_buyer_id"]):
         formatted_lead["second_chance_buyer_id"] = PyObjectId(str(lead["second_chance_buyer_id"]))
-        formatted_lead["second_chance_lead_sold_time"] = format_sold_time(lead["second_chance_lead_sold_time"])
+        formatted_lead["second_chance_lead_sold_time"] = format_sold_time(lead["second_chance_lead_sold_time"]) if not pd.isna(lead["second_chance_lead_sold_time"]) else None
     try:
         lead = LeadModel(**formatted_lead)
     except Exception as e:
