@@ -3,6 +3,8 @@ from fastapi.testclient import TestClient
 from main import app
 from app.db import Database
 
+from .fixtures import *  # noqa
+
 
 class TestSettings:
     testing: bool = True
