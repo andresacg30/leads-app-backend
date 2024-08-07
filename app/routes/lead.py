@@ -63,7 +63,7 @@ async def show_lead(id: str):
 
 
 @router.put(
-    "/",
+    "/{id}",
     response_description="Update a lead",
     response_model_by_alias=False
 )

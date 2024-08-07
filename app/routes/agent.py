@@ -76,7 +76,7 @@ async def show_agent(id: str):
 
 
 @router.put(
-    "/",
+    "/{id}",
     response_description="Update a agent",
     response_model_by_alias=False
 )
@@ -95,9 +95,11 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
         raise HTTPException(status_code=404, detail=str(e))
     except agent_controller.AgentIdInvalidError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except agent_controller.EmptyAgentError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/", response_description="Delete a agent")
+@router.delete("/{id}", response_description="Delete a agent")
 async def delete_agent(id: str):
     """
     Remove a single agent record from the database.

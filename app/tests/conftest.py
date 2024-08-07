@@ -20,5 +20,4 @@ def test_client():
     Database(settings=test_settings)
     client = TestClient(app)
     yield client
-    app.dependency_overrides = {}
     Database._instance.client.close()

@@ -15,3 +15,8 @@ def format_time(time: datetime.datetime):
         return formatted_time
     except Exception as e:
         print(f"{e}")
+
+
+def format_string_to_datetime(date):
+    formatted_date = datetime.datetime.strptime(date, "%m/%d/%Y")
+    return formatted_date
