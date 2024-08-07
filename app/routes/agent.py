@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body, status, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 
 import app.controllers.agent as agent_controller
 
@@ -52,11 +52,13 @@ async def create_agent(agent: AgentModel = Body(...)):
     response_model=AgentCollection,
     response_model_by_alias=False
 )
-async def list_agents(page: int = 1, limit: int = 10):
+async def list_agents(response: Response, page: int = 1, limit: int = 10, sort: str = "created_time" , filter: str = None):
     """
     List all of the agent data in the database within the specified page and limit.
     """
-    agents = await agent_controller.get_all_agents(page=page, limit=limit)
+    filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
+    agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter)
+    response.headers["X-Total-Count"] = str(total)
     return AgentCollection(agents=agents)
 
 
