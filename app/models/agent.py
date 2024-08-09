@@ -1,8 +1,9 @@
 import datetime
+import math
 from bson import ObjectId
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator, validator
 from pydantic.functional_validators import BeforeValidator
-from typing import List, Optional, Annotated
+from typing import List, Optional, Annotated, Dict, Any
 
 
 PyObjectId = Annotated[str, BeforeValidator(str)]
@@ -12,9 +13,20 @@ class CRMModel(BaseModel):
     """
     Container for a single CRM record.
     """
-    name: str = Field(...)
-    url: str = Field(...)
-    integration_details: Optional[dict] = Field(default=None)
+    name: Optional[str] = Field(default=None)
+    url: Optional[str] = Field(default=None)
+    integration_details: Optional[Dict[str, Any]] = Field(default=None)
+
+    @root_validator(pre=True)
+    def replace_invalid_with_empty_string(cls, values):
+        integration_details = values.get('integration_details', {})
+        if isinstance(integration_details, dict):
+            for key, value in integration_details.items():
+                if isinstance(value, float) and math.isnan(value):
+                    integration_details[key] = ""
+        values['integration_details'] = integration_details
+        return values
+
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -63,6 +75,13 @@ class AgentModel(BaseModel):
     campaigns: List[PyObjectId] = Field(default_factory=list)
     credentials: AgentCredentials = Field(default_factory=AgentCredentials)
     custom_fields: Optional[dict] = Field(default=None)
+
+    @validator('phone', pre=True, always=True)
+    def ensure_phone_is_str(cls, v):
+        if isinstance(v, int):
+            return str(v)
+        return v
+
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -143,4 +162,4 @@ class AgentCollection(BaseModel):
 
     This exists because providing a top-level array in a JSON response can be a [vulnerability](https://haacked.com/archive/2009/06/25/json-hijacking.aspx/)
     """
-    agents: List[AgentModel]
+    data: List[AgentModel]

@@ -1,12 +1,13 @@
 IMAGE_NAME = leads_app
 CONTAINER_NAME = leads_app_container
 PORT = 80
+ENV_FILE = .env
 
 build:
 	docker build -t $(IMAGE_NAME) .
 
 run:
-	docker run -d -p $(PORT):80 --name $(CONTAINER_NAME) $(IMAGE_NAME)
+	docker run -d -p $(PORT):8000 --env-file $(ENV_FILE) --name $(CONTAINER_NAME) $(IMAGE_NAME)
 
 stop:
 	docker stop $(CONTAINER_NAME)

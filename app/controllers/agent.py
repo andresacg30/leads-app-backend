@@ -77,7 +77,9 @@ async def create_agent(agent: AgentModel):
 
 
 async def get_all_agents(page, limit, sort, filter):
-    agents = await agent_collection.find(filter).sort(sort).skip((page - 1) * limit).limit(limit).to_list(limit)
+    field, order = sort
+    sort_dict = {field: order}
+    agents = await agent_collection.find(filter).sort(sort_dict).skip((page - 1) * limit).limit(limit).to_list(limit)
     total = await agent_collection.count_documents({})
     return agents, total
 

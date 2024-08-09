@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Body, status, HTTPException
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import Response
+from typing import List
 
 import app.controllers.agent as agent_controller
 
@@ -49,18 +50,19 @@ async def create_agent(agent: AgentModel = Body(...)):
 @router.get(
     "/",
     response_description="Get all agents",
-    response_model=AgentCollection,
     response_model_by_alias=False
 )
-async def list_agents(response: Response, page: int = 1, limit: int = 10, sort: str = "created_time" , filter: str = None):
+async def list_agents(page: int = 1, limit: int = 10, sort: str = "created_time=1" , filter: str = None):
     """
     List all of the agent data in the database within the specified page and limit.
     """
-    filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
-    agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter)
-    response.headers["X-Total-Count"] = str(total)
-    return AgentCollection(agents=agents)
-
+    try:
+        filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
+        sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
+        agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter)
+        return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data), "total": total}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get(
     "/{id}",
