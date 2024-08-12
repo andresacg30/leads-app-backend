@@ -9,18 +9,17 @@ from app.routes import agent, lead, invoice, campaign
 app = FastAPI(
     title="LeadConex API"
 )
-app.include_router(agent.router)
-app.include_router(lead.router)
-app.include_router(invoice.router)
-app.include_router(campaign.router)
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # List of allowed origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(agent.router)
+app.include_router(lead.router)
+app.include_router(invoice.router)
+app.include_router(campaign.router)
 
 
 if __name__ == "__main__":

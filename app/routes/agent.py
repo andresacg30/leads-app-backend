@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
-from typing import List
 
 import app.controllers.agent as agent_controller
 
@@ -64,6 +63,7 @@ async def list_agents(page: int = 1, limit: int = 10, sort: str = "created_time=
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @router.get(
     "/{id}",
     response_description="Get a single agent",
@@ -83,7 +83,7 @@ async def show_agent(id: str):
 
 
 @router.put(
-    "/",
+    "/{id}",
     response_description="Update a agent",
     response_model_by_alias=False
 )
@@ -106,7 +106,7 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/", response_description="Delete a agent")
+@router.delete("/{id}", response_description="Delete a agent")
 async def delete_agent(id: str):
     """
     Remove a single agent record from the database.
@@ -141,3 +141,6 @@ async def get_agent_id_by_field(
         return {"id": str(agent["_id"])}
     except agent_controller.AgentNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+
