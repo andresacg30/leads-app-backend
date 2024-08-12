@@ -2,6 +2,7 @@ import pytest
 
 from app.models.agent import AgentModel
 from app.controllers.agent import get_agent_collection
+from app.controllers.lead import get_lead_collection
 
 
 @pytest.fixture
@@ -14,6 +15,18 @@ async def agent_factory():
         return inserted_agent
 
     yield create_agent
+
+
+@pytest.fixture
+async def lead_factory():
+    collection = get_lead_collection()
+
+    async def create_lead(**kwargs):
+        lead = AgentModel(**kwargs)
+        inserted_lead = await collection.insert_one(lead.model_dump(by_alias=True, exclude={"id"}))
+        return inserted_lead
+
+    yield create_lead
 
 
 @pytest.fixture(autouse=True)

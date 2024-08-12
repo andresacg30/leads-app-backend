@@ -135,3 +135,24 @@ async def test__delete_agent_route__returns_404_not_found__when_agent_does_not_e
     invalid_object_id = fake.hexify(text='^' * 24)
     response = test_client.delete(f"/api/agent/{invalid_object_id}")
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize("field", ["email", "phone", "full_name"])
+async def test__get_agent_id_by_field_route__returns_200_ok__when_agent_field_exists_in_database(agent_fixture, agent_factory, test_client, field):
+    agent = agent_fixture
+    inserted_agent = await agent_factory(**agent)
+    response = test_client.get(f"/api/agent/find/?{field}={agent[field]}")
+    assert response.status_code == 200
+    assert response.json()['id'] == str(inserted_agent.inserted_id)
+
+
+async def test__get_agent_id_by_field_route__returns_404_not_found__when_agent_field_does_not_exist_in_database(test_client):
+    response = test_client.get(f"/api/agent/find/?email={fake.email()}")
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("field", ["first_name", "last_name"])
+async def test__get_agent_id_by_field_route__returns_400__when_sending_only_first_or_last_name_by_itself(test_client, field):
+    response = test_client.get(f"/api/agent/find/?{field}={fake.name()}")
+    assert response.status_code == 400
+    assert response.json()['detail'] == "First name and last name must be provided together"

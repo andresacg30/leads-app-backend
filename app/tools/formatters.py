@@ -4,7 +4,10 @@ from zoneinfo import ZoneInfo
 
 
 def format_state_list(states):
-    state_list = states[0].split(', ')
+    if "," in states[0]:
+        state_list = states[0].split(', ')
+    else:
+        state_list = [states]
     return state_list
 
 

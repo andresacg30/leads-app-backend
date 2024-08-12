@@ -1,2 +1,2 @@
 from .factories import *  # noqa
-from .agent import *  # noqa
+from .models import *  # noqa
