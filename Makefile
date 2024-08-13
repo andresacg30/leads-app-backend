@@ -20,3 +20,7 @@ logs:
 
 clean:
 	docker rmi $(IMAGE_NAME)
+
+cov:
+	pytest --cov
+	rm .coverage

@@ -1,16 +1,12 @@
-from bson import ObjectId
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
-from pymongo import ReturnDocument
 
 import app.controllers.campaign as campaign_controller
 
-from app.db import db
 from app.models.campaign import CampaignModel, UpdateCampaignModel, CampaignCollection
 
 
 router = APIRouter(prefix="/api/campaign", tags=["campaign"])
-campaign_collection = db["campaign"]
 
 
 @router.post(
@@ -57,7 +53,7 @@ async def show_campaign(id: str):
         campaign = await campaign_controller.get_one_campaign(id)
         return campaign
 
-    except campaign_controller.CampaignNotFoundError as e:
+    except campaign_controller.CampaignNotFoundError:
         raise HTTPException(status_code=404, detail=f"Campaign {id} not found")
 
 
@@ -74,21 +70,14 @@ async def update_campaign(id: str, campaign: UpdateCampaignModel = Body(...)):
     Only the provided fields will be updated.
     Any missing or `null` fields will be ignored.
     """
-    campaign = {k: v for k, v in campaign.model_dump(by_alias=True).items() if v is not None}
+    try:
+        updated_campaign = await campaign_controller.update_campaign(id, campaign)
+        return {"id": str(updated_campaign["_id"])}
 
-    if len(campaign) >= 1:
-        update_result = await campaign_controller.update_campaign(id=id, campaign=campaign)
-
-        if update_result is not None:
-            return update_result
-
-        else:
-            raise HTTPException(status_code=404, detail=f"Campaign {id} not found")
-
-    if (existing_campaign := await campaign_collection.find_one({"_id": id})) is not None:
-        return existing_campaign
-
-    raise HTTPException(status_code=404, detail=f"Campaign {id} not found")
+    except campaign_controller.CampaignNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except campaign_controller.CampaignIdInvalidError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/", response_description="Delete a campaign")

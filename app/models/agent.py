@@ -1,7 +1,7 @@
 import datetime
 import math
 from bson import ObjectId
-from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator, validator
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator, validator
 from pydantic.functional_validators import BeforeValidator
 from typing import List, Optional, Annotated, Dict, Any
 
@@ -109,6 +109,11 @@ class AgentModel(BaseModel):
             }
         }
     )
+
+    @computed_field
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
 
 
 class UpdateAgentModel(BaseModel):

@@ -3,13 +3,11 @@ from fastapi.responses import Response
 
 import app.controllers.agent as agent_controller
 
-from app.db import db
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
 from app.tools import mappings, formatters
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
-agent_collection = db["agent"]
 
 
 @router.post(
@@ -104,6 +102,8 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
         raise HTTPException(status_code=404, detail=str(e))
     except agent_controller.AgentIdInvalidError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except agent_controller.AgentEmptyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/{id}", response_description="Delete a agent")
@@ -125,7 +125,7 @@ async def delete_agent(id: str):
     response_model_by_alias=False
 )
 async def get_agent_id_by_field(
-    email: str = None, phone_number: str = None, first_name: str = None, last_name: str = None, full_name: str = None
+    email: str = None, phone: str = None, first_name: str = None, last_name: str = None, full_name: str = None
 ):
     """
     Get the id for a specific agent, looked up by a specified field.
@@ -136,7 +136,7 @@ async def get_agent_id_by_field(
         if email:
             email = email.lower()
         agent = await agent_controller.get_agent_by_field(
-            email=email, phone_number=phone_number, first_name=first_name, last_name=last_name, full_name=full_name
+            email=email, phone=phone, first_name=first_name, last_name=last_name, full_name=full_name
         )
         return {"id": str(agent["_id"])}
     except agent_controller.AgentNotFoundError as e:
