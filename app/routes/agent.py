@@ -143,4 +143,17 @@ async def get_agent_id_by_field(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-
+@router.get(
+    "/{ids}",
+    response_description="Get multiple agents",
+    response_model_by_alias=False
+)
+async def get_multiple_agents(ids: str):
+    """
+    Get the record for multiple agents, looked up by `ids`.
+    """
+    try:
+        agents = await agent_controller.get_agents(ids)
+        return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data)}
+    except agent_controller.AgentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))

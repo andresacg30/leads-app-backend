@@ -52,4 +52,4 @@ class CampaignCollection(BaseModel):
     """
     Container for a list of Campaign records.
     """
-    campaigns: List[CampaignModel]
+    data: List[CampaignModel]

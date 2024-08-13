@@ -121,3 +121,8 @@ async def delete_agent(id):
         return result
     except bson.errors.InvalidId:
         raise AgentIdInvalidError(f"Invalid id {id} on delete agent route.")
+
+
+async def get_agents(ids):
+    agents = await agent_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
+    return agents

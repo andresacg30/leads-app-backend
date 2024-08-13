@@ -40,7 +40,7 @@ async def list_campaigns(page: int = 1, limit: int = 10):
     List all of the campaign data in the database within the specified page and limit.
     """
     campaigns = await campaign_controller.get_all_campaigns(page=page, limit=limit)
-    return CampaignCollection(campaigns=campaigns)
+    return {"data": list(campaign.model_dump() for campaign in CampaignCollection(data=campaigns).data)}
 
 
 @router.get(
