@@ -1,6 +1,7 @@
 import pytest
 
 from app.models.agent import AgentModel
+from app.models.lead import LeadModel
 from app.controllers.agent import get_agent_collection
 from app.controllers.lead import get_lead_collection
 
@@ -22,7 +23,7 @@ async def lead_factory():
     collection = get_lead_collection()
 
     async def create_lead(**kwargs):
-        lead = AgentModel(**kwargs)
+        lead = LeadModel(**kwargs)
         inserted_lead = await collection.insert_one(lead.model_dump(by_alias=True, exclude={"id"}))
         return inserted_lead
 
@@ -31,5 +32,6 @@ async def lead_factory():
 
 @pytest.fixture(autouse=True)
 async def clean_database():
-    collection = get_agent_collection()
-    await collection.delete_many({})
+    collections = [get_agent_collection(), get_lead_collection()]
+    for collection in collections:
+        await collection.delete_many({})

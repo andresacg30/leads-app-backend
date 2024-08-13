@@ -26,6 +26,8 @@ async def create_lead(lead: LeadModel = Body(...)):
         if lead.state.lower() in state_variations:
             lead.state = state
             break
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid state {lead.state}")
     new_lead = await lead_controller.create_lead(lead)
     return {"id": str(new_lead.inserted_id)}
 
@@ -83,9 +85,11 @@ async def update_lead(id: str, lead: UpdateLeadModel = Body(...)):
         raise HTTPException(status_code=404, detail=str(e))
     except lead_controller.LeadIdInvalidError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except lead_controller.LeadEmptyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/", response_description="Delete a lead")
+@router.delete("/{id}", response_description="Delete a lead")
 async def delete_lead(id: str):
     """
     Remove a single lead record from the database.
@@ -118,7 +122,7 @@ async def find_leads(
 
 
 @router.put(
-    "/ghl",
+    "/ghl/{id}",
     response_description="Update a lead",
     response_model_by_alias=False
 )
@@ -137,4 +141,6 @@ async def update_lead_from_ghl(id: str, lead: UpdateLeadModel = Body(...)):
     except lead_controller.LeadNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except lead_controller.LeadIdInvalidError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except lead_controller.LeadEmptyError as e:
         raise HTTPException(status_code=400, detail=str(e))

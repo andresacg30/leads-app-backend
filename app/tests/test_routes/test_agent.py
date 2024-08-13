@@ -78,6 +78,7 @@ async def test__show_agent_route__returns_200_ok__when_agent_exists_in_database(
     inserted_agent = await agent_factory(**agent)
     response = test_client.get(f"/api/agent/{inserted_agent.inserted_id}")
     assert response.status_code == 200
+    assert response.json()['id'] == str(inserted_agent.inserted_id)
 
 
 async def test__show_agent_route__returns_404_not_found__when_agent_does_not_exist_in_database(test_client):
@@ -92,6 +93,7 @@ async def test__update_agent_route__returns_200_ok__when_agent_exists_in_databas
     updated_fields = {"email": fake.email(), "first_name": fake.first_name(), "campaigns": [fake.random_number(digits=2)]}
     response = test_client.put(f"/api/agent/{inserted_agent.inserted_id}", json=updated_fields)
     assert response.status_code == 200
+    assert response.json()['id'] == str(inserted_agent.inserted_id)
 
 
 async def test__update_agent_route__returns_404_agent_not_found__when_agent_does_not_exist_in_database(test_client):

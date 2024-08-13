@@ -25,7 +25,13 @@ class LeadIdInvalidError(Exception):
     pass
 
 
-async def update_lead(id, lead):
+class LeadEmptyError(Exception):
+    pass
+
+
+async def update_lead(id, lead: lead.UpdateLeadModel):
+    if all(v is None for v in lead.model_dump().values()):
+        raise LeadEmptyError("No values to update")
     lead_collection = get_lead_collection()
     try:
         lead = {k: v for k, v in lead.model_dump(by_alias=True).items() if v is not None}
@@ -54,7 +60,9 @@ async def update_lead(id, lead):
         raise LeadIdInvalidError(f"Invalid id {id} on update lead route")
 
 
-async def update_lead_from_ghl(id, lead):
+async def update_lead_from_ghl(id, lead: lead.UpdateLeadModel):
+    if all(v is None for v in lead.model_dump().values()):
+        raise LeadEmptyError("No values to update")
     lead_collection = get_lead_collection()
     try:
         lead = {k: v for k, v in lead.model_dump(by_alias=True).items() if v is not None}

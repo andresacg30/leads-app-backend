@@ -13,8 +13,8 @@ def agent_fixture():
         first_name=fake.first_name(),
         last_name=fake.last_name(),
         email=fake.email(),
-        phone=fake.phone_number(),
-        states_with_license=[fake.state_abbr() for _ in range(3)],
+        phone=fake.msisdn(),
+        states_with_license=[fake.state() for _ in range(3)],
         CRM={
             "name": "Ringy",
             "url": fake.url(),
@@ -39,14 +39,11 @@ def lead_fixture():
         first_name=fake.first_name(),
         last_name=fake.last_name(),
         email=fake.email(),
-        phone=fake.phone_number(),
-        state=fake.state_abbr(),
+        phone=fake.msisdn(),
+        state=fake.state(),
         origin="facebook",
         campaign_id=fake.uuid4(),
         custom_fields={}
     )
     lead.created_time = lead.created_time.isoformat()
     return lead.model_dump()
-
-
-

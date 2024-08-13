@@ -23,7 +23,7 @@ class AgentIdInvalidError(Exception):
     pass
 
 
-class EmptyAgentError(Exception):
+class AgentEmptyError(Exception):
     pass
 
 
@@ -103,7 +103,7 @@ async def get_agent(id):
 
 async def update_agent(id, agent: UpdateAgentModel):
     if all([v is None for v in agent.model_dump().values()]):
-        raise EmptyAgentError("Empty agent fields provided for update.")
+        raise AgentEmptyError("Empty agent fields provided for update.")
     agent_collection = get_agent_collection()
     try:
         agent = {k: v for k, v in agent.model_dump(by_alias=True).items() if v is not None}

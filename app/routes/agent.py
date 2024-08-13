@@ -95,7 +95,7 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
         raise HTTPException(status_code=404, detail=str(e))
     except agent_controller.AgentIdInvalidError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except agent_controller.EmptyAgentError as e:
+    except agent_controller.AgentEmptyError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
