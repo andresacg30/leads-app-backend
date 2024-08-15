@@ -1,7 +1,7 @@
 import pytest
 from faker import Faker
 
-from app.models.agent import AgentModel
+from app.models.agent import AgentModel, CRMModel
 from app.models.lead import LeadModel
 
 fake = Faker()
@@ -17,7 +17,6 @@ def agent_fixture():
         states_with_license=[fake.state() for _ in range(3)],
         CRM={
             "name": "Ringy",
-            "url": fake.url(),
             "integration_details": {
                 "auth_token": fake.password(),
                 "sid": fake.password()

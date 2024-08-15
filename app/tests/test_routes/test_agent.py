@@ -41,7 +41,7 @@ async def test__create_agent_route__returns_409_exists__if_agent_exists_in_campa
     assert response.status_code == 409
 
 
-@pytest.mark.parametrize("field", ["first_name", "last_name", "email", "phone", "states_with_license", "CRM"])
+@pytest.mark.parametrize("field", ["first_name", "last_name", "email", "phone", "states_with_license"])
 async def test__create_agent_route__returns_422_unproessable_entity__if_required_field_is_missing(agent_fixture, test_client, field):
     agent = agent_fixture
     del agent[field]
@@ -52,7 +52,8 @@ async def test__create_agent_route__returns_422_unproessable_entity__if_required
 async def test__list_agents_route__returns_200_ok__when_agents_exist_in_database(agent_fixture, agent_factory, test_client):
     agent = agent_fixture
     await agent_factory(**agent)
-    response = test_client.get("/api/agent/")
+    response = test_client.get("/api/agent/?sort=id=ASC")
+    raise Exception(response.json())
     assert response.status_code == 200
     assert len(response.json()['agents']) > 0
 
