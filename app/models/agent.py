@@ -125,8 +125,8 @@ class UpdateAgentModel(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     states_with_license: Optional[List] = None
-    CRM: Optional[PyObjectId] = Field(default=None)
-    creation_time: Optional[datetime.datetime] = None
+    CRM: Optional[CRMModel] = Field(default=None)
+    created_time: Optional[datetime.datetime] = None
     campaigns: Optional[List[PyObjectId]] = None
     credentials: Optional[AgentCredentials] = None
     custom_fields: Optional[dict] = None

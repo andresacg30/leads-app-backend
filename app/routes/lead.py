@@ -2,6 +2,7 @@ from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
 
 import app.controllers.lead as lead_controller
+import ast
 
 from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
 from app.tools import mappings
@@ -36,15 +37,20 @@ async def create_lead(lead: LeadModel = Body(...)):
 @router.get(
     "/",
     response_description="Get all leads",
-    response_model=LeadCollection,
     response_model_by_alias=False
 )
-async def list_leads(page: int = 1, limit: int = 10):
+async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=1" , filter: str = None):
     """
     List all of the lead data in the database within the specified page and limit.
     """
-    leads = await lead_controller.get_all_leads(page=page, limit=limit)
-    return LeadCollection(leads=leads)
+    try:
+        # filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
+        filter = ast.literal_eval(filter) if filter else None
+        sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
+        leads, total = await lead_controller.get_all_leads(page=page, limit=limit, sort=sort, filter=filter)
+        return {"data": list(lead.model_dump() for lead in LeadCollection(data=leads).data), "total": total}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get(

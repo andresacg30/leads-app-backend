@@ -33,9 +33,11 @@ async def create_campaign(campaign: campaign.CampaignModel):
     return new_campaign
 
 
-async def get_all_campaigns(page, limit):
+async def get_all_campaigns(page, limit, sort, filter):
     campaign_collection = get_campaign_collection()
-    campaigns = await campaign_collection.find().skip((page - 1) * limit).limit(limit).to_list(limit)
+    field, order = sort
+    sort_dict = {field: order}
+    campaigns = await campaign_collection.find(filter).sort(sort_dict).skip((page - 1) * limit).limit(limit).to_list(limit)
     return campaigns
 
 
@@ -76,3 +78,10 @@ async def delete_campaign(id):
     campaign_collection = get_campaign_collection()
     delete_result = await campaign_collection.delete_one({"_id": ObjectId(id)})
     return delete_result
+
+
+async def get_campaigns(ids):
+    campaign_collection = get_campaign_collection()
+    campaigns = await campaign_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
+    return campaigns
+

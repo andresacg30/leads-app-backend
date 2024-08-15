@@ -158,3 +158,6 @@ async def test__get_agent_id_by_field_route__returns_400__when_sending_only_firs
     response = test_client.get(f"/api/agent/find/?{field}={fake.name()}")
     assert response.status_code == 400
     assert response.json()['detail'] == "First name and last name must be provided together"
+
+
+    

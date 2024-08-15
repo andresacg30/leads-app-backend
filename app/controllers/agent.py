@@ -90,6 +90,7 @@ async def get_all_agents(page, limit, sort, filter):
     agent_collection = get_agent_collection()
     field, order = sort
     sort_dict = {field: order}
+    
     agents = await agent_collection.find(filter).sort(sort_dict).skip((page - 1) * limit).limit(limit).to_list(limit)
     total = await agent_collection.count_documents({})
     return agents, total
@@ -141,5 +142,5 @@ async def delete_agent(id):
 
 async def get_agents(ids):
     agent_collection = get_agent_collection()
-    agents = await agent_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
+    agents = await agent_collection.find({"_id": {"$in": [ObjectId(id) for id in ids if id != "null"]}}).to_list(None)
     return agents

@@ -1,6 +1,7 @@
 import datetime
+import math
 from bson import ObjectId
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator, validator
 from pydantic.functional_validators import BeforeValidator
 from typing import List, Optional, Annotated
 
@@ -17,7 +18,7 @@ class LeadModel(BaseModel):
     last_name: str = Field(...)
     email: EmailStr = Field(...)
     phone: str = Field(...)
-    state: str = Field(...)
+    state: Optional[str] = Field(...)
     origin: str = Field(...)
     buyer_id: Optional[PyObjectId] = Field(default=None)
     second_chance_buyer_id: Optional[PyObjectId] = Field(default=None)
@@ -28,6 +29,20 @@ class LeadModel(BaseModel):
     campaign_id: PyObjectId = Field(...)
     is_second_chance: bool = Field(default=False)
     custom_fields: Optional[dict] = Field(default=None)
+    @validator('phone', pre=True, always=True)
+    def ensure_phone_is_str(cls, v):
+        if isinstance(v, int):
+            return str(v)
+        return v
+    @root_validator(pre=True)
+    def replace_invalid_with_empty_string(cls, values):
+        custom_fields = values.get('custom_fields', {})
+        if isinstance(custom_fields, dict):
+            for key, value in custom_fields.items():
+                if isinstance(value, float) and math.isnan(value):
+                    custom_fields[key] = ""
+        values['custom_fields'] = custom_fields
+        return values
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -53,7 +68,11 @@ class LeadModel(BaseModel):
             }
         }
     )
-
+    @computed_field
+    @property
+    def full_name(self) -> str:
+        return str(self.first_name + " " + self.last_name)
+    
 
 class UpdateLeadModel(BaseModel):
     """
@@ -109,4 +128,4 @@ class LeadCollection(BaseModel):
 
     This exists because providing a top-level array in a JSON response can be a [vulnerability](https://haacked.com/archive/2009/06/25/json-hijacking.aspx/)
     """
-    leads: List[LeadModel]
+    data: List[LeadModel]

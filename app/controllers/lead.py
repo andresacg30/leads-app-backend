@@ -117,10 +117,13 @@ async def create_lead(lead: lead.LeadModel):
     return new_lead
 
 
-async def get_all_leads(page, limit):
+async def get_all_leads(page, limit, sort, filter):
     lead_collection = get_lead_collection()
-    leads = await lead_collection.find().skip((page - 1) * limit).limit(limit).to_list(limit)
-    return leads
+    field, order = sort
+    sort_dict = {field: order}
+    leads = await lead_collection.find(filter).sort(sort_dict).skip((page - 1) * limit).limit(limit).to_list(limit)
+    total = await lead_collection.count_documents({})
+    return leads, total
 
 
 async def get_one_lead(id):

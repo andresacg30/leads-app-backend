@@ -1,7 +1,10 @@
+from typing import List
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
+from datetime import datetime
 
 import app.controllers.agent as agent_controller
+import ast
 
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
 from app.tools import mappings, formatters
@@ -54,7 +57,8 @@ async def list_agents(page: int = 1, limit: int = 10, sort: str = "created_time=
     List all of the agent data in the database within the specified page and limit.
     """
     try:
-        filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
+        # filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
+        filter = ast.literal_eval(filter) if filter else None
         sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
         agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter)
         return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data), "total": total}
@@ -143,12 +147,12 @@ async def get_agent_id_by_field(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get(
-    "/{ids}",
+@router.post(
+    "/get-many",
     response_description="Get multiple agents",
     response_model_by_alias=False
 )
-async def get_multiple_agents(ids: str):
+async def get_multiple_agents(ids: List[str] = Body(...)):
     """
     Get the record for multiple agents, looked up by `ids`.
     """
