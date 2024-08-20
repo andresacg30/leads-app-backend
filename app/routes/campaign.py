@@ -23,6 +23,9 @@ async def create_campaign(campaign: CampaignModel = Body(...)):
 
     A unique `id` will be created and provided in the response.
     """
+    campaign_name = campaign.name
+    if await campaign_controller.get_campaign_by_name(campaign_name):
+        raise HTTPException(status_code=400, detail=f"Campaign {campaign_name} already exists")
     new_campaign = await campaign_controller.create_campaign(campaign)
     return {"id": str(new_campaign.inserted_id)}
 
@@ -37,11 +40,18 @@ async def list_campaigns(page: int = 1, limit: int = 10, sort: str = "start_date
     """
     List all of the campaign data in the database within the specified page and limit.
     """
-    # filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
-    filter = ast.literal_eval(filter) if filter else None
-    sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
-    campaigns = await campaign_controller.get_all_campaigns(page=page, limit=limit, sort=sort, filter=filter)
-    return {"data": list(campaign.model_dump() for campaign in CampaignCollection(data=campaigns).data)}
+    if sort.split('=')[1] not in ["ASC", "DESC"]:
+        raise HTTPException(status_code=400, detail="Invalid sort parameter")
+    try:
+        filter = ast.literal_eval(filter) if filter else None
+        sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
+        campaigns, total = await campaign_controller.get_all_campaigns(page=page, limit=limit, sort=sort, filter=filter)
+        return {
+            "data": list(campaign.model_dump() for campaign in CampaignCollection(data=campaigns).data),
+            "total": total
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get(

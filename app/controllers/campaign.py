@@ -35,10 +35,9 @@ async def create_campaign(campaign: campaign.CampaignModel):
 
 async def get_all_campaigns(page, limit, sort, filter):
     campaign_collection = get_campaign_collection()
-    field, order = sort
-    sort_dict = {field: order}
-    campaigns = await campaign_collection.find(filter).sort(sort_dict).skip((page - 1) * limit).limit(limit).to_list(limit)
-    return campaigns
+    campaigns = await campaign_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
+    total = await campaign_collection.count_documents({})
+    return campaigns, total
 
 
 async def get_one_campaign(id):

@@ -1,4 +1,7 @@
+import datetime
+import json
 import pytest
+import freezegun
 from faker import Faker
 
 
@@ -53,15 +56,15 @@ async def test__list_agents_route__returns_200_ok__when_agents_exist_in_database
     agent = agent_fixture
     await agent_factory(**agent)
     response = test_client.get("/api/agent/?sort=id=ASC")
-    raise Exception(response.json())
     assert response.status_code == 200
-    assert len(response.json()['agents']) > 0
+    assert len(response.json()['data']) > 0
+    assert response.json()['total'] > 0
 
 
 async def test__list_agents_route__returns_200_ok__when_agents_do_not_exist_in_database(test_client):
     response = test_client.get("/api/agent/")
     assert response.status_code == 200
-    assert len(response.json()['agents']) == 0
+    assert len(response.json()['data']) == 0
 
 
 async def test__list_agents_route__returns_200_ok__when_more_than_one_agent_exists_in_database(agent_fixture, agent_factory, test_client):
@@ -71,7 +74,79 @@ async def test__list_agents_route__returns_200_ok__when_more_than_one_agent_exis
     await agent_factory(**second_agent)
     response = test_client.get("/api/agent/")
     assert response.status_code == 200
-    assert len(response.json()['agents']) > 1
+    assert len(response.json()['data']) > 1
+
+
+async def test__list_agents_route_returns_200_ok_and_sorted_by_id__when_sort_query_is_valid(agent_fixture, agent_factory, test_client):
+    agent = agent_fixture
+    await agent_factory(**agent)
+    await agent_factory(**agent)
+    response = test_client.get("/api/agent/?sort=id=ASC")
+    assert response.status_code == 200
+    assert response.json()['data'][0]['id'] < response.json()['data'][1]['id']
+
+
+@freezegun.freeze_time('2021-01-01')
+async def test__list_agents_route_returns_200_ok_and_correctly_sorted__when_sort_query_is_created_time(agent_fixture, agent_factory, test_client):
+    now_time = datetime.datetime.now()
+    agent = agent_fixture
+    agent["created_time"] = now_time
+    await agent_factory(**agent)
+    await agent_factory(use_fixture_model=True, created_time=now_time + datetime.timedelta(days=1))
+    response = test_client.get("/api/agent/?sort=created_time=ASC")
+    assert response.status_code == 200
+    assert response.json()['data'][0]['created_time'] < response.json()['data'][1]['created_time']
+
+
+async def test__list_agents_route__returns_only_1_agent__when_limit_query_is_1(agent_fixture, agent_factory, test_client):
+    agent = agent_fixture
+    await agent_factory(**agent)
+    await agent_factory(use_fixture_model=True)
+    response = test_client.get("/api/agent/?limit=1")
+    assert response.status_code == 200
+    assert len(response.json()['data']) == 1
+
+
+async def test__list_agents_route__returns_last_agent__when_page_query_is_2(agent_fixture, agent_factory, test_client):
+    agent = agent_fixture
+    inserted_agent = await agent_factory(**agent)
+    second_inserted_agent = await agent_factory(use_fixture_model=True)
+    response = test_client.get("/api/agent/?page=2&limit=1")
+    assert response.status_code == 200
+    assert len(response.json()['data']) == 1
+    assert response.json()['data'][0]['id'] == str(second_inserted_agent.inserted_id)
+    assert response.json()['data'][0]['id'] != str(inserted_agent.inserted_id)
+
+
+async def test_list_agent_rout__returns_correct_agent__when_filter_is_email(agent_fixture, agent_factory, test_client):
+    agent = agent_fixture
+    inserted_agent = await agent_factory(**agent)
+    second_inserted_agent = await agent_factory(use_fixture_model=True)
+    response = test_client.get("/api/agent/?filter={\"email\":\"%s\"}" % agent['email'])
+    assert response.status_code == 200
+    assert response.json()['data'][0]['email'] == agent['email']
+    assert response.json()['data'][0]['id'] == str(inserted_agent.inserted_id)
+    assert len(response.json()['data']) == 1
+    assert second_inserted_agent.inserted_id not in [agent['id'] for agent in response.json()['data']]
+
+
+@pytest.mark.skip(reason="Need to change the way the filter is being passed when filtering by dates")
+@freezegun.freeze_time('2021-01-01')
+async def test__list_agents_route__returns_agents__when_filter_is_created_time(agent_fixture, agent_factory, test_client):
+    agent = agent_fixture
+    agent['created_time'] = datetime.datetime.now()
+    inserted_agent = await agent_factory(**agent)
+    second_inserted_agent = await agent_factory(use_fixture_model=True, created_time=datetime.datetime.now() - datetime.timedelta(days=1))
+    response = test_client.get("/api/agent/?filter={\"created_time\":\"%s\"}" % agent['created_time'])
+    assert response.status_code == 200
+    assert response.json()['data'][0]['id'] == str(inserted_agent.inserted_id)
+    assert len(response.json()['data']) == 1
+    assert second_inserted_agent.inserted_id not in [agent['id'] for agent in response.json()['data']]
+
+
+async def test__list_agents_route__returns_400_bad_request__when_sort_query_is_invalid(test_client):
+    response = test_client.get("/api/agent/?sort=id=INVALID")
+    assert response.status_code == 400
 
 
 async def test__show_agent_route__returns_200_ok__when_agent_exists_in_database(agent_fixture, agent_factory, test_client):
@@ -161,4 +236,28 @@ async def test__get_agent_id_by_field_route__returns_400__when_sending_only_firs
     assert response.json()['detail'] == "First name and last name must be provided together"
 
 
-    
+async def test__get_multiple_agents_route__returns_200_ok__when_only_one_agent_exist_in_database(agent_fixture, agent_factory, test_client):
+    agent = agent_fixture
+    inserted_agent = await agent_factory(**agent)
+    payload = json.dumps([str(inserted_agent.inserted_id)])
+    response = test_client.post("/api/agent/get-many", data=payload, headers={"Content-Type": "application/json"})
+    assert response.status_code == 200
+    assert len(response.json()['data']) == 1
+
+
+async def test__get_multiple_agents_route__returns_200_ok__when_multiple_agents_exist_in_database(agent_fixture, agent_factory, test_client):
+    agent = agent_fixture
+    inserted_agent = await agent_factory(**agent)
+    second_inserted_agent = await agent_factory(use_fixture_model=True)
+    payload = json.dumps([str(inserted_agent.inserted_id), str(second_inserted_agent.inserted_id)])
+    response = test_client.post("/api/agent/get-many", data=payload, headers={"Content-Type": "application/json"})
+    assert response.status_code == 200
+    assert len(response.json()['data']) == 2
+    assert response.json()['data'][0]['id'] == str(inserted_agent.inserted_id)
+    assert response.json()['data'][1]['id'] == str(second_inserted_agent.inserted_id)
+
+
+async def test__get_multiple_agents_route__returns_404_not_found__when_no_agents_exist_in_database(test_client):
+    payload = json.dumps([fake.hexify(text='^' * 24)])
+    response = test_client.post("/api/agent/get-many", data=payload, headers={"Content-Type": "application/json"})
+    assert response.status_code == 404
