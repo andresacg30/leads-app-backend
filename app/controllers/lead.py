@@ -122,7 +122,10 @@ async def get_all_leads(page, limit, sort, filter):
     field, order = sort
     sort_dict = {field: order}
     leads = await lead_collection.find(filter).sort(sort_dict).skip((page - 1) * limit).limit(limit).to_list(limit)
-    total = await lead_collection.count_documents({})
+    if filter:
+        total = await lead_collection.count_documents(filter)
+    else:
+        total = await lead_collection.count_documents({})
     return leads, total
 
 
@@ -146,3 +149,9 @@ async def delete_lead(id):
         return delete_result
     except bson.errors.InvalidId:
         raise LeadIdInvalidError(f"Invalid id {id} on delete lead route")
+
+
+async def delete_leads(ids):
+    lead_collection = get_lead_collection()
+    result = await lead_collection.delete_many({"_id": {"$in": [ObjectId(id) for id in ids if id != "null"]}})
+    return result

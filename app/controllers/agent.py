@@ -1,3 +1,4 @@
+from datetime import datetime
 import bson
 import difflib
 
@@ -87,10 +88,14 @@ async def create_agent(agent: AgentModel):
 
 
 async def get_all_agents(page, limit, sort, filter):
+    filter["created_time"] = {}
+    if "created_time_gte" in filter:
+        filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.000Z")
+    if "created_time_lte" in filter:
+        filter["created_time"]["$lte"] = datetime.strptime(filter.pop("created_time_lte"), "%Y-%m-%dT%H:%M:%S.000Z")
     agent_collection = get_agent_collection()
     field, order = sort
     sort_dict = {field: order}
-    
     agents = await agent_collection.find(filter).sort(sort_dict).skip((page - 1) * limit).limit(limit).to_list(limit)
     total = await agent_collection.count_documents({})
     return agents, total
@@ -144,3 +149,9 @@ async def get_agents(ids):
     agent_collection = get_agent_collection()
     agents = await agent_collection.find({"_id": {"$in": [ObjectId(id) for id in ids if id != "null"]}}).to_list(None)
     return agents
+
+
+async def delete_agents(ids):
+    agent_collection = get_agent_collection()
+    result = await agent_collection.delete_many({"_id": {"$in": [ObjectId(id) for id in ids if id != "null"]}})
+    return result

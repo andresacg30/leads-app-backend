@@ -1,10 +1,11 @@
-from typing import List
+from typing import List, Union
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
 from datetime import datetime
 
 import app.controllers.agent as agent_controller
 import ast
+import json
 
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
 from app.tools import mappings, formatters
@@ -57,7 +58,6 @@ async def list_agents(page: int = 1, limit: int = 10, sort: str = "created_time=
     List all of the agent data in the database within the specified page and limit.
     """
     try:
-        # filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
         filter = ast.literal_eval(filter) if filter else None
         sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
         agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter)
@@ -115,6 +115,11 @@ async def delete_agent(id: str):
     """
     Remove a single agent record from the database.
     """
+    if len(id.split(",")) > 1:
+        id = id.split(",")
+        delete_result = await agent_controller.delete_agents(ids=id)
+        if delete_result.deleted_count >= 1:
+            return Response(status_code=status.HTTP_204_NO_CONTENT, content=json.dumps({"data": "Agents deleted"}))
     delete_result = await agent_controller.delete_agent(id=id)
 
     if delete_result.deleted_count == 1:
@@ -161,3 +166,4 @@ async def get_multiple_agents(ids: List[str] = Body(...)):
         return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data)}
     except agent_controller.AgentNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    

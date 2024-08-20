@@ -103,6 +103,11 @@ async def delete_lead(id: str):
     """
     Remove a single lead record from the database.
     """
+    if len(id.split(",")) > 1:
+        id = id.split(",")
+        delete_result = await lead_controller.delete_leads(ids=id)
+        if delete_result.deleted_count >= 1:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
     delete_result = await lead_controller.delete_lead(id)
 
     if delete_result.deleted_count == 1:

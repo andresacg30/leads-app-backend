@@ -89,6 +89,11 @@ async def delete_campaign(id: str):
     """
     Remove a single campaign record from the database.
     """
+    if len(id.split(",")) > 1:
+        id = id.split(",")
+        delete_result = await campaign_controller.delete_campaigns(ids=id)
+        if delete_result.deleted_count >= 1:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
     delete_result = await campaign_controller.delete_campaign(id=id)
 
     if delete_result.deleted_count == 1:
