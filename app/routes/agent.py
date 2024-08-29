@@ -1,7 +1,6 @@
 from typing import List, Union
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
-from datetime import datetime
 
 import app.controllers.agent as agent_controller
 import ast
@@ -53,13 +52,15 @@ async def create_agent(agent: AgentModel = Body(...)):
     response_description="Get all agents",
     response_model_by_alias=False
 )
-async def list_agents(page: int = 1, limit: int = 10, sort: str = "created_time=1" , filter: str = None):
+async def list_agents(page: int = 1, limit: int = 10, sort: str = "created_time=DESC" , filter: str = None):
     """
     List all of the agent data in the database within the specified page and limit.
     """
+    if sort.split('=')[1] not in ["ASC", "DESC"]:
+        raise HTTPException(status_code=400, detail="Invalid sort parameter")
     try:
         filter = ast.literal_eval(filter) if filter else None
-        sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
+        sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
         agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter)
         return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data), "total": total}
     except ValueError as e:

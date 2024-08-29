@@ -107,9 +107,7 @@ async def get_all_agents(page, limit, sort, filter):
     if "last_name" in filter:
         filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
     agent_collection = get_agent_collection()
-    field, order = sort
-    sort_dict = {field: order}
-    agents = await agent_collection.find(filter).sort(sort_dict).skip((page - 1) * limit).limit(limit).to_list(limit)
+    agents = await agent_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
     total = await agent_collection.count_documents({})
     return agents, total
 
@@ -161,6 +159,8 @@ async def delete_agent(id):
 async def get_agents(ids):
     agent_collection = get_agent_collection()
     agents = await agent_collection.find({"_id": {"$in": [ObjectId(id) for id in ids if id != "null"]}}).to_list(None)
+    if not agents:
+        raise AgentNotFoundError("Agents not found with the provided information.")
     return agents
 
 

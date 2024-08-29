@@ -3,6 +3,7 @@ from faker import Faker
 
 from app.models.agent import AgentModel
 from app.models.lead import LeadModel
+from app.models.campaign import CampaignModel
 
 fake = Faker()
 
@@ -17,7 +18,6 @@ def agent_fixture():
         states_with_license=[fake.state() for _ in range(3)],
         CRM={
             "name": "Ringy",
-            "url": fake.url(),
             "integration_details": {
                 "auth_token": fake.password(),
                 "sid": fake.password()
@@ -47,3 +47,14 @@ def lead_fixture():
     )
     lead.created_time = lead.created_time.isoformat()
     return lead.model_dump()
+
+
+@pytest.fixture
+def campaign_fixture():
+    campaign = CampaignModel(
+        name=fake.company(),
+        active=fake.boolean(),
+        start_date=fake.date_time_this_decade()
+    )
+    campaign.start_date = campaign.start_date.isoformat()
+    return campaign.model_dump()

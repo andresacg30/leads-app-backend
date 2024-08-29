@@ -35,13 +35,13 @@ async def test__list_leads_route__returns_200_ok__when_leads_exist_in_database(l
     await lead_factory(**lead)
     response = test_client.get("/api/lead/")
     assert response.status_code == 200
-    assert len(response.json()['leads']) > 0
+    assert len(response.json()['data']) > 0
 
 
 async def test__list_leads_route__returns_200_ok__when_leads_do_not_exist_in_database(test_client):
     response = test_client.get("/api/lead/")
     assert response.status_code == 200
-    assert len(response.json()['leads']) == 0
+    assert len(response.json()['data']) == 0
 
 
 async def test__list_leads_route__returns_200_ok__when_more_than_one_lead_exists_in_database(lead_fixture, lead_factory, test_client):
@@ -51,7 +51,7 @@ async def test__list_leads_route__returns_200_ok__when_more_than_one_lead_exists
     await lead_factory(**second_lead)
     response = test_client.get("/api/lead/")
     assert response.status_code == 200
-    assert len(response.json()['leads']) > 1
+    assert len(response.json()['data']) > 1
 
 
 async def test__show_lead_route__returns_200_ok__when_lead_exists_in_database(lead_fixture, lead_factory, test_client):
@@ -165,7 +165,7 @@ async def test__get_lead_id_by_field_route__returns_404_not_found__when_agent_na
 
 
 async def test__get_lead_id_by_field_route__returns_422_unprocessable_entity__when_no_email_is_sent(test_client):
-    response = test_client.get(f"/api/lead/find/")
+    response = test_client.get("/api/lead/find/")
     assert response.status_code == 422
 
 
