@@ -89,10 +89,23 @@ async def create_agent(agent: AgentModel):
 
 async def get_all_agents(page, limit, sort, filter):
     filter["created_time"] = {}
+    if "q" in filter:
+        query_value = filter["q"]
+        filter["$or"] = [
+            {"first_name": {"$regex": query_value, "$options": "i"}},
+            {"last_name": {"$regex": query_value, "$options": "i"}},
+            {"email": {"$regex": query_value, "$options": "i"}},
+            {"phone": {"$regex": query_value, "$options": "i"}}
+        ]
+        filter.pop("q")
     if "created_time_gte" in filter:
         filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.000Z")
     if "created_time_lte" in filter:
         filter["created_time"]["$lte"] = datetime.strptime(filter.pop("created_time_lte"), "%Y-%m-%dT%H:%M:%S.000Z")
+    if "first_name" in filter:
+        filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
+    if "last_name" in filter:
+        filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
     agent_collection = get_agent_collection()
     field, order = sort
     sort_dict = {field: order}
