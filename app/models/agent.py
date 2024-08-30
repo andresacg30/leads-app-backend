@@ -81,12 +81,12 @@ class AgentModel(BaseModel):
         if isinstance(v, int):
             return str(v)
         return v
-    
-    @validator('created_time', pre=True, always=True)
-    def ensure_created_time_is_datetime(cls, v):
-        if isinstance(v, datetime.datetime):
-            return v
-        return datetime.datetime.strptime(v, "%Y-%m-%d")
+
+    # @validator('created_time', pre=True, always=True)
+    # def ensure_created_time_is_datetime(cls, v):
+    #     if isinstance(v, datetime.datetime):
+    #         return v
+    #     return datetime.datetime.strptime(v, "%Y-%m-%d")
 
     model_config = ConfigDict(
         populate_by_name=True,

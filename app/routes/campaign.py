@@ -33,10 +33,9 @@ async def create_campaign(campaign: CampaignModel = Body(...)):
 @router.get(
     "/",
     response_description="Get all campaigns",
-    response_model=CampaignCollection,
     response_model_by_alias=False
 )
-async def list_campaigns(page: int = 1, limit: int = 10, sort: str = "start_date=1" , filter: str = None):
+async def list_campaigns(page: int = 1, limit: int = 10, sort: str = "start_date=DESC" , filter: str = None):
     """
     List all of the campaign data in the database within the specified page and limit.
     """

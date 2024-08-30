@@ -1,4 +1,5 @@
 import datetime
+import time
 import freezegun
 import pytest
 
@@ -34,7 +35,6 @@ async def test__list_campaigns_route__returns_200_ok__when_campaigns_exist_in_da
     campaign = campaign_fixture
     await campaign_factory(**campaign)
     response = test_client.get("/api/campaign/?sort=id=ASC")
-    raise Exception(response.json())
     assert response.status_code == 200
     assert len(response.json()['data']) > 0
     assert response.json()['total'] > 0
@@ -66,15 +66,16 @@ async def test__list_campaigns_route_returns_200_ok_and_sorted_by_id__when_sort_
 
 
 @freezegun.freeze_time('2021-01-01')
-async def test__list_campaigns_route_returns_200_ok_and_correctly_sorted__when_sort_query_is_created_time(campaign_fixture, campaign_factory, test_client):
+async def test__list_campaigns_route_returns_200_ok_and_correctly_sorted__when_sort_query_is_start_date(campaign_fixture, campaign_factory, test_client):
     now_time = datetime.datetime.now()
     campaign = campaign_fixture
-    campaign["created_time"] = now_time
+
+    campaign["start_date"] = now_time
     await campaign_factory(**campaign)
-    await campaign_factory(use_fixture_model=True, created_time=now_time + datetime.timedelta(days=1))
-    response = test_client.get("/api/campaign/?sort=created_time=ASC")
+    await campaign_factory(use_fixture_model=True, start_date=now_time + datetime.timedelta(days=1))
+    response = test_client.get("/api/campaign/?sort=start_date=ASC")
     assert response.status_code == 200
-    assert response.json()['data'][0]['created_time'] < response.json()['data'][1]['created_time']
+    assert response.json()['data'][0]['start_date'] < response.json()['data'][1]['start_date']
 
 
 async def test__list_campaigns_route__returns_only_1_campaign__when_limit_query_is_1(campaign_fixture, campaign_factory, test_client):
@@ -86,24 +87,29 @@ async def test__list_campaigns_route__returns_only_1_campaign__when_limit_query_
     assert len(response.json()['data']) == 1
 
 
+@freezegun.freeze_time('2021-01-01')
 async def test__list_campaigns_route__returns_last_campaign__when_page_query_is_2(campaign_fixture, campaign_factory, test_client):
     campaign = campaign_fixture
     inserted_campaign = await campaign_factory(**campaign)
+    time.sleep(1)
     second_inserted_campaign = await campaign_factory(use_fixture_model=True)
-    response = test_client.get("/api/campaign/?page=2&limit=1")
+    time.sleep(1)
+
+    response = test_client.get("/api/campaign/?page=2&limit=1&sort_by=created_at")
+
     assert response.status_code == 200
     assert len(response.json()['data']) == 1
     assert response.json()['data'][0]['id'] == str(second_inserted_campaign.inserted_id)
     assert response.json()['data'][0]['id'] != str(inserted_campaign.inserted_id)
 
 
-async def test_list_campaign_rout__returns_correct_campaign__when_filter_is_email(campaign_fixture, campaign_factory, test_client):
+async def test_list_campaign_rout__returns_correct_campaign__when_filter_is_name(campaign_fixture, campaign_factory, test_client):
     campaign = campaign_fixture
     inserted_campaign = await campaign_factory(**campaign)
     second_inserted_campaign = await campaign_factory(use_fixture_model=True)
-    response = test_client.get("/api/campaign/?filter={\"email\":\"%s\"}" % campaign['email'])
+    response = test_client.get("/api/campaign/?filter={\"name\":\"%s\"}" % campaign['name'])
     assert response.status_code == 200
-    assert response.json()['data'][0]['email'] == campaign['email']
+    assert response.json()['data'][0]['name'] == campaign['name']
     assert response.json()['data'][0]['id'] == str(inserted_campaign.inserted_id)
     assert len(response.json()['data']) == 1
     assert second_inserted_campaign.inserted_id not in [campaign['id'] for campaign in response.json()['data']]

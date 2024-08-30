@@ -88,27 +88,34 @@ async def create_agent(agent: AgentModel):
 
 
 async def get_all_agents(page, limit, sort, filter):
-    filter["created_time"] = {}
-    if "q" in filter:
-        query_value = filter["q"]
-        filter["$or"] = [
-            {"first_name": {"$regex": query_value, "$options": "i"}},
-            {"last_name": {"$regex": query_value, "$options": "i"}},
-            {"email": {"$regex": query_value, "$options": "i"}},
-            {"phone": {"$regex": query_value, "$options": "i"}}
-        ]
-        filter.pop("q")
-    if "created_time_gte" in filter:
-        filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.000Z")
-    if "created_time_lte" in filter:
-        filter["created_time"]["$lte"] = datetime.strptime(filter.pop("created_time_lte"), "%Y-%m-%dT%H:%M:%S.000Z")
-    if "first_name" in filter:
-        filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
-    if "last_name" in filter:
-        filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
+    if filter:
+        filter["created_time"] = {}
+        if "q" in filter:
+            query_value = filter["q"]
+            filter["$or"] = [
+                {"first_name": {"$regex": query_value, "$options": "i"}},
+                {"last_name": {"$regex": query_value, "$options": "i"}},
+                {"email": {"$regex": query_value, "$options": "i"}},
+                {"phone": {"$regex": query_value, "$options": "i"}}
+            ]
+            filter.pop("q")
+        if "created_time_gte" not in filter or "created_time_lte" not in filter:
+            filter.pop("created_time")
+        if "created_time_gte" in filter:
+            filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.000Z")
+        if "created_time_lte" in filter:
+            filter["created_time"]["$lte"] = datetime.strptime(filter.pop("created_time_lte"), "%Y-%m-%dT%H:%M:%S.000Z")
+        if "first_name" in filter:
+            filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
+        if "last_name" in filter:
+            filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
+
     agent_collection = get_agent_collection()
     agents = await agent_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
-    total = await agent_collection.count_documents({})
+    if filter:
+        total = await agent_collection.count_documents(filter)
+    else:
+        total = await agent_collection.count_documents({})
     return agents, total
 
 

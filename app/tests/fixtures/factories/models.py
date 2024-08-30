@@ -93,6 +93,6 @@ async def campaign_factory():
 
 @pytest.fixture(autouse=True)
 async def clean_database():
-    collections = [get_agent_collection(), get_lead_collection()]
+    collections = [get_agent_collection(), get_lead_collection(), get_campaign_collection()]
     for collection in collections:
         await collection.delete_many({})

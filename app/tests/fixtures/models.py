@@ -18,6 +18,7 @@ def agent_fixture():
         states_with_license=[fake.state() for _ in range(3)],
         CRM={
             "name": "Ringy",
+            "url": "www.ringy.com",
             "integration_details": {
                 "auth_token": fake.password(),
                 "sid": fake.password()

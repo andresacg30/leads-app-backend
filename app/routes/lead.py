@@ -39,7 +39,7 @@ async def create_lead(lead: LeadModel = Body(...)):
     response_description="Get all leads",
     response_model_by_alias=False
 )
-async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=1" , filter: str = None):
+async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=DESC" , filter: str = None):
     """
     List all of the lead data in the database within the specified page and limit.
     """
