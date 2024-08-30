@@ -1,15 +1,16 @@
+from typing import List, Union
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
 
 import app.controllers.agent as agent_controller
+import ast
+import json
 
-from app.db import db
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
 from app.tools import mappings, formatters
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
-agent_collection = db["agent"]
 
 
 @router.post(
@@ -49,15 +50,21 @@ async def create_agent(agent: AgentModel = Body(...)):
 @router.get(
     "/",
     response_description="Get all agents",
-    response_model=AgentCollection,
     response_model_by_alias=False
 )
-async def list_agents(page: int = 1, limit: int = 10):
+async def list_agents(page: int = 1, limit: int = 10, sort: str = "created_time=DESC" , filter: str = None):
     """
     List all of the agent data in the database within the specified page and limit.
     """
-    agents = await agent_controller.get_all_agents(page=page, limit=limit)
-    return AgentCollection(agents=agents)
+    if sort.split('=')[1] not in ["ASC", "DESC"]:
+        raise HTTPException(status_code=400, detail="Invalid sort parameter")
+    try:
+        filter = ast.literal_eval(filter) if filter else None
+        sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
+        agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter)
+        return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data), "total": total}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get(
@@ -79,7 +86,7 @@ async def show_agent(id: str):
 
 
 @router.put(
-    "/",
+    "/{id}",
     response_description="Update a agent",
     response_model_by_alias=False
 )
@@ -100,13 +107,20 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
         raise HTTPException(status_code=404, detail=str(e))
     except agent_controller.AgentIdInvalidError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except agent_controller.AgentEmptyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/", response_description="Delete a agent")
+@router.delete("/{id}", response_description="Delete a agent")
 async def delete_agent(id: str):
     """
     Remove a single agent record from the database.
     """
+    if len(id.split(",")) > 1:
+        id = id.split(",")
+        delete_result = await agent_controller.delete_agents(ids=id)
+        if delete_result.deleted_count >= 1:
+            return Response(status_code=status.HTTP_204_NO_CONTENT, content=json.dumps({"data": "Agents deleted"}))
     delete_result = await agent_controller.delete_agent(id=id)
 
     if delete_result.deleted_count == 1:
@@ -121,7 +135,7 @@ async def delete_agent(id: str):
     response_model_by_alias=False
 )
 async def get_agent_id_by_field(
-    email: str = None, phone_number: str = None, first_name: str = None, last_name: str = None, full_name: str = None
+    email: str = None, phone: str = None, first_name: str = None, last_name: str = None, full_name: str = None
 ):
     """
     Get the id for a specific agent, looked up by a specified field.
@@ -132,8 +146,25 @@ async def get_agent_id_by_field(
         if email:
             email = email.lower()
         agent = await agent_controller.get_agent_by_field(
-            email=email, phone_number=phone_number, first_name=first_name, last_name=last_name, full_name=full_name
+            email=email, phone=phone, first_name=first_name, last_name=last_name, full_name=full_name
         )
         return {"id": str(agent["_id"])}
     except agent_controller.AgentNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post(
+    "/get-many",
+    response_description="Get multiple agents",
+    response_model_by_alias=False
+)
+async def get_multiple_agents(ids: List[str] = Body(...)):
+    """
+    Get the record for multiple agents, looked up by `ids`.
+    """
+    try:
+        agents = await agent_controller.get_agents(ids)
+        return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data)}
+    except agent_controller.AgentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    

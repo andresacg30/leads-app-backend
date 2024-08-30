@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import agent, lead, invoice, campaign
 
+
 app = FastAPI(
     title="LeadConex API"
 )

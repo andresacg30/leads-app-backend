@@ -1,16 +1,14 @@
-from bson import ObjectId
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
 
 import app.controllers.lead as lead_controller
+import ast
 
-from app.db import db
 from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
 from app.tools import mappings
 
 
 router = APIRouter(prefix="/api/lead", tags=["lead"])
-lead_collection = db["lead"]
 
 
 @router.post(
@@ -29,6 +27,8 @@ async def create_lead(lead: LeadModel = Body(...)):
         if lead.state.lower() in state_variations:
             lead.state = state
             break
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid state {lead.state}")
     lead.email = lead.email.lower()
     new_lead = await lead_controller.create_lead(lead)
     return {"id": str(new_lead.inserted_id)}
@@ -37,15 +37,20 @@ async def create_lead(lead: LeadModel = Body(...)):
 @router.get(
     "/",
     response_description="Get all leads",
-    response_model=LeadCollection,
     response_model_by_alias=False
 )
-async def list_leads(page: int = 1, limit: int = 10):
+async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=DESC" , filter: str = None):
     """
     List all of the lead data in the database within the specified page and limit.
     """
-    leads = await lead_controller.get_all_leads(page=page, limit=limit)
-    return LeadCollection(leads=leads)
+    try:
+        # filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
+        filter = ast.literal_eval(filter) if filter else None
+        sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
+        leads, total = await lead_controller.get_all_leads(page=page, limit=limit, sort=sort, filter=filter)
+        return {"data": list(lead.model_dump() for lead in LeadCollection(data=leads).data), "total": total}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get(
@@ -67,7 +72,7 @@ async def show_lead(id: str):
 
 
 @router.put(
-    "/",
+    "/{id}",
     response_description="Update a lead",
     response_model_by_alias=False
 )
@@ -89,13 +94,20 @@ async def update_lead(id: str, lead: UpdateLeadModel = Body(...)):
         raise HTTPException(status_code=404, detail=str(e))
     except lead_controller.LeadIdInvalidError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except lead_controller.LeadEmptyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/", response_description="Delete a lead")
+@router.delete("/{id}", response_description="Delete a lead")
 async def delete_lead(id: str):
     """
     Remove a single lead record from the database.
     """
+    if len(id.split(",")) > 1:
+        id = id.split(",")
+        delete_result = await lead_controller.delete_leads(ids=id)
+        if delete_result.deleted_count >= 1:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
     delete_result = await lead_controller.delete_lead(id)
 
     if delete_result.deleted_count == 1:
@@ -126,7 +138,7 @@ async def find_leads(
 
 
 @router.put(
-    "/ghl",
+    "/ghl/{id}",
     response_description="Update a lead",
     response_model_by_alias=False
 )
@@ -147,4 +159,6 @@ async def update_lead_from_ghl(id: str, lead: UpdateLeadModel = Body(...)):
     except lead_controller.LeadNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except lead_controller.LeadIdInvalidError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except lead_controller.LeadEmptyError as e:
         raise HTTPException(status_code=400, detail=str(e))
