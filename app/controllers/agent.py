@@ -99,7 +99,7 @@ async def get_all_agents(page, limit, sort, filter):
                 {"phone": {"$regex": query_value, "$options": "i"}}
             ]
             filter.pop("q")
-        if "created_time_gte" not in filter or "created_time_lte" not in filter:
+        if "created_time_gte" not in filter and "created_time_lte" not in filter:
             filter.pop("created_time")
         if "created_time_gte" in filter:
             filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.000Z")
