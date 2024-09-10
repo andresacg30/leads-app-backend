@@ -1,10 +1,14 @@
 
-from fastapi import Body, APIRouter, HTTPException
+from fastapi import Body, APIRouter, HTTPException, Request
 from passlib.context import CryptContext
 
 import app.controllers.user as user_controller
 from app.auth.jwt_handler import sign_jwt
 from app.models.user import UserModel, UserData, UserSignIn
+from settings import Settings
+
+
+settings = Settings()
 
 router = APIRouter()
 
@@ -29,6 +33,8 @@ async def user_login(user_credentials: UserSignIn = Body(...)):
 
 @router.post("", response_model=UserData)
 async def user_signup(user: UserModel = Body(...)):
+    if Request.headers.get("x-api-key") != settings.api_key:
+        raise HTTPException(status_code=403, detail="Invalid API Key")
     try:
         user_exists = await user_controller.get_user_by_field(email=user.email)
     except user_controller.UserNotFoundError:

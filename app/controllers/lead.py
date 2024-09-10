@@ -135,7 +135,7 @@ async def get_all_leads(page, limit, sort, filter):
             filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
         if "last_name" in filter:
             filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
-            
+   
     lead_collection = get_lead_collection()
     leads = await lead_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
     if filter:
@@ -177,10 +177,10 @@ def _format_created_time_filter(filter):
     if "created_time_gte" in filter or "created_time_lte" in filter:
         filter["created_time"] = {}
     if "created_time_gte" in filter:
-        filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.fffZ")
+        filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.%fZ")
     if "created_time_lte" in filter:
-        filter["created_time"]["$lte"] = datetime.strptime(filter.pop("created_time_lte"), "%Y-%m-%dT%H:%M:%S.fffZ")
-    
+        filter["created_time"]["$lte"] = datetime.strptime(filter.pop("created_time_lte"), "%Y-%m-%dT%H:%M:%S.%fZ")
+
     return filter
 
 
@@ -188,10 +188,10 @@ def _format_lead_sold_time_filter(filter):
     if "lead_sold_time_gte" in filter or "lead_sold_time_lte" in filter:
         filter["lead_sold_time"] = {}
     if "lead_sold_time_gte" in filter:
-        filter["lead_sold_time"]["$gte"] = datetime.strptime(filter.pop("lead_sold_time_gte"), "%Y-%m-%dT%H:%M:%S.fffZ")
+        filter["lead_sold_time"]["$gte"] = datetime.strptime(filter.pop("lead_sold_time_gte"), "%Y-%m-%dT%H:%M:%S.%fZ")
     if "lead_sold_time_lte" in filter:
-        filter["lead_sold_time"]["$lte"] = datetime.strptime(filter.pop("lead_sold_time_lte"), "%Y-%m-%dT%H:%M:%S.fffZ")
-    
+        filter["lead_sold_time"]["$lte"] = datetime.strptime(filter.pop("lead_sold_time_lte"), "%Y-%m-%dT%H:%M:%S.%fZ")
+
     return filter
 
 
@@ -199,8 +199,8 @@ def _format_second_chance_lead_sold_time_filter(filter):
     if "second_chance_lead_sold_time_gte" in filter or "second_chance_lead_sold_time_lte" in filter:
         filter["second_chance_lead_sold_time"] = {}
     if "second_chance_lead_sold_time_gte" in filter:
-        filter["second_chance_lead_sold_time"]["$gte"] = datetime.strptime(filter.pop("second_chance_lead_sold_time_gte"), "%Y-%m-%dT%H:%M:%S.fffZ")
+        filter["second_chance_lead_sold_time"]["$gte"] = datetime.strptime(filter.pop("second_chance_lead_sold_time_gte"), "%Y-%m-%dT%H:%M:%S.%fZ")
     if "second_chance_lead_sold_time_lte" in filter:
-        filter["second_chance_lead_sold_time"]["$lte"] = datetime.strptime(filter.pop("second_chance_lead_sold_time_lte"), "%Y-%m-%dT%H:%M:%S.fffZ")
-    
+        filter["second_chance_lead_sold_time"]["$lte"] = datetime.strptime(filter.pop("second_chance_lead_sold_time_lte"), "%Y-%m-%dT%H:%M:%S.%fZ")
+
     return filter

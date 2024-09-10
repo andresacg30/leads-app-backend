@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     email_password: str = os.environ.get("EMAIL_PASSWORD")
     email_service: str = os.environ.get("EMAIL_SERVICE")
     email_port: int = os.environ.get("EMAIL_PORT")
+    api_key: str = os.environ.get("API_KEY")
     testing: bool = False
 
 

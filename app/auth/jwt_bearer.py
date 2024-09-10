@@ -23,14 +23,12 @@ class JWTBearer(HTTPBearer):
         super(JWTBearer, self).__init__(auto_error=auto_error)
 
     async def __call__(self, request: Request):
+        api_key = request.headers.get("x-api-key")
+        if api_key and api_key == settings.api_key:
+            return api_key
         credentials: HTTPAuthorizationCredentials = await super(
             JWTBearer, self
         ).__call__(request)
-        print("Credentials :", credentials)
-        
-        api_key = request.headers.get("api-key")
-        if api_key and api_key == settings.api_key:
-            return api_key
 
         if credentials:
             if not credentials.scheme == "Bearer":
