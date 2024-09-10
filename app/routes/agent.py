@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List
 from fastapi import APIRouter, Body, status, HTTPException
 from fastapi.responses import Response
 

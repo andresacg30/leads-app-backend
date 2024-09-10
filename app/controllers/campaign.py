@@ -34,6 +34,8 @@ async def create_campaign(campaign: campaign.CampaignModel):
 
 
 async def get_all_campaigns(page, limit, sort, filter):
+    if "id" in filter:
+        filter = {"_id": {"$in": [ObjectId(id) for id in filter["id"]]}}
     campaign_collection = get_campaign_collection()
     campaigns = await campaign_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
     total = await campaign_collection.count_documents({})

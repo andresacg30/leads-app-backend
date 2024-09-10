@@ -29,11 +29,13 @@ class LeadModel(BaseModel):
     campaign_id: PyObjectId = Field(...)
     is_second_chance: bool = Field(default=False)
     custom_fields: Optional[dict] = Field(default=None)
+
     @validator('phone', pre=True, always=True)
     def ensure_phone_is_str(cls, v):
         if isinstance(v, int):
             return str(v)
         return v
+
     @root_validator(pre=True)
     def replace_invalid_with_empty_string(cls, values):
         custom_fields = values.get('custom_fields', {})
@@ -68,11 +70,12 @@ class LeadModel(BaseModel):
             }
         }
     )
+
     @computed_field
     @property
     def full_name(self) -> str:
         return str(self.first_name + " " + self.last_name)
-    
+
 
 class UpdateLeadModel(BaseModel):
     """
