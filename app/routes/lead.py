@@ -11,45 +11,52 @@ from app.tools import mappings
 router = APIRouter(prefix="/api/lead", tags=["lead"])
 
 
-@router.post(
-    "/",
-    response_description="Add new lead",
-    status_code=status.HTTP_201_CREATED,
-    response_model_by_alias=False
-)
-async def create_lead(lead: LeadModel = Body(...)):
-    """
-    Insert a new lead record.
-
-    A unique `id` will be created and provided in the response.
-    """
-    for state, state_variations in mappings.state_mappings.items():
-        if lead.state.lower() in state_variations:
-            lead.state = state
-            break
-    else:
-        raise HTTPException(status_code=400, detail=f"Invalid state {lead.state}")
-    lead.email = lead.email.lower()
-    new_lead = await lead_controller.create_lead(lead)
-    return {"id": str(new_lead.inserted_id)}
-
 
 @router.get(
-    "/",
-    response_description="Get all leads",
+    "/find",
+    response_description="Search lead id by email and/or buyer name",
     response_model_by_alias=False
 )
-async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=DESC" , filter: str = None):
+async def find_leads(
+    email: str, buyer_name: str = None, second_chance_buyer_name: str = None, campaign_id: str = None
+):
     """
-    List all of the lead data in the database within the specified page and limit.
+    Search for leads by email and/or buyer name.
     """
     try:
-        # filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
-        filter = ast.literal_eval(filter) if filter else None
-        sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
-        leads, total = await lead_controller.get_all_leads(page=page, limit=limit, sort=sort, filter=filter)
-        return {"data": list(lead.model_dump() for lead in LeadCollection(data=leads).data), "total": total}
-    except ValueError as e:
+        if email:
+            email = email.lower()
+        lead = await lead_controller.get_lead_by_field(email=email, buyer_name=buyer_name, second_chance_buyer_name=second_chance_buyer_name, campaign_id=campaign_id)
+        return {"id": str(lead["_id"])}
+
+    except lead_controller.LeadNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put(
+    "/ghl/{id}",
+    response_description="Update a lead",
+    response_model_by_alias=False
+)
+async def update_lead_from_ghl(id: str, lead: UpdateLeadModel = Body(...)):
+    """
+    Update individual fields of an existing lead record.
+
+    Only the provided fields will be updated.
+    Any missing or `null` fields will be ignored.
+    """
+
+    try:
+        if lead.email:
+            lead.email = lead.email.lower()
+        updated_lead = await lead_controller.update_lead_from_ghl(id, lead)
+        return {"id": str(updated_lead["_id"])}
+
+    except lead_controller.LeadNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except lead_controller.LeadIdInvalidError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except lead_controller.LeadEmptyError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -116,49 +123,43 @@ async def delete_lead(id: str):
     raise HTTPException(status_code=404, detail=f"Lead {id} not found")
 
 
+@router.post(
+    "",
+    response_description="Add new lead",
+    status_code=status.HTTP_201_CREATED,
+    response_model_by_alias=False
+)
+async def create_lead(lead: LeadModel = Body(...)):
+    """
+    Insert a new lead record.
+
+    A unique `id` will be created and provided in the response.
+    """
+    for state, state_variations in mappings.state_mappings.items():
+        if lead.state.lower() in state_variations:
+            lead.state = state
+            break
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid state {lead.state}")
+    lead.email = lead.email.lower()
+    new_lead = await lead_controller.create_lead(lead)
+    return {"id": str(new_lead.inserted_id)}
+
+
 @router.get(
-    "/find/",
-    response_description="Search lead id by email and/or buyer name",
+    "",
+    response_description="Get all leads",
     response_model_by_alias=False
 )
-async def find_leads(
-    email: str, buyer_name: str = None, second_chance_buyer_name: str = None, campaign_id: str = None
-):
+async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=DESC" , filter: str = None):
     """
-    Search for leads by email and/or buyer name.
+    List all of the lead data in the database within the specified page and limit.
     """
     try:
-        if email:
-            email = email.lower()
-        lead = await lead_controller.get_lead_by_field(email=email, buyer_name=buyer_name, second_chance_buyer_name=second_chance_buyer_name, campaign_id=campaign_id)
-        return {"id": str(lead["_id"])}
-
-    except lead_controller.LeadNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@router.put(
-    "/ghl/{id}",
-    response_description="Update a lead",
-    response_model_by_alias=False
-)
-async def update_lead_from_ghl(id: str, lead: UpdateLeadModel = Body(...)):
-    """
-    Update individual fields of an existing lead record.
-
-    Only the provided fields will be updated.
-    Any missing or `null` fields will be ignored.
-    """
-
-    try:
-        if lead.email:
-            lead.email = lead.email.lower()
-        updated_lead = await lead_controller.update_lead_from_ghl(id, lead)
-        return {"id": str(updated_lead["_id"])}
-
-    except lead_controller.LeadNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except lead_controller.LeadIdInvalidError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except lead_controller.LeadEmptyError as e:
+        # filter = {filter.split('=')[0]: filter.split('=')[1]} if filter else None
+        filter = ast.literal_eval(filter) if filter else None
+        sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
+        leads, total = await lead_controller.get_all_leads(page=page, limit=limit, sort=sort, filter=filter)
+        return {"data": list(lead.model_dump() for lead in LeadCollection(data=leads).data), "total": total}
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

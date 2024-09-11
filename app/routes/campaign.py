@@ -12,7 +12,23 @@ router = APIRouter(prefix="/api/campaign", tags=["campaign"])
 
 
 @router.post(
-    "/",
+    "/get-many",
+    response_description="Get multiple campaigns",
+    response_model_by_alias=False
+)
+async def get_multiple_campaigns(ids: List[str] = Body(...)):
+    """
+    Get the record for multiple campaigns, looked up by `ids`.
+    """
+    try:
+        campaigns = await campaign_controller.get_campaigns(ids)
+        return {"data": list(campaign.model_dump() for campaign in CampaignCollection(data=campaigns).data)}
+    except campaign_controller.CampaignNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post(
+    "",
     response_description="Add new campaign",
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=False
@@ -31,7 +47,7 @@ async def create_campaign(campaign: CampaignModel = Body(...)):
 
 
 @router.get(
-    "/",
+    "",
     response_description="Get all campaigns",
     response_model_by_alias=False
 )
@@ -109,19 +125,3 @@ async def delete_campaign(id: str):
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     raise HTTPException(status_code=404, detail=f"Campaign {id} not found")
-
-
-@router.post(
-    "/get-many",
-    response_description="Get multiple campaigns",
-    response_model_by_alias=False
-)
-async def get_multiple_campaigns(ids: List[str] = Body(...)):
-    """
-    Get the record for multiple campaigns, looked up by `ids`.
-    """
-    try:
-        campaigns = await campaign_controller.get_campaigns(ids)
-        return {"data": list(campaign.model_dump() for campaign in CampaignCollection(data=campaigns).data)}
-    except campaign_controller.CampaignNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))

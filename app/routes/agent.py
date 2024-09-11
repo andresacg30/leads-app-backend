@@ -13,8 +13,48 @@ from app.tools import mappings, formatters
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 
+@router.get(
+    "/find",
+    response_description="Get agent id by specified field",
+    response_model_by_alias=False
+)
+async def get_agent_id_by_field(
+    email: str = None, phone: str = None, first_name: str = None, last_name: str = None, full_name: str = None
+):
+    """
+    Get the id for a specific agent, looked up by a specified field.
+    """
+    if first_name and not last_name or last_name and not first_name:
+        raise HTTPException(status_code=400, detail="First name and last name must be provided together")
+    try:
+        if email:
+            email = email.lower()
+        agent = await agent_controller.get_agent_by_field(
+            email=email, phone=phone, first_name=first_name, last_name=last_name, full_name=full_name
+        )
+        return {"id": str(agent["_id"])}
+    except agent_controller.AgentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.post(
-    "/",
+    "/get-many",
+    response_description="Get multiple agents",
+    response_model_by_alias=False
+)
+async def get_multiple_agents(ids: List[str] = Body(...)):
+    """
+    Get the record for multiple agents, looked up by `ids`.
+    """
+    try:
+        agents = await agent_controller.get_agents(ids)
+        return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data)}
+    except agent_controller.AgentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post(
+    "",
     response_description="Add new agent",
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=False
@@ -48,7 +88,7 @@ async def create_agent(agent: AgentModel = Body(...)):
 
 
 @router.get(
-    "/",
+    "",
     response_description="Get all agents",
     response_model_by_alias=False
 )
@@ -127,43 +167,3 @@ async def delete_agent(id: str):
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     raise HTTPException(status_code=404, detail=f"Agent {id} not found")
-
-
-@router.get(
-    "/find/",
-    response_description="Get agent id by specified field",
-    response_model_by_alias=False
-)
-async def get_agent_id_by_field(
-    email: str = None, phone: str = None, first_name: str = None, last_name: str = None, full_name: str = None
-):
-    """
-    Get the id for a specific agent, looked up by a specified field.
-    """
-    if first_name and not last_name or last_name and not first_name:
-        raise HTTPException(status_code=400, detail="First name and last name must be provided together")
-    try:
-        if email:
-            email = email.lower()
-        agent = await agent_controller.get_agent_by_field(
-            email=email, phone=phone, first_name=first_name, last_name=last_name, full_name=full_name
-        )
-        return {"id": str(agent["_id"])}
-    except agent_controller.AgentNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@router.post(
-    "/get-many",
-    response_description="Get multiple agents",
-    response_model_by_alias=False
-)
-async def get_multiple_agents(ids: List[str] = Body(...)):
-    """
-    Get the record for multiple agents, looked up by `ids`.
-    """
-    try:
-        agents = await agent_controller.get_agents(ids)
-        return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data)}
-    except agent_controller.AgentNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
