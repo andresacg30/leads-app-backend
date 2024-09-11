@@ -154,7 +154,7 @@ async def get_agent_id_by_field(
 
 
 @router.post(
-    "/get-many/",
+    "/get-many",
     response_description="Get multiple agents",
     response_model_by_alias=False
 )
