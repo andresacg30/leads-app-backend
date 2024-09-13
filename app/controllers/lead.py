@@ -118,6 +118,7 @@ async def create_lead(lead: lead.LeadModel):
 
 
 async def get_all_leads(page, limit, sort, filter):
+    pipeline = []
     if filter:
         if "q" in filter:
             query_value = filter["q"]
@@ -139,9 +140,62 @@ async def get_all_leads(page, limit, sort, filter):
             filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
         if "last_name" in filter:
             filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
+        if "agent_id" in filter:
+            if not filter["agent_id"]:
+                return [], 0
+            agent_id = filter.pop("agent_id")
+            filter["$or"] = [
+                {"buyer_id": agent_id},
+                {"second_chance_buyer_id": agent_id}
+            ]
+            pipeline = [
+                {"$match": filter},
+                {"$sort": {sort[0]: sort[1]}},
+                {"$skip": (page - 1) * limit},
+                {"$limit": limit},
+                {"$project": {
+                    "first_name": 1,
+                    "last_name": 1,
+                    "email": 1,
+                    "phone": 1,
+                    "state": 1,
+                    "origin": 1,
+                    "lead_sold_time": 1,
+                    "second_chance_lead_sold_time": 1,
+                    "buyer_id": 1,
+                    "second_chance_buyer_id": 1,
+                    "lead_sold_by_agent_time": 1,
+                    "campaign_id": 1,
+                    "created_time": 1,
+                    "custom_fields": 1,
+                    "lead_received_date": {
+                        "$cond": {
+                            "if": {"$eq": ["$buyer_id", agent_id]},
+                            "then": "$lead_sold_time",
+                            "else": {
+                                "$cond": {
+                                    "if": {"$eq": ["$second_chance_buyer_id", agent_id]},
+                                    "then": "$second_chance_lead_sold_time",
+                                    "else": None
+                                }
+                            }
+                        }
+                    },
+                    "is_second_chance": {
+                        "$cond": {
+                            "if": {"$eq": [agent_id, "$second_chance_buyer_id"]},
+                            "then": True,
+                            "else": False
+                        }
+                    }
+                }}
+            ]
 
     lead_collection = get_lead_collection()
-    leads = await lead_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
+    if pipeline:
+        leads = await lead_collection.aggregate(pipeline).to_list(None)
+    else:
+        leads = await lead_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
     if filter:
         total = await lead_collection.count_documents(filter)
     else:

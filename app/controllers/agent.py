@@ -90,26 +90,7 @@ async def create_agent(agent: AgentModel):
 async def get_all_agents(page, limit, sort, filter):
     pipeline = []
     if filter:
-        filter["created_time"] = {}
-        if "q" in filter:
-            query_value = filter["q"]
-            filter["$or"] = [
-                {"first_name": {"$regex": query_value, "$options": "i"}},
-                {"last_name": {"$regex": query_value, "$options": "i"}},
-                {"email": {"$regex": query_value, "$options": "i"}},
-                {"phone": {"$regex": query_value, "$options": "i"}}
-            ]
-            filter.pop("q")
-        if "created_time_gte" not in filter and "created_time_lte" not in filter:
-            filter.pop("created_time")
-        if "created_time_gte" in filter:
-            filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.000Z")
-        if "created_time_lte" in filter:
-            filter["created_time"]["$lte"] = datetime.strptime(filter.pop("created_time_lte"), "%Y-%m-%dT%H:%M:%S.000Z")
-        if "first_name" in filter:
-            filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
-        if "last_name" in filter:
-            filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
+        filter = _filter_formatter_helper(filter)
         if "user_campaigns" in filter:
             campaigns = filter.pop("user_campaigns")
             filter["campaigns"] = {"$in": campaigns}
@@ -137,7 +118,6 @@ async def get_all_agents(page, limit, sort, filter):
                     "custom_fields": 1
                 }}
             ]
-
     agent_collection = get_agent_collection()
     if pipeline:
         agents = await agent_collection.aggregate(pipeline).to_list(None)
@@ -206,3 +186,27 @@ async def delete_agents(ids):
     agent_collection = get_agent_collection()
     result = await agent_collection.delete_many({"_id": {"$in": [ObjectId(id) for id in ids if id != "null"]}})
     return result
+
+
+def _filter_formatter_helper(filter):
+    filter["created_time"] = {}
+    if "q" in filter:
+        query_value = filter["q"]
+        filter["$or"] = [
+            {"first_name": {"$regex": query_value, "$options": "i"}},
+            {"last_name": {"$regex": query_value, "$options": "i"}},
+            {"email": {"$regex": query_value, "$options": "i"}},
+            {"phone": {"$regex": query_value, "$options": "i"}}
+        ]
+        filter.pop("q")
+    if "created_time_gte" not in filter and "created_time_lte" not in filter:
+        filter.pop("created_time")
+    if "created_time_gte" in filter:
+        filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.000Z")
+    if "created_time_lte" in filter:
+        filter["created_time"]["$lte"] = datetime.strptime(filter.pop("created_time_lte"), "%Y-%m-%dT%H:%M:%S.000Z")
+    if "first_name" in filter:
+        filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
+    if "last_name" in filter:
+        filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
+    return filter
