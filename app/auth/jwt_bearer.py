@@ -51,8 +51,7 @@ async def get_current_user(authorization: str = Depends(JWTBearer())) -> UserMod
         return UserModel(
             email="info@leadconex.com",
             password=settings.api_key,
-            first_name="API",
-            last_name="Key",
+            name="LeadConex API",
             region="API",
             permissions=["admin"]
         )
