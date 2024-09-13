@@ -1,12 +1,14 @@
 from typing import List
-from fastapi import APIRouter, Body, status, HTTPException
+from fastapi import APIRouter, Body, status, HTTPException, Depends
 from fastapi.responses import Response
 
 import app.controllers.agent as agent_controller
 import ast
 import json
 
+from app.auth.jwt_bearer import get_current_user
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
+from app.models.user import UserModel
 from app.tools import mappings, formatters
 
 
@@ -19,7 +21,12 @@ router = APIRouter(prefix="/api/agent", tags=["agent"])
     response_model_by_alias=False
 )
 async def get_agent_id_by_field(
-    email: str = None, phone: str = None, first_name: str = None, last_name: str = None, full_name: str = None
+    email: str = None,
+    phone: str = None,
+    first_name: str = None,
+    last_name: str = None,
+    full_name: str = None,
+    user: UserModel = Depends(get_current_user)
 ):
     """
     Get the id for a specific agent, looked up by a specified field.
@@ -27,10 +34,19 @@ async def get_agent_id_by_field(
     if first_name and not last_name or last_name and not first_name:
         raise HTTPException(status_code=400, detail="First name and last name must be provided together")
     try:
+        if not user.is_admin():
+            campaigns = {"$in": user.campaigns}
+        else:
+            campaigns = None
         if email:
             email = email.lower()
         agent = await agent_controller.get_agent_by_field(
-            email=email, phone=phone, first_name=first_name, last_name=last_name, full_name=full_name
+            email=email,
+            phone=phone,
+            first_name=first_name,
+            last_name=last_name,
+            full_name=full_name,
+            campaigns=campaigns
         )
         return {"id": str(agent["_id"])}
     except agent_controller.AgentNotFoundError as e:
@@ -59,13 +75,15 @@ async def get_multiple_agents(ids: List[str] = Body(...)):
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=False
 )
-async def create_agent(agent: AgentModel = Body(...)):
+async def create_agent(agent: AgentModel = Body(...), user: UserModel = Depends(get_current_user)):
     """
     Insert a new agent record.
 
     A unique `id` will be created and provided in the response.
     """
     try:
+        if not user.is_admin():
+            raise HTTPException(status_code=404, detail="User do not have permission to create agents")
         agent_in_db_found = await agent_controller.get_agent_by_field(email=agent.email)
     except agent_controller.AgentNotFoundError:
         agent_in_db_found = None
@@ -92,7 +110,13 @@ async def create_agent(agent: AgentModel = Body(...)):
     response_description="Get all agents",
     response_model_by_alias=False
 )
-async def list_agents(page: int = 1, limit: int = 10, sort: str = "created_time=DESC" , filter: str = None):
+async def list_agents(
+    page: int = 1,
+    limit: int = 10,
+    sort: str = "created_time=DESC",
+    filter: str = None,
+    user: UserModel = Depends(get_current_user)
+):
     """
     List all of the agent data in the database within the specified page and limit.
     """
@@ -100,6 +124,12 @@ async def list_agents(page: int = 1, limit: int = 10, sort: str = "created_time=
         raise HTTPException(status_code=400, detail="Invalid sort parameter")
     try:
         filter = ast.literal_eval(filter) if filter else None
+        if not user.is_admin():
+            if not filter:
+                filter = {}
+            if not user.campaigns:
+                raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+            filter["user_campaigns"] = user.campaigns
         sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
         agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter)
         return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data), "total": total}
@@ -113,13 +143,22 @@ async def list_agents(page: int = 1, limit: int = 10, sort: str = "created_time=
     response_model=AgentModel,
     response_model_by_alias=False
 )
-async def show_agent(id: str):
+async def show_agent(id: str, user: UserModel = Depends(get_current_user)):
     """
     Get the record for a specific agent, looked up by `id`.
     """
+    if not user.is_admin():
+        if not user.campaigns:
+            raise HTTPException(status_code=404, detail="User does not have access to this agent")
     if (
         agent := await agent_controller.get_agent(id=id)
     ) is not None:
+        if not user.is_admin():
+            for campaign in agent['campaigns']:
+                if campaign not in user.campaigns:
+                    agent["campaigns"].remove(campaign)
+            if len(agent["campaigns"]) == 0:
+                raise HTTPException(status_code=404, detail="User does not have access to this agent")
         return agent
 
     raise HTTPException(status_code=404, detail=f"Agent {id} not found")
@@ -130,13 +169,17 @@ async def show_agent(id: str):
     response_description="Update a agent",
     response_model_by_alias=False
 )
-async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
+async def update_agent(id: str, agent: UpdateAgentModel = Body(...), user: UserModel = Depends(get_current_user)):
     """
     Update individual fields of an existing agent record.
 
     Only the provided fields will be updated.
     Any missing or `null` fields will be ignored.
     """
+    if not user.is_admin():
+        allowed_fields = ["email", "phone", "first_name", "last_name", "CRM", "states_with_license"]
+        if not any([v for k, v in agent.dict(by_alias=True).items() if k in allowed_fields]):
+            raise HTTPException(status_code=403, detail="User does not have permission to update this agent")
     try:
         if agent.email:
             agent.email = agent.email.lower()
@@ -152,10 +195,12 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...)):
 
 
 @router.delete("/{id}", response_description="Delete a agent")
-async def delete_agent(id: str):
+async def delete_agent(id: str, user: UserModel = Depends(get_current_user)):
     """
     Remove a single agent record from the database.
     """
+    if not user.is_admin():
+        raise HTTPException(status_code=404, detail="User does not have permission to delete this agent")
     if len(id.split(",")) > 1:
         id = id.split(",")
         delete_result = await agent_controller.delete_agents(ids=id)

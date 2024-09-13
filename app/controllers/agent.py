@@ -88,6 +88,7 @@ async def create_agent(agent: AgentModel):
 
 
 async def get_all_agents(page, limit, sort, filter):
+    pipeline = []
     if filter:
         filter["created_time"] = {}
         if "q" in filter:
@@ -109,9 +110,39 @@ async def get_all_agents(page, limit, sort, filter):
             filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
         if "last_name" in filter:
             filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
+        if "user_campaigns" in filter:
+            campaigns = filter.pop("user_campaigns")
+            filter["campaigns"] = {"$in": campaigns}
+            pipeline = [
+                {"$match": filter},
+                {"$sort": {sort[0]: sort[1]}},
+                {"$skip": (page - 1) * limit},
+                {"$limit": limit},
+                {"$project": {
+                    "first_name": 1,
+                    "last_name": 1,
+                    "email": 1,
+                    "phone": 1,
+                    "states_with_license": 1,
+                    "CRM": 1,
+                    "created_time": 1,
+                    "campaigns": {
+                        "$filter": {
+                            "input": "$campaigns",
+                            "as": "campaign",
+                            "cond": {"$in": ["$$campaign", campaigns]}
+                        }
+                    },
+                    "credentials": 1,
+                    "custom_fields": 1
+                }}
+            ]
 
     agent_collection = get_agent_collection()
-    agents = await agent_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
+    if pipeline:
+        agents = await agent_collection.aggregate(pipeline).to_list(None)
+    else:
+        agents = await agent_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
     if filter:
         total = await agent_collection.count_documents(filter)
     else:
