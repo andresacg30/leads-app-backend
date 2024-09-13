@@ -121,12 +121,16 @@ async def get_all_leads(page, limit, sort, filter):
     if filter:
         if "q" in filter:
             query_value = filter["q"]
-            filter["$or"] = [
+            query_filters = [
                 {"first_name": {"$regex": query_value, "$options": "i"}},
                 {"last_name": {"$regex": query_value, "$options": "i"}},
                 {"email": {"$regex": query_value, "$options": "i"}},
                 {"phone": {"$regex": query_value, "$options": "i"}}
             ]
+            if filter.get("$or"):
+                filter["$and"] = [{"$or": query_filters}, {"$or": filter.pop("$or")}]
+            else:
+                filter["$or"] = query_filters
             filter.pop("q")
         filter = _format_created_time_filter(filter)
         filter = _format_lead_sold_time_filter(filter)
@@ -135,7 +139,7 @@ async def get_all_leads(page, limit, sort, filter):
             filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
         if "last_name" in filter:
             filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
-   
+
     lead_collection = get_lead_collection()
     leads = await lead_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
     if filter:

@@ -24,7 +24,7 @@ async def user_login(user_credentials: UserSignIn = Body(...)):
     if user_exists:
         password = hash_helper.verify(user_credentials.password, user_exists["password"])
         if password:
-            return sign_jwt(user_credentials.username)
+            return sign_jwt(user_credentials.username, user_exists["permissions"])
 
         raise HTTPException(status_code=403, detail="Incorrect email or password")
 
@@ -49,3 +49,21 @@ async def user_signup(request: Request, user: UserModel = Body(...)):
         "full_name": user.full_name,
         "email": user.email
     }
+
+
+@router.post("/reset-password")
+async def reset_password(request: Request, user: UserModel = Body(...)):
+    if request.headers.get("x-api-key") != settings.api_key:
+        raise HTTPException(status_code=403, detail="Invalid API Key")
+    try:
+        user_exists = await user_controller.get_user_by_field(email=user.email)
+    except user_controller.UserNotFoundError:
+        user_exists = None
+    if not user_exists:
+        raise HTTPException(
+            status_code=404, detail="user with email supplied does not exist"
+        )
+
+    user.password = hash_helper.hash(user.password)
+    await user_controller.update_user(user)
+    return {"message": "Password reset successful"}

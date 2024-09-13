@@ -1,7 +1,10 @@
-from fastapi import Request, HTTPException
+import app.controllers.user as user_controller
+
+from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.auth.jwt_handler import decode_jwt
+from app.models.user import UserModel
 
 from settings import Settings
 
@@ -41,3 +44,25 @@ class JWTBearer(HTTPBearer):
                 )
 
             return credentials.credentials
+
+
+async def get_current_user(authorization: str = Depends(JWTBearer())) -> UserModel:
+    if authorization == settings.api_key:
+        return UserModel(
+            email="info@leadconex.com",
+            password=settings.api_key,
+            first_name="API",
+            last_name="Key",
+            region="API",
+            permissions=["admin"]
+        )
+    payload = decode_jwt(authorization)
+    if not payload:
+        raise HTTPException(status_code=403, detail="Could not validate credentials")
+    try:
+        user_data = await user_controller.get_user_by_field(email=payload.get("user_id"))
+    except user_controller.UserNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    user = UserModel(**user_data)
+    return user

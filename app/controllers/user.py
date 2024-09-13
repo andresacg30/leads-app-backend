@@ -1,3 +1,5 @@
+import bson
+
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBasicCredentials, HTTPBasic
 from motor.core import AgnosticCollection
@@ -38,7 +40,7 @@ async def validate_login(credentials: HTTPBasicCredentials = Depends(security)):
 async def create_user(user: user.UserModel):
     user_collection = get_user_collection()
     user.password = jwt_helper.encrypt(user.password)
-    new_user = await user_collection.insert_one(user.model_dump())
+    new_user = await user_collection.insert_one(user.model_dump(by_alias=True, exclude=["id"]))
     return new_user
 
 
@@ -48,4 +50,10 @@ async def get_user_by_field(**kwargs):
     user = await user_collection.find_one(query)
     if not user:
         raise UserNotFoundError("User not found with the provided information.")
+    return user
+
+
+async def update_user(user: user.UserModel):
+    user_collection = get_user_collection()
+    await user_collection.update_one({"_id": bson.ObjectId(user.id)}, {"$set": user.model_dump(by_alias=True, exclude=["id"])})
     return user

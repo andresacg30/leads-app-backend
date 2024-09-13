@@ -12,30 +12,49 @@ class UserModel(BaseModel):
     Container for a single User record.
     """
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
-    first_name: str = Field(...)
-    last_name: str = Field(...)
+    name: str = Field(...)
     email: EmailStr = Field(...)
     password: str = Field(...)
     region: str = Field(...)
     agent_id: Optional[PyObjectId] = Field(default=None)
+    permissions: Optional[list[str]] = Field(default=None)
+    campaigns: Optional[list[str]] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
         json_schema_extra={
             "example": {
-                "first_name": "Jane",
-                "last_name": "Doe",
+                "name": "Jane Doe",
                 "email": "janedoe@email.com",
                 "password": "password",
                 "region": "USA/Eastern",
-                "agent_id": "5f9c0a9e9c6d4b1e9c6d4b1e"
+                "agent_id": "5f9c0a9e9c6d4b1e9c6d4b1e",
+                "permissions": ["user"],
+                "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e"]
             }
         }
     )
 
     @property
-    def full_name(self):
-        return f"{self.first_name} {self.last_name}"
+    def ROLE_AGENCY(self) -> str:
+        return "agency"
+
+    @property
+    def ROLE_AGENT(self) -> str:
+        return "agent"
+
+    @property
+    def ROLE_ADMIN(self) -> str:
+        return "admin"
+
+    def is_admin(self) -> bool:
+        return self.ROLE_ADMIN in self.permissions
+
+    def is_agent(self) -> bool:
+        return self.ROLE_AGENT in self.permissions
+
+    def is_agency(self) -> bool:
+        return self.ROLE_AGENCY in self.permissions
 
 
 class UserSignIn(HTTPBasicCredentials):
@@ -52,14 +71,14 @@ class UserSignIn(HTTPBasicCredentials):
 
 
 class UserData(BaseModel):
-    full_name: str
+    name: str
     email: EmailStr
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
         json_schema_extra={
             "example": {
-                "full_name": "Jane Doe",
+                "name": "Jane Doe",
                 "email": "janedoe@email.com"
             }
         }
