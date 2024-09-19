@@ -168,6 +168,7 @@ async def get_all_leads(page, limit, sort, filter):
                     "campaign_id": 1,
                     "created_time": 1,
                     "custom_fields": 1,
+                    "is_second_chance": 1,
                     "lead_received_date": {
                         "$cond": {
                             "if": {"$eq": ["$buyer_id", agent_id]},
@@ -181,11 +182,11 @@ async def get_all_leads(page, limit, sort, filter):
                             }
                         }
                     },
-                    "is_second_chance": {
+                    "lead_type": {
                         "$cond": {
                             "if": {"$eq": [agent_id, "$second_chance_buyer_id"]},
-                            "then": True,
-                            "else": False
+                            "then": "2nd Chance",
+                            "else": "Fresh"
                         }
                     }
                 }}

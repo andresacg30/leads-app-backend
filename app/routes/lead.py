@@ -181,6 +181,14 @@ async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=D
     """
     try:
         filter = ast.literal_eval(filter) if filter else None
+        if "buyer_id" in filter and filter["buyer_id"] == "null":
+            filter["buyer_id"] = None
+            filter["is_second_chance"] = False
+            filter["$or"] = [{"custom_fields.invalid": "no"}, {"custom_fields.invalid": {"$exists": False}}]
+        if "second_chance_buyer_id" in filter and filter["second_chance_buyer_id"] == "null":
+            filter["second_chance_buyer_id"] = None
+            filter["is_second_chance"] = True
+            filter["custom_fields.invalid"] = "no"
         sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
         if not user.is_admin():
             if not filter:

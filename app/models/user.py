@@ -17,6 +17,7 @@ class UserModel(BaseModel):
     password: str = Field(...)
     region: str = Field(...)
     agent_id: Optional[PyObjectId] = Field(default=None)
+    refresh_token: Optional[str] = Field(default=None)
     permissions: Optional[list[str]] = Field(default=None)
     campaigns: Optional[list[str]] = Field(default=None)
     model_config = ConfigDict(
@@ -83,3 +84,7 @@ class UserData(BaseModel):
             }
         }
     )
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

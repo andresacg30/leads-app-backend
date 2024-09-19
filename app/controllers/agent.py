@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import bson
 import difflib
 
@@ -8,6 +8,7 @@ from pymongo import ReturnDocument
 from motor.core import AgnosticCollection
 
 from app.db import Database
+from app.controllers.lead import get_lead_collection
 from app.models.agent import AgentModel, UpdateAgentModel
 
 
@@ -186,6 +187,53 @@ async def delete_agents(ids):
     agent_collection = get_agent_collection()
     result = await agent_collection.delete_many({"_id": {"$in": [ObjectId(id) for id in ids if id != "null"]}})
     return result
+
+
+async def get_active_agents(user_campaigns):
+    lead_collection = get_lead_collection()
+    nine_days_ago = datetime.utcnow() - timedelta(days=9)
+
+    pipeline = [
+        {"$match": {
+            "$or": [
+                {"lead_sold_time": {"$gte": nine_days_ago}},
+                {"second_chance_lead_sold_time": {"$gte": nine_days_ago}}
+            ],
+            "campaign_id": {"$in": user_campaigns},
+        }},
+        {"$project": {
+            "buyer_ids": {
+                "$cond": {
+                    "if": {"$gte": ["$lead_sold_time", nine_days_ago]},
+                    "then": "$buyer_id",
+                    "else": None
+                },
+            },
+            "second_chance_buyer_ids": {
+                "$cond": {
+                    "if": {"$gte": ["$second_chance_lead_sold_time", nine_days_ago]},
+                    "then": "$second_chance_buyer_id",
+                    "else": None
+                }
+            }
+        }},
+        {"$project": {
+            "buyer_ids": {
+                "$setUnion": [["$buyer_ids"], ["$second_chance_buyer_ids"]]
+            }
+        }},
+        {"$unwind": "$buyer_ids"},
+        {"$match": {"buyer_ids": {"$ne": None}}},
+        {"$group": {
+            "_id": None,
+            "unique_buyer_ids": {"$addToSet": "$buyer_ids"}
+        }}
+    ]
+
+    result = await lead_collection.aggregate(pipeline).to_list(length=None)
+    active_agents = result[0]["unique_buyer_ids"] if result else []
+    total = len(active_agents)
+    return active_agents, total
 
 
 def _filter_formatter_helper(filter):

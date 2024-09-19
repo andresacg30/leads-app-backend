@@ -57,3 +57,11 @@ async def update_user(user: user.UserModel):
     user_collection = get_user_collection()
     await user_collection.update_one({"_id": bson.ObjectId(user.id)}, {"$set": user.model_dump(by_alias=True, exclude=["id"])})
     return user
+
+
+async def store_refresh_token(username: str, refresh_token: str):
+    user_collection = get_user_collection()
+    await user_collection.update_one(
+        {"email": username},
+        {"$set": {"refresh_token": refresh_token}}
+    )
