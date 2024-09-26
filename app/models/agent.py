@@ -81,6 +81,13 @@ class AgentModel(BaseModel):
         if isinstance(v, int):
             return str(v)
         return v
+    @root_validator(pre=True)
+    def strip_fields(cls, values):
+        fields_to_strip = ['first_name', 'last_name', 'phone', 'email']
+        for field in fields_to_strip:
+            if field in values and isinstance(values[field], str):
+                values[field] = values[field].strip()
+        return values
 
     # @validator('created_time', pre=True, always=True)
     # def ensure_created_time_is_datetime(cls, v):

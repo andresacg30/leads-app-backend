@@ -14,9 +14,9 @@ class LeadModel(BaseModel):
     Container for a single Lead record.
     """
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
-    first_name: str = Field(...)
-    email: EmailStr = Field(...)
-    phone: str = Field(...)
+    first_name: Optional[str] = Field(...)
+    email: Optional[str] = Field(...)
+    phone: Optional[str] = Field(...)
     state: Optional[str] = Field(...)
     origin: Optional[str] = Field(...)
     last_name: Optional[str] = Field(...)
@@ -46,6 +46,13 @@ class LeadModel(BaseModel):
                 if isinstance(value, float) and math.isnan(value):
                     custom_fields[key] = ""
         values['custom_fields'] = custom_fields
+        return values
+    @root_validator(pre=True)
+    def strip_fields(cls, values):
+        fields_to_strip = ['first_name', 'last_name', 'phone', 'email']
+        for field in fields_to_strip:
+            if field in values and isinstance(values[field], str):
+                values[field] = values[field].strip()
         return values
     model_config = ConfigDict(
         populate_by_name=True,
