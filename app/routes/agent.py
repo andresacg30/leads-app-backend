@@ -53,6 +53,22 @@ async def get_agent_id_by_field(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.get(
+    "/get-active",
+    response_description="Get active agents",
+    response_model_by_alias=False
+)
+async def get_active_agents(user: UserModel = Depends(get_current_user)):
+    """
+    Get the record for all active agents.
+    """
+    if not user.is_admin():
+        if not user.campaigns:
+            raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+    agents, total = await agent_controller.get_active_agents(user_campaigns=user.campaigns)
+    return {"data": agents, "total": total}
+
+
 @router.post(
     "/get-many",
     response_description="Get multiple agents",

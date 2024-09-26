@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import bson
 import difflib
 
@@ -8,6 +8,7 @@ from pymongo import ReturnDocument
 from motor.core import AgnosticCollection
 
 from app.db import Database
+from app.controllers.lead import get_lead_collection
 from app.models.agent import AgentModel, UpdateAgentModel
 
 
@@ -90,26 +91,7 @@ async def create_agent(agent: AgentModel):
 async def get_all_agents(page, limit, sort, filter):
     pipeline = []
     if filter:
-        filter["created_time"] = {}
-        if "q" in filter:
-            query_value = filter["q"]
-            filter["$or"] = [
-                {"first_name": {"$regex": query_value, "$options": "i"}},
-                {"last_name": {"$regex": query_value, "$options": "i"}},
-                {"email": {"$regex": query_value, "$options": "i"}},
-                {"phone": {"$regex": query_value, "$options": "i"}}
-            ]
-            filter.pop("q")
-        if "created_time_gte" not in filter and "created_time_lte" not in filter:
-            filter.pop("created_time")
-        if "created_time_gte" in filter:
-            filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.000Z")
-        if "created_time_lte" in filter:
-            filter["created_time"]["$lte"] = datetime.strptime(filter.pop("created_time_lte"), "%Y-%m-%dT%H:%M:%S.000Z")
-        if "first_name" in filter:
-            filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
-        if "last_name" in filter:
-            filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
+        filter = _filter_formatter_helper(filter)
         if "user_campaigns" in filter:
             campaigns = filter.pop("user_campaigns")
             filter["campaigns"] = {"$in": campaigns}
@@ -137,7 +119,6 @@ async def get_all_agents(page, limit, sort, filter):
                     "custom_fields": 1
                 }}
             ]
-
     agent_collection = get_agent_collection()
     if pipeline:
         agents = await agent_collection.aggregate(pipeline).to_list(None)
@@ -206,3 +187,74 @@ async def delete_agents(ids):
     agent_collection = get_agent_collection()
     result = await agent_collection.delete_many({"_id": {"$in": [ObjectId(id) for id in ids if id != "null"]}})
     return result
+
+
+async def get_active_agents(user_campaigns):
+    lead_collection = get_lead_collection()
+    nine_days_ago = datetime.utcnow() - timedelta(days=9)
+
+    pipeline = [
+        {"$match": {
+            "$or": [
+                {"lead_sold_time": {"$gte": nine_days_ago}},
+                {"second_chance_lead_sold_time": {"$gte": nine_days_ago}}
+            ],
+            "campaign_id": {"$in": user_campaigns},
+        }},
+        {"$project": {
+            "buyer_ids": {
+                "$cond": {
+                    "if": {"$gte": ["$lead_sold_time", nine_days_ago]},
+                    "then": "$buyer_id",
+                    "else": None
+                },
+            },
+            "second_chance_buyer_ids": {
+                "$cond": {
+                    "if": {"$gte": ["$second_chance_lead_sold_time", nine_days_ago]},
+                    "then": "$second_chance_buyer_id",
+                    "else": None
+                }
+            }
+        }},
+        {"$project": {
+            "buyer_ids": {
+                "$setUnion": [["$buyer_ids"], ["$second_chance_buyer_ids"]]
+            }
+        }},
+        {"$unwind": "$buyer_ids"},
+        {"$match": {"buyer_ids": {"$ne": None}}},
+        {"$group": {
+            "_id": None,
+            "unique_buyer_ids": {"$addToSet": "$buyer_ids"}
+        }}
+    ]
+
+    result = await lead_collection.aggregate(pipeline).to_list(length=None)
+    active_agents = result[0]["unique_buyer_ids"] if result else []
+    total = len(active_agents)
+    return active_agents, total
+
+
+def _filter_formatter_helper(filter):
+    filter["created_time"] = {}
+    if "q" in filter:
+        query_value = filter["q"]
+        filter["$or"] = [
+            {"first_name": {"$regex": query_value, "$options": "i"}},
+            {"last_name": {"$regex": query_value, "$options": "i"}},
+            {"email": {"$regex": query_value, "$options": "i"}},
+            {"phone": {"$regex": query_value, "$options": "i"}}
+        ]
+        filter.pop("q")
+    if "created_time_gte" not in filter and "created_time_lte" not in filter:
+        filter.pop("created_time")
+    if "created_time_gte" in filter:
+        filter["created_time"]["$gte"] = datetime.strptime(filter.pop("created_time_gte"), "%Y-%m-%dT%H:%M:%S.000Z")
+    if "created_time_lte" in filter:
+        filter["created_time"]["$lte"] = datetime.strptime(filter.pop("created_time_lte"), "%Y-%m-%dT%H:%M:%S.000Z")
+    if "first_name" in filter:
+        filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
+    if "last_name" in filter:
+        filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
+    return filter

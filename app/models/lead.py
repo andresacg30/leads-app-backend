@@ -15,17 +15,19 @@ class LeadModel(BaseModel):
     """
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     first_name: str = Field(...)
-    last_name: str = Field(...)
     email: EmailStr = Field(...)
     phone: str = Field(...)
     state: Optional[str] = Field(...)
-    origin: str = Field(...)
+    origin: Optional[str] = Field(...)
+    last_name: Optional[str] = Field(...)
     buyer_id: Optional[PyObjectId] = Field(default=None)
     second_chance_buyer_id: Optional[PyObjectId] = Field(default=None)
     created_time: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     lead_sold_time: Optional[datetime.datetime] = Field(default=None)
     second_chance_lead_sold_time: Optional[datetime.datetime] = Field(default=None)
     lead_sold_by_agent_time: Optional[datetime.datetime] = Field(default=None)
+    lead_received_date: Optional[datetime.datetime] = None
+    lead_type: Optional[str] = None
     campaign_id: PyObjectId = Field(...)
     is_second_chance: bool = Field(default=False)
     custom_fields: Optional[dict] = Field(default=None)
@@ -93,6 +95,7 @@ class UpdateLeadModel(BaseModel):
     lead_sold_time: Optional[datetime.datetime] = None
     second_chance_lead_sold_time: Optional[datetime.datetime] = None
     lead_sold_by_agent_time: Optional[datetime.datetime] = None
+    lead_received_date: Optional[datetime.datetime] = None
     campaign_id: PyObjectId = None
     is_second_chance: Optional[bool] = None
     custom_fields: Optional[dict] = None

@@ -89,9 +89,8 @@ async def show_lead(id: str, user: UserModel = Depends(get_current_user)):
             if lead["campaign_id"] not in user.campaigns:
                 raise HTTPException(status_code=404, detail="User does not have access to this campaign")
             if user.is_agent():
-                if lead["buyer_id"] != user.agent_id:
-                    if lead["second_chance_buyer_id"] != user.agent_id:
-                        raise HTTPException(status_code=404, detail="User does not have access to this lead")
+                if id != user.agent_id:
+                    raise HTTPException(status_code=404, detail="User does not have access to this lead")
         return lead
 
     except lead_controller.LeadNotFoundError as e:
@@ -182,6 +181,14 @@ async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=D
     """
     try:
         filter = ast.literal_eval(filter) if filter else None
+        if "buyer_id" in filter and filter["buyer_id"] == "null":
+            filter["buyer_id"] = None
+            filter["is_second_chance"] = False
+            filter["$or"] = [{"custom_fields.invalid": "no"}, {"custom_fields.invalid": {"$exists": False}}]
+        if "second_chance_buyer_id" in filter and filter["second_chance_buyer_id"] == "null":
+            filter["second_chance_buyer_id"] = None
+            filter["is_second_chance"] = True
+            filter["custom_fields.invalid"] = "no"
         sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
         if not user.is_admin():
             if not filter:
@@ -198,6 +205,7 @@ async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=D
                     {"buyer_id": user.agent_id},
                     {"second_chance_buyer_id": user.agent_id}
                 ]
+                filter["agent_id"] = user.agent_id
 
         leads, total = await lead_controller.get_all_leads(page=page, limit=limit, sort=sort, filter=filter)
         return {"data": list(lead.model_dump() for lead in LeadCollection(data=leads).data), "total": total}
