@@ -81,6 +81,6 @@ async def user_signup(request: Request, user: UserModel = Body(...)):
 
     await user_controller.create_user(user)
     return {
-        "full_name": user.full_name,
+        "name": user.name,
         "email": user.email
     }
