@@ -136,6 +136,8 @@ async def get_all_leads(page, limit, sort, filter):
         filter = _format_created_time_filter(filter)
         filter = _format_lead_sold_time_filter(filter)
         filter = _format_second_chance_lead_sold_time_filter(filter)
+        if "lead_received_date" in filter:
+            filter = _format_lead_received_date_filter()
         if "first_name" in filter:
             filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
         if "last_name" in filter:
@@ -242,6 +244,39 @@ def _format_created_time_filter(filter):
 
     return filter
 
+def _format_lead_received_date_filter(filter, date_gte, date_lte, agent_id):
+
+    if date_gte or date_lte:
+        date_filter = {}
+        if date_gte:
+            date_filter["$gte"] = datetime.strptime(date_gte, "%Y-%m-%dT%H:%M:%S.%fZ")
+        if date_lte:
+            date_filter["$lte"] = datetime.strptime(date_lte, "%Y-%m-%dT%H:%M:%S.%fZ")
+        
+        lead_receive_date_filter = {
+            "$cond": {
+                "if": {"$and": [
+                    {"$eq": ["$buyer_id", agent_id]},
+                    {"$gte": ["$lead_sold_time", date_filter.get("$gte", datetime.min)]},
+                    {"$lte": ["$lead_sold_time", date_filter.get("$lte", datetime.max)]}
+                ]},
+                "then": "$lead_sold_time",
+                "else": {
+                    "$cond": {
+                        "if": {"$and": [
+                            {"$eq": ["$second_chance_buyer_id", agent_id]},
+                            {"$gte": ["$second_chance_lead_sold_time", date_filter.get("$gte", datetime.min)]},
+                            {"$lte": ["$second_chance_lead_sold_time", date_filter.get("$lte", datetime.max)]}
+                        ]},
+                        "then": "$second_chance_lead_sold_time",
+                        "else": None
+                    }
+                }
+            }
+        }
+    
+    filter["cond"] = lead_receive_date_filter
+    return filter
 
 def _format_lead_sold_time_filter(filter):
     if "lead_sold_time_gte" in filter or "lead_sold_time_lte" in filter:

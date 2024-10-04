@@ -198,8 +198,9 @@ async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=D
             if "campaign_id" not in filter:
                 filter["campaign_id"] = {"$in": user.campaigns}
             else:
-                if filter["campaign_id"] not in user.campaigns:
+                if any(campaign_id not in user.campaigns for campaign_id in filter["campaign_id"]):
                     raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+                filter["campaign_id"] = {"$in": filter["campaign_id"]}
             if user.is_agent():
                 filter["$or"] = [
                     {"buyer_id": user.agent_id},
