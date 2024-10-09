@@ -1,8 +1,10 @@
+import json
+
 from fastapi import APIRouter, Body, status, HTTPException, Depends
 from fastapi.responses import Response
+from typing import Optional, Dict
 
 import app.controllers.lead as lead_controller
-import ast
 
 from app.auth.jwt_bearer import get_current_user
 from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
@@ -175,40 +177,65 @@ async def create_lead(lead: LeadModel = Body(...), user: UserModel = Depends(get
     response_description="Get all leads",
     response_model_by_alias=False
 )
-async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=DESC" , filter: str = None, user: UserModel = Depends(get_current_user)):
+async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=DESC", filter: str = None, user: UserModel = Depends(get_current_user)):
     """
     List all of the lead data in the database within the specified page and limit.
     """
     try:
-        filter = ast.literal_eval(filter) if filter else None
-        if "buyer_id" in filter and filter["buyer_id"] == "null":
-            filter["buyer_id"] = None
-            filter["is_second_chance"] = False
-            filter["$or"] = [{"custom_fields.invalid": "no"}, {"custom_fields.invalid": {"$exists": False}}]
-        if "second_chance_buyer_id" in filter and filter["second_chance_buyer_id"] == "null":
-            filter["second_chance_buyer_id"] = None
-            filter["is_second_chance"] = True
-            filter["custom_fields.invalid"] = "no"
-        sort = (sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1)
-        if not user.is_admin():
-            if not filter:
-                filter = {}
-            if not user.campaigns:
-                raise HTTPException(status_code=404, detail="User does not have access to this campaign")
-            if "campaign_id" not in filter:
-                filter["campaign_id"] = {"$in": user.campaigns}
-            else:
-                if any(campaign_id not in user.campaigns for campaign_id in filter["campaign_id"]):
-                    raise HTTPException(status_code=404, detail="User does not have access to this campaign")
-                filter["campaign_id"] = {"$in": filter["campaign_id"]}
-            if user.is_agent():
-                filter["$or"] = [
-                    {"buyer_id": user.agent_id},
-                    {"second_chance_buyer_id": user.agent_id}
-                ]
-                filter["agent_id"] = user.agent_id
+        filter = _parse_filter(filter)
+        if filter:
+            filter = _handle_buyer_filters(filter)
+        sort = _build_sort_tuple(sort)
+        filter = _handle_user_filters(filter, user)
 
         leads, total = await lead_controller.get_all_leads(page=page, limit=limit, sort=sort, filter=filter)
         return {"data": list(lead.model_dump() for lead in LeadCollection(data=leads).data), "total": total}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+def _parse_filter(filter_str: Optional[str]) -> Optional[Dict]:
+    if filter_str:
+        try:
+            return json.loads(filter_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid filter string: {e}")
+    return None
+
+
+def _build_sort_tuple(sort_str: str) -> tuple:
+    sort_field, sort_order = sort_str.split('=')
+    return (sort_field, 1 if sort_order == "ASC" else -1)
+
+
+def _handle_user_filters(filter: Dict, user: UserModel) -> Dict:
+    if not user.is_admin():
+        if not filter:
+            filter = {}
+        if not user.campaigns:
+            raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+        if "campaign_id" not in filter:
+            filter["campaign_id"] = {"$in": user.campaigns}
+        else:
+            if any(campaign_id not in user.campaigns for campaign_id in filter["campaign_id"]):
+                raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+            filter["campaign_id"] = {"$in": filter["campaign_id"]}
+        if user.is_agent():
+            filter["$or"] = [
+                {"buyer_id": user.agent_id},
+                {"second_chance_buyer_id": user.agent_id}
+            ]
+            filter["agent_id"] = user.agent_id
+    return filter
+
+
+def _handle_buyer_filters(filter: Dict) -> Dict:
+    if "buyer_id" in filter and filter["buyer_id"] == "null":
+        filter["buyer_id"] = None
+        filter["is_second_chance"] = False
+        filter["$or"] = [{"custom_fields.invalid": "no"}, {"custom_fields.invalid": {"$exists": False}}]
+    if "second_chance_buyer_id" in filter and filter["second_chance_buyer_id"] == "null":
+        filter["second_chance_buyer_id"] = None
+        filter["is_second_chance"] = True
+        filter["custom_fields.invalid"] = "no"
+    return filter

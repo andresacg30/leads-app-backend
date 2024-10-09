@@ -118,91 +118,37 @@ async def create_lead(lead: lead.LeadModel):
 
 
 async def get_all_leads(page, limit, sort, filter):
-    pipeline = []
-    if filter:
-        if "q" in filter:
-            query_value = filter["q"]
-            query_filters = [
-                {"first_name": {"$regex": query_value, "$options": "i"}},
-                {"last_name": {"$regex": query_value, "$options": "i"}},
-                {"email": {"$regex": query_value, "$options": "i"}},
-                {"phone": {"$regex": query_value, "$options": "i"}}
-            ]
-            if filter.get("$or"):
-                filter["$and"] = [{"$or": query_filters}, {"$or": filter.pop("$or")}]
-            else:
-                filter["$or"] = query_filters
-            filter.pop("q")
-        filter = _format_created_time_filter(filter)
-        filter = _format_lead_sold_time_filter(filter)
-        filter = _format_second_chance_lead_sold_time_filter(filter)
-        if "lead_received_date" in filter:
-            filter = _format_lead_received_date_filter()
-        if "first_name" in filter:
-            filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
-        if "last_name" in filter:
-            filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
-        if "agent_id" in filter:
-            if not filter["agent_id"]:
-                return [], 0
-            agent_id = filter.pop("agent_id")
-            filter["$or"] = [
-                {"buyer_id": agent_id},
-                {"second_chance_buyer_id": agent_id}
-            ]
-            pipeline = [
-                {"$match": filter},
-                {"$sort": {sort[0]: sort[1]}},
-                {"$skip": (page - 1) * limit},
-                {"$limit": limit},
-                {"$project": {
-                    "first_name": 1,
-                    "last_name": 1,
-                    "email": 1,
-                    "phone": 1,
-                    "state": 1,
-                    "origin": 1,
-                    "lead_sold_time": 1,
-                    "second_chance_lead_sold_time": 1,
-                    "buyer_id": 1,
-                    "second_chance_buyer_id": 1,
-                    "lead_sold_by_agent_time": 1,
-                    "campaign_id": 1,
-                    "created_time": 1,
-                    "custom_fields": 1,
-                    "is_second_chance": 1,
-                    "lead_received_date": {
-                        "$cond": {
-                            "if": {"$eq": ["$buyer_id", agent_id]},
-                            "then": "$lead_sold_time",
-                            "else": {
-                                "$cond": {
-                                    "if": {"$eq": ["$second_chance_buyer_id", agent_id]},
-                                    "then": "$second_chance_lead_sold_time",
-                                    "else": None
-                                }
-                            }
-                        }
-                    },
-                    "lead_type": {
-                        "$cond": {
-                            "if": {"$eq": [agent_id, "$second_chance_buyer_id"]},
-                            "then": "2nd Chance",
-                            "else": "Fresh"
-                        }
-                    }
-                }}
-            ]
+    if not filter:
+        filter = {}
+
+    filter = build_query_filters(filter)
+    filter, date_gte, date_lte = _handle_lead_received_date_filter(filter)
+
+    if "first_name" in filter:
+        filter["first_name"] = {"$regex": str.capitalize(filter["first_name"]), "$options": "i"}
+    if "last_name" in filter:
+        filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
+    if "agent_id" in filter:
+        if not filter["agent_id"]:
+            return [], 0
+        agent_id = filter.pop("agent_id")
+        filter["$or"] = [
+            {"buyer_id": agent_id},
+            {"second_chance_buyer_id": agent_id}
+        ]
+        pipeline = _build_aggregation_pipeline(filter, sort, page, limit, agent_id, date_gte, date_lte)
+    else:
+        pipeline = []
 
     lead_collection = get_lead_collection()
     if pipeline:
-        leads = await lead_collection.aggregate(pipeline).to_list(None)
+        result = await lead_collection.aggregate(pipeline).to_list(None)
+        leads = result[0]["data"]
+        total = result[0]["total"][0]["count"] if result[0]["total"] else 0
     else:
         leads = await lead_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
-    if filter:
-        total = await lead_collection.count_documents(filter)
-    else:
-        total = await lead_collection.count_documents({})
+        total = await lead_collection.count_documents(filter) if filter else await lead_collection.count_documents({})
+
     return leads, total
 
 
@@ -244,39 +190,6 @@ def _format_created_time_filter(filter):
 
     return filter
 
-def _format_lead_received_date_filter(filter, date_gte, date_lte, agent_id):
-
-    if date_gte or date_lte:
-        date_filter = {}
-        if date_gte:
-            date_filter["$gte"] = datetime.strptime(date_gte, "%Y-%m-%dT%H:%M:%S.%fZ")
-        if date_lte:
-            date_filter["$lte"] = datetime.strptime(date_lte, "%Y-%m-%dT%H:%M:%S.%fZ")
-        
-        lead_receive_date_filter = {
-            "$cond": {
-                "if": {"$and": [
-                    {"$eq": ["$buyer_id", agent_id]},
-                    {"$gte": ["$lead_sold_time", date_filter.get("$gte", datetime.min)]},
-                    {"$lte": ["$lead_sold_time", date_filter.get("$lte", datetime.max)]}
-                ]},
-                "then": "$lead_sold_time",
-                "else": {
-                    "$cond": {
-                        "if": {"$and": [
-                            {"$eq": ["$second_chance_buyer_id", agent_id]},
-                            {"$gte": ["$second_chance_lead_sold_time", date_filter.get("$gte", datetime.min)]},
-                            {"$lte": ["$second_chance_lead_sold_time", date_filter.get("$lte", datetime.max)]}
-                        ]},
-                        "then": "$second_chance_lead_sold_time",
-                        "else": None
-                    }
-                }
-            }
-        }
-    
-    filter["cond"] = lead_receive_date_filter
-    return filter
 
 def _format_lead_sold_time_filter(filter):
     if "lead_sold_time_gte" in filter or "lead_sold_time_lte" in filter:
@@ -298,3 +211,106 @@ def _format_second_chance_lead_sold_time_filter(filter):
         filter["second_chance_lead_sold_time"]["$lte"] = datetime.strptime(filter.pop("second_chance_lead_sold_time_lte"), "%Y-%m-%dT%H:%M:%S.%fZ")
 
     return filter
+
+
+def build_query_filters(filter):
+    if "q" in filter:
+        query_value = filter["q"]
+        query_filters = [
+            {"first_name": {"$regex": query_value, "$options": "i"}},
+            {"last_name": {"$regex": query_value, "$options": "i"}},
+            {"email": {"$regex": query_value, "$options": "i"}},
+            {"phone": {"$regex": query_value, "$options": "i"}}
+        ]
+        if filter.get("$or"):
+            filter["$and"] = [{"$or": query_filters}, {"$or": filter.pop("$or")}]
+        else:
+            filter["$or"] = query_filters
+        filter.pop("q")
+    filter = _format_created_time_filter(filter)
+    filter = _format_lead_sold_time_filter(filter)
+    filter = _format_second_chance_lead_sold_time_filter(filter)
+    return filter
+
+
+def _handle_lead_received_date_filter(filter):
+    if "lead_received_date_gte" in filter or "lead_received_date_lte" in filter:
+        date_gte = filter.pop("lead_received_date_gte", None)
+        date_lte = filter.pop("lead_received_date_lte", None)
+        if date_gte:
+            date_gte = datetime.strptime(date_gte, "%Y-%m-%dT%H:%M:%S.%fZ")
+        if date_lte:
+            date_lte = datetime.strptime(date_lte, "%Y-%m-%dT%H:%M:%S.%fZ")
+        return filter, date_gte, date_lte
+    return filter, None, None
+
+
+def _build_aggregation_pipeline(filter, sort, page, limit, agent_id, date_gte, date_lte):
+    pipeline_filter = filter.copy()
+    if date_gte:
+        pipeline_filter["lead_received_date"] = {"$gte": date_gte}
+    if date_lte:
+        pipeline_filter["lead_received_date"] = {"$lte": date_lte}
+    if date_gte and date_lte:
+        pipeline_filter["lead_received_date"] = {"$gte": date_gte, "$lte": date_lte}
+    pipeline = [
+        {"$project": {
+            "first_name": 1,
+            "last_name": 1,
+            "email": 1,
+            "phone": 1,
+            "state": 1,
+            "origin": 1,
+            "lead_sold_time": 1,
+            "second_chance_lead_sold_time": 1,
+            "buyer_id": 1,
+            "second_chance_buyer_id": 1,
+            "lead_sold_by_agent_time": 1,
+            "campaign_id": 1,
+            "created_time": 1,
+            "custom_fields": 1,
+            "lead_received_date": {
+                "$cond": {
+                    "if": {"$eq": ["$buyer_id", agent_id]},
+                    "then": "$lead_sold_time",
+                    "else": {
+                        "$cond": {
+                            "if": {"$eq": ["$second_chance_buyer_id", agent_id]},
+                            "then": "$second_chance_lead_sold_time",
+                            "else": None
+                        }
+                    }
+                }
+            },
+            "lead_type": {
+                "$cond": {
+                    "if": {"$eq": [agent_id, "$second_chance_buyer_id"]},
+                    "then": "2nd Chance",
+                    "else": "Fresh"
+                }
+            }
+        }},
+        {"$addFields": {
+            "is_second_chance": {
+                "$cond": {
+                    "if": {"$eq": ["$lead_type", "2nd Chance"]},
+                    "then": True,
+                    "else": False
+                }
+            }
+        }},
+        {"$facet": {
+            "data": [
+                {"$match": pipeline_filter},
+                {"$sort": {sort[0]: sort[1]}},
+                {"$skip": (page - 1) * limit},
+                {"$limit": limit}
+            ],
+            "total": [
+                {"$match": pipeline_filter},
+                {"$count": "count"}
+            ]
+        }}
+    ]
+
+    return pipeline
