@@ -1,18 +1,21 @@
 import datetime
 import math
 from bson import ObjectId
-from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator, validator, GetCoreSchemaHandler, field_validator
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator
+from pydantic import validator, GetCoreSchemaHandler, field_validator, GetJsonSchemaHandler
 from pydantic_core import core_schema
 from typing import List, Optional, Dict, Any
 
 
 class PyObjectId(ObjectId):
     @classmethod
-    def __get_pydantic_core_schema__(cls, source, handler: GetCoreSchemaHandler):
-        return core_schema.no_info_plain_validator_function(cls.validate)
+    def __get_pydantic_core_schema__(
+        cls, source: type, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.with_info_plain_validator_function(cls.validate)
 
     @classmethod
-    def validate(cls, v):
+    def validate(cls, v, info):
         if isinstance(v, ObjectId):
             return v
         if isinstance(v, str) and ObjectId.is_valid(v):
@@ -20,8 +23,12 @@ class PyObjectId(ObjectId):
         raise ValueError(f'Invalid ObjectId: {v}')
 
     @classmethod
-    def __modify_schema__(cls, field_schema):
-        field_schema.update(type='string')
+    def __get_pydantic_json_schema__(
+        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> dict:
+        json_schema = handler(core_schema)
+        json_schema.update(type='string')
+        return json_schema
 
 
 class CRMModel(BaseModel):
@@ -143,6 +150,15 @@ class AgentModel(BaseModel):
     @property
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
+
+    def to_json(self):
+        data = self.model_dump()
+        for key, value in data.items():
+            if isinstance(value, ObjectId):
+                data[key] = str(value)
+            elif isinstance(value, list):
+                data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
+        return data
 
 
 class UpdateAgentModel(BaseModel):
