@@ -77,7 +77,7 @@ async def update_campaigns_for_invoice(invoice_id, campaigns):
 async def create_invoice(invoice: InvoiceModel):
     invoice_collection = get_invoice_collection()
     created_invoice = await invoice_collection.insert_one(
-        invoice.model_dump(by_alias=True, exclude=["id"])
+        invoice.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
     return created_invoice
 
@@ -100,7 +100,7 @@ async def get_invoice(id):
 async def update_invoice(id, invoice: UpdateInvoiceModel):
     invoice_collection = get_invoice_collection()
     try:
-        invoice = {k: v for k, v in invoice.model_dump(by_alias=True).items() if v is not None}
+        invoice = {k: v for k, v in invoice.model_dump(by_alias=True, mode="python").items() if v is not None}
 
         if len(invoice) >= 1:
             update_result = await invoice_collection.find_one_and_update(

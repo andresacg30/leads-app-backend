@@ -1,10 +1,9 @@
 import datetime
+from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict
-from pydantic.functional_validators import BeforeValidator
-from typing import List, Optional, Annotated
+from typing import List, Optional
 
-
-PyObjectId = Annotated[str, BeforeValidator(str)]
+from app.tools.modifiers import PyObjectId
 
 
 class InvoiceModel(BaseModel):
@@ -30,6 +29,15 @@ class InvoiceModel(BaseModel):
             }
         }
     )
+
+    def to_json(self):
+        data = self.model_dump()
+        for key, value in data.items():
+            if isinstance(value, ObjectId):
+                data[key] = str(value)
+            elif isinstance(value, list):
+                data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
+        return data
 
 
 class UpdateInvoiceModel(BaseModel):
