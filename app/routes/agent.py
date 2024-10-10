@@ -175,12 +175,12 @@ async def show_agent(id: str, user: UserModel = Depends(get_current_user)):
         agent := await agent_controller.get_agent(id=id)
     ) is not None:
         if not user.is_admin():
-            for campaign in agent['campaigns']:
+            for campaign in agent.campaigns:
                 if campaign not in user.campaigns:
-                    agent["campaigns"].remove(campaign)
-            if len(agent["campaigns"]) == 0:
+                    agent.campaigns.remove(campaign)
+            if len(agent.campaigns) == 0:
                 raise HTTPException(status_code=404, detail="User does not have access to this agent")
-        return agent
+        return agent.to_json()
 
     raise HTTPException(status_code=404, detail=f"Agent {id} not found")
 

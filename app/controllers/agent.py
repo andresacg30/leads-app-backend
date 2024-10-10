@@ -136,7 +136,7 @@ async def get_agent(id):
     try:
         agent_in_db = await agent_collection.find_one({"_id": ObjectId(id)})
         agent = AgentModel(**agent_in_db)
-        return agent.to_json()
+        return agent
     except bson.errors.InvalidId:
         raise AgentIdInvalidError(f"Invalid id {id} on get agent route.")
 

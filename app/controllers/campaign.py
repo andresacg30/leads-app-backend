@@ -83,7 +83,8 @@ async def delete_campaign(id):
 
 async def get_campaigns(ids):
     campaign_collection = get_campaign_collection()
-    campaigns = await campaign_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
+    campaigns_in_db = await campaign_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
+    campaigns = [campaign.CampaignModel(**campaign_in_db).to_json() for campaign_in_db in campaigns_in_db]
     return campaigns
 
 
