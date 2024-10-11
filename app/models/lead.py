@@ -110,6 +110,7 @@ class UpdateLeadModel(BaseModel):
     lead_sold_time: Optional[datetime.datetime] = None
     second_chance_lead_sold_time: Optional[datetime.datetime] = None
     lead_sold_by_agent_time: Optional[datetime.datetime] = None
+    lead_sold_by_integrity: Optional[datetime.datetime] = Field(default=None)
     lead_received_date: Optional[datetime.datetime] = None
     campaign_id: PyObjectId = None
     is_second_chance: Optional[bool] = None
