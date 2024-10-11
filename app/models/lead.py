@@ -24,6 +24,7 @@ class LeadModel(BaseModel):
     lead_sold_time: Optional[datetime.datetime] = Field(default=None)
     second_chance_lead_sold_time: Optional[datetime.datetime] = Field(default=None)
     lead_sold_by_agent_time: Optional[datetime.datetime] = Field(default=None)
+    lead_sold_by_integrity: Optional[datetime.datetime] = Field(default=None)
     lead_received_date: Optional[datetime.datetime] = None
     lead_type: Optional[str] = None
     campaign_id: PyObjectId = Field(...)
