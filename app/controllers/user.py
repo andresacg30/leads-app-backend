@@ -48,10 +48,9 @@ async def get_user_by_field(**kwargs):
     user_collection = get_user_collection()
     query = {k: v for k, v in kwargs.items() if v is not None}
     user_in_db = await user_collection.find_one(query)
-    user = user_model.UserModel(**user_in_db).to_json()
-    if not user:
+    if not user_in_db:
         raise UserNotFoundError("User not found with the provided information.")
-    return user
+    return user_in_db
 
 
 async def update_user(user: user_model.UserModel):

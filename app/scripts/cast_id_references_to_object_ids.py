@@ -1,4 +1,5 @@
-from bson import ObjectId
+from bson.objectid import ObjectId
+from bson.errors import InvalidId
 from pymongo import UpdateMany
 
 from app.db import Database
@@ -24,13 +25,18 @@ async def update_lead_references():
     updates = []
 
     async for lead in lead_collection.find():
-        campaign_id = ObjectId(lead["campaign_id"])
-        if "buyer_id" not in lead:
-            lead["buyer_id"] = "null"
-        buyer_id = ObjectId(lead["buyer_id"]) if lead["buyer_id"] != "null" else None
-        if "second_chance_buyer_id" not in lead:
-            lead["second_chance_buyer_id"] = "null"
-        second_chance_buyer_id = ObjectId(lead["second_chance_buyer_id"]) if lead["second_chance_buyer_id"] != "null" else None
+        def to_objectid(value):
+            if value and value not in ["null", ""]:
+                try:
+                    return ObjectId(value)
+                except InvalidId:
+                    pass
+            return None
+
+        campaign_id = to_objectid(lead.get("campaign_id"))
+        buyer_id = to_objectid(lead.get("buyer_id"))
+        second_chance_buyer_id = to_objectid(lead.get("second_chance_buyer_id"))
+
         updates.append(UpdateMany(
             {"_id": lead["_id"]},
             {"$set": {
@@ -39,6 +45,7 @@ async def update_lead_references():
                 "second_chance_buyer_id": second_chance_buyer_id
             }}
         ))
+
     if updates:
         await lead_collection.bulk_write(updates)
         print("Updated lead references")

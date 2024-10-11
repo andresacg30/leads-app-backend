@@ -160,7 +160,7 @@ async def get_one_lead(id):
         if (
             lead_in_db := await lead_collection.find_one({"_id": ObjectId(id)})
         ) is not None:
-            lead = lead_model.LeadModel(**lead_in_db).to_json()
+            lead = lead_model.LeadModel(**lead_in_db)
             return lead
 
         raise LeadNotFoundError(f"Lead with id {id} not found")
