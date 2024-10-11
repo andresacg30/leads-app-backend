@@ -23,3 +23,9 @@ def format_time(time: datetime.datetime):
 def format_string_to_datetime(date):
     formatted_date = datetime.datetime.strptime(date, "%m/%d/%Y")
     return formatted_date
+
+
+def format_string_to_utc_datetime(date: datetime.datetime):
+    est_date = date.replace(tzinfo=ZoneInfo("America/New_York"))
+    utc_date = est_date.astimezone(ZoneInfo("UTC"))
+    return utc_date

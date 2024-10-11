@@ -35,12 +35,11 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
     lead_collection = get_lead_collection()
     try:
         lead = {k: v for k, v in lead.model_dump(by_alias=True, mode="python").items() if v is not None}
-        if "buyer_id" in lead:
-            lead["lead_sold_time"] = datetime.utcnow()
-        if "second_chance_buyer_id" in lead:
-            lead["second_chance_lead_sold_time"] = datetime.utcnow()
-        if "lead_sold_by_agent_time" in lead:
-            lead["lead_sold_by_agent_time"] = datetime.utcnow()
+        datetime_fields = ["created_time", "lead_sold_time", "second_chance_lead_sold_time", "lead_sold_by_agent_time"]
+        if any(field in lead for field in datetime_fields):
+            for field in datetime_fields:
+                if field in lead:
+                    lead[field] = formatter.format_string_to_utc_datetime(lead[field])
         if len(lead) >= 1:
             update_result = await lead_collection.find_one_and_update(
                 {"_id": ObjectId(id)},
