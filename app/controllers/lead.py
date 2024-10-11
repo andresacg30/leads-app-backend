@@ -101,8 +101,7 @@ async def get_lead_by_field(**kwargs):
             query["second_chance_buyer_id"] = str(second_chance_buyer_id["_id"])
         except agent_controller.AgentNotFoundError as e:
             raise LeadNotFoundError(str(e))
-    lead_in_db = await lead_collection.find_one(query, sort=[("created_time", -1)])
-    lead = lead_model.LeadModel(**lead_in_db).to_json()
+    lead = await lead_collection.find_one(query, sort=[("created_time", -1)])
     if not lead:
         raise LeadNotFoundError("Lead not found with the provided information.")
 
