@@ -35,7 +35,7 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
     lead_collection = get_lead_collection()
     try:
         lead = {k: v for k, v in lead.model_dump(by_alias=True, mode="python").items() if v is not None}
-        datetime_fields = ["created_time", "lead_sold_time", "second_chance_lead_sold_time", "lead_sold_by_agent_time", "lead_sold_by_integrity"]
+        datetime_fields = ["created_time", "lead_sold_time", "second_chance_lead_sold_time", "lead_sold_by_agent_time"]
         if any(field in lead for field in datetime_fields):
             for field in datetime_fields:
                 if field in lead:
