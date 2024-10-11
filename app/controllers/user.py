@@ -5,7 +5,7 @@ from fastapi.security import HTTPBasicCredentials, HTTPBasic
 from motor.core import AgnosticCollection
 
 from app.db import Database
-from app.models import user
+from app.models import user as user_model
 from app.tools import jwt_helper
 
 
@@ -37,25 +37,25 @@ async def validate_login(credentials: HTTPBasicCredentials = Depends(security)):
     )
 
 
-async def create_user(user: user.UserModel):
+async def create_user(user: user_model.UserModel):
     user_collection = get_user_collection()
     user.password = jwt_helper.encrypt(user.password)
-    new_user = await user_collection.insert_one(user.model_dump(by_alias=True, exclude=["id"]))
+    new_user = await user_collection.insert_one(user.model_dump(by_alias=True, exclude=["id"], mode="python"))
     return new_user
 
 
 async def get_user_by_field(**kwargs):
     user_collection = get_user_collection()
     query = {k: v for k, v in kwargs.items() if v is not None}
-    user = await user_collection.find_one(query)
-    if not user:
+    user_in_db = await user_collection.find_one(query)
+    if not user_in_db:
         raise UserNotFoundError("User not found with the provided information.")
-    return user
+    return user_in_db
 
 
-async def update_user(user: user.UserModel):
+async def update_user(user: user_model.UserModel):
     user_collection = get_user_collection()
-    await user_collection.update_one({"_id": bson.ObjectId(user.id)}, {"$set": user.model_dump(by_alias=True, exclude=["id"])})
+    await user_collection.update_one({"_id": bson.ObjectId(user.id)}, {"$set": user.model_dump(by_alias=True, exclude=["id"], mode="python")})
     return user
 
 

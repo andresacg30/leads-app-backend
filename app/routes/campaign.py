@@ -26,7 +26,7 @@ async def get_multiple_campaigns(ids: List[str] = Body(...), user: UserModel = D
     """
     try:
         campaigns = await campaign_controller.get_campaigns(ids)
-        return {"data": list(campaign.model_dump() for campaign in CampaignCollection(data=campaigns).data)}
+        return {"data": list(campaign.to_json() for campaign in CampaignCollection(data=campaigns).data)}
     except campaign_controller.CampaignNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -137,7 +137,7 @@ async def list_campaigns(page: int = 1, limit: int = 10, sort: str = "start_date
         sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
         campaigns, total = await campaign_controller.get_all_campaigns(page=page, limit=limit, sort=sort, filter=filter)
         return {
-            "data": list(campaign.model_dump() for campaign in CampaignCollection(data=campaigns).data),
+            "data": list(campaign.to_json() for campaign in CampaignCollection(data=campaigns).data),
             "total": total
         }
     except ValueError as e:

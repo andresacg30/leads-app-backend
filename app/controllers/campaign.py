@@ -28,7 +28,7 @@ async def get_campaign_by_name(campaign_name: str):
 async def create_campaign(campaign: campaign.CampaignModel):
     campaign_collection = get_campaign_collection()
     new_campaign = await campaign_collection.insert_one(
-        campaign.model_dump(by_alias=True, exclude=["id"])
+        campaign.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
     return new_campaign
 
@@ -54,7 +54,7 @@ async def get_one_campaign(id):
 
 async def update_campaign(id, campaign: campaign.UpdateCampaignModel):
     campaign_collection = get_campaign_collection()
-    campaign = {k: v for k, v in campaign.model_dump(by_alias=True).items() if v is not None}
+    campaign = {k: v for k, v in campaign.model_dump(by_alias=True, mode="python").items() if v is not None}
 
     if len(campaign) >= 1:
         update_result = await campaign_collection.find_one_and_update(
@@ -83,7 +83,8 @@ async def delete_campaign(id):
 
 async def get_campaigns(ids):
     campaign_collection = get_campaign_collection()
-    campaigns = await campaign_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
+    campaigns_in_db = await campaign_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
+    campaigns = [campaign.CampaignModel(**campaign_in_db).to_json() for campaign_in_db in campaigns_in_db]
     return campaigns
 
 

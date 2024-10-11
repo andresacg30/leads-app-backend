@@ -83,7 +83,7 @@ async def update_campaigns_for_agent(agent_id, campaigns):
 async def create_agent(agent: AgentModel):
     agent_collection = get_agent_collection()
     created_agent = await agent_collection.insert_one(
-        agent.model_dump(by_alias=True, exclude=["id"])
+        agent.model_dump(by_alias=True, exclude=["id", "full_name"], mode="python")
     )
     return created_agent
 
@@ -135,17 +135,18 @@ async def get_agent(id):
     agent_collection = get_agent_collection()
     try:
         agent_in_db = await agent_collection.find_one({"_id": ObjectId(id)})
-        return agent_in_db
+        agent = AgentModel(**agent_in_db)
+        return agent
     except bson.errors.InvalidId:
         raise AgentIdInvalidError(f"Invalid id {id} on get agent route.")
 
 
 async def update_agent(id, agent: UpdateAgentModel):
-    if all([v is None for v in agent.model_dump().values()]):
+    if all([v is None for v in agent.model_dump(mode="python").values()]):
         raise AgentEmptyError("Empty agent fields provided for update.")
     agent_collection = get_agent_collection()
     try:
-        agent = {k: v for k, v in agent.model_dump(by_alias=True).items() if v is not None}
+        agent = {k: v for k, v in agent.model_dump(by_alias=True, mode="python").items() if v is not None}
 
         if len(agent) >= 1:
             update_result = await agent_collection.find_one_and_update(
@@ -224,6 +225,9 @@ async def get_active_agents(user_campaigns):
         }},
         {"$unwind": "$buyer_ids"},
         {"$match": {"buyer_ids": {"$ne": None}}},
+        {"$project": {
+            "buyer_ids": {"$toString": "$buyer_ids"}
+        }},
         {"$group": {
             "_id": None,
             "unique_buyer_ids": {"$addToSet": "$buyer_ids"}

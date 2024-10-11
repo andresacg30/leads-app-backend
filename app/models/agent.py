@@ -1,12 +1,11 @@
 import datetime
 import math
 from bson import ObjectId
-from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator, validator
-from pydantic.functional_validators import BeforeValidator
-from typing import List, Optional, Annotated, Dict, Any
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator
+from pydantic import validator, field_validator
+from typing import List, Optional, Dict, Any
 
-
-PyObjectId = Annotated[str, BeforeValidator(str)]
+from app.tools.modifiers import PyObjectId
 
 
 class CRMModel(BaseModel):
@@ -81,6 +80,13 @@ class AgentModel(BaseModel):
         if isinstance(v, int):
             return str(v)
         return v
+
+    @field_validator('campaigns', mode='before')
+    def validate_campaigns(cls, v):
+        if isinstance(v, list):
+            return [PyObjectId(i) if not isinstance(i, ObjectId) else i for i in v]
+        raise ValueError('Invalid campaigns list')
+
     @root_validator(pre=True)
     def strip_fields(cls, values):
         fields_to_strip = ['first_name', 'last_name', 'phone', 'email']
@@ -88,12 +94,6 @@ class AgentModel(BaseModel):
             if field in values and isinstance(values[field], str):
                 values[field] = values[field].strip()
         return values
-
-    # @validator('created_time', pre=True, always=True)
-    # def ensure_created_time_is_datetime(cls, v):
-    #     if isinstance(v, datetime.datetime):
-    #         return v
-    #     return datetime.datetime.strptime(v, "%Y-%m-%d")
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -128,6 +128,15 @@ class AgentModel(BaseModel):
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
 
+    def to_json(self):
+        data = self.model_dump()
+        for key, value in data.items():
+            if isinstance(value, ObjectId):
+                data[key] = str(value)
+            elif isinstance(value, list):
+                data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
+        return data
+
 
 class UpdateAgentModel(BaseModel):
     """
@@ -146,7 +155,6 @@ class UpdateAgentModel(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
-        json_encoders={ObjectId: str},
         json_schema_extra={
             "example": {
                 "first_name": "Jane",

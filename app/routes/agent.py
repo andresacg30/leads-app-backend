@@ -1,10 +1,12 @@
+import ast
+import json
+
 from typing import List
 from fastapi import APIRouter, Body, status, HTTPException, Depends
 from fastapi.responses import Response
 
 import app.controllers.agent as agent_controller
-import ast
-import json
+import app.controllers.campaign as campaign_controller
 
 from app.auth.jwt_bearer import get_current_user
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
@@ -65,6 +67,10 @@ async def get_active_agents(user: UserModel = Depends(get_current_user)):
     if not user.is_admin():
         if not user.campaigns:
             raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+    if user.is_admin():
+        campaigns = await campaign_controller.get_campaign_collection().find().to_list(None)
+        campaign_ids = [str(campaign["_id"]) for campaign in campaigns]
+        user.campaigns = campaign_ids
     agents, total = await agent_controller.get_active_agents(user_campaigns=user.campaigns)
     return {"data": agents, "total": total}
 
@@ -80,7 +86,7 @@ async def get_multiple_agents(ids: List[str] = Body(...)):
     """
     try:
         agents = await agent_controller.get_agents(ids)
-        return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data)}
+        return {"data": list(agent.to_json() for agent in AgentCollection(data=agents).data)}
     except agent_controller.AgentNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -148,7 +154,7 @@ async def list_agents(
             filter["user_campaigns"] = user.campaigns
         sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
         agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter)
-        return {"data": list(agent.model_dump() for agent in AgentCollection(data=agents).data), "total": total}
+        return {"data": list(agent.to_json() for agent in AgentCollection(data=agents).data), "total": total}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -156,7 +162,6 @@ async def list_agents(
 @router.get(
     "/{id}",
     response_description="Get a single agent",
-    response_model=AgentModel,
     response_model_by_alias=False
 )
 async def show_agent(id: str, user: UserModel = Depends(get_current_user)):
@@ -170,12 +175,12 @@ async def show_agent(id: str, user: UserModel = Depends(get_current_user)):
         agent := await agent_controller.get_agent(id=id)
     ) is not None:
         if not user.is_admin():
-            for campaign in agent['campaigns']:
+            for campaign in agent.campaigns:
                 if campaign not in user.campaigns:
-                    agent["campaigns"].remove(campaign)
-            if len(agent["campaigns"]) == 0:
+                    agent.campaigns.remove(campaign)
+            if len(agent.campaigns) == 0:
                 raise HTTPException(status_code=404, detail="User does not have access to this agent")
-        return agent
+        return agent.to_json()
 
     raise HTTPException(status_code=404, detail=f"Agent {id} not found")
 

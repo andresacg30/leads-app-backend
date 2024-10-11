@@ -78,7 +78,6 @@ async def update_lead_from_ghl(id: str, lead: UpdateLeadModel = Body(...)):
 @router.get(
     "/{id}",
     response_description="Get a single lead",
-    response_model=LeadModel,
     response_model_by_alias=False
 )
 async def show_lead(id: str, user: UserModel = Depends(get_current_user)):
@@ -93,7 +92,7 @@ async def show_lead(id: str, user: UserModel = Depends(get_current_user)):
             if user.is_agent():
                 if id != user.agent_id:
                     raise HTTPException(status_code=404, detail="User does not have access to this lead")
-        return lead
+        return lead.to_json()
 
     except lead_controller.LeadNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -189,7 +188,7 @@ async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=D
         filter = _handle_user_filters(filter, user)
 
         leads, total = await lead_controller.get_all_leads(page=page, limit=limit, sort=sort, filter=filter)
-        return {"data": list(lead.model_dump() for lead in LeadCollection(data=leads).data), "total": total}
+        return {"data": list(lead.to_json() for lead in LeadCollection(data=leads).data), "total": total}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

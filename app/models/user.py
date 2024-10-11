@@ -1,10 +1,9 @@
+from bson import ObjectId
 from fastapi.security import HTTPBasicCredentials
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
-from pydantic.functional_validators import BeforeValidator
-from typing import Optional, Annotated
+from typing import Optional
 
-
-PyObjectId = Annotated[str, BeforeValidator(str)]
+from app.tools.modifiers import PyObjectId
 
 
 class UserModel(BaseModel):
@@ -19,7 +18,7 @@ class UserModel(BaseModel):
     agent_id: Optional[PyObjectId] = Field(default=None)
     refresh_token: Optional[str] = Field(default=None)
     permissions: Optional[list[str]] = Field(default=None)
-    campaigns: Optional[list[str]] = Field(default=None)
+    campaigns: Optional[list[PyObjectId]] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -56,6 +55,15 @@ class UserModel(BaseModel):
 
     def is_agency(self) -> bool:
         return self.ROLE_AGENCY in self.permissions
+
+    def to_json(self):
+        data = self.model_dump()
+        for key, value in data.items():
+            if isinstance(value, ObjectId):
+                data[key] = str(value)
+            elif isinstance(value, list):
+                data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
+        return data
 
 
 class UserSignIn(HTTPBasicCredentials):

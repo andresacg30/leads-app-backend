@@ -2,11 +2,9 @@ import datetime
 import math
 from bson import ObjectId
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator, validator
-from pydantic.functional_validators import BeforeValidator
-from typing import List, Optional, Annotated
+from typing import List, Optional
 
-
-PyObjectId = Annotated[str, BeforeValidator(str)]
+from app.tools.modifiers import PyObjectId
 
 
 class LeadModel(BaseModel):
@@ -84,6 +82,15 @@ class LeadModel(BaseModel):
     @property
     def full_name(self) -> str:
         return str(self.first_name + " " + self.last_name)
+
+    def to_json(self):
+        data = self.model_dump()
+        for key, value in data.items():
+            if isinstance(value, ObjectId):
+                data[key] = str(value)
+            elif isinstance(value, list):
+                data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
+        return data
 
 
 class UpdateLeadModel(BaseModel):

@@ -8,7 +8,7 @@ from motor.core import AgnosticCollection
 
 from app.db import Database
 from app.controllers import agent as agent_controller
-from app.models import lead
+from app.models import lead as lead_model
 from app.tools import formatters as formatter
 
 
@@ -29,12 +29,12 @@ class LeadEmptyError(Exception):
     pass
 
 
-async def update_lead(id, lead: lead.UpdateLeadModel):
-    if all(v is None for v in lead.model_dump().values()):
+async def update_lead(id, lead: lead_model.UpdateLeadModel):
+    if all(v is None for v in lead.model_dump(mode="python").values()):
         raise LeadEmptyError("No values to update")
     lead_collection = get_lead_collection()
     try:
-        lead = {k: v for k, v in lead.model_dump(by_alias=True).items() if v is not None}
+        lead = {k: v for k, v in lead.model_dump(by_alias=True, mode="python").items() if v is not None}
         if "buyer_id" in lead:
             lead["lead_sold_time"] = datetime.utcnow()
         if "second_chance_buyer_id" in lead:
@@ -60,12 +60,12 @@ async def update_lead(id, lead: lead.UpdateLeadModel):
         raise LeadIdInvalidError(f"Invalid id {id} on update lead route")
 
 
-async def update_lead_from_ghl(id, lead: lead.UpdateLeadModel):
-    if all(v is None for v in lead.model_dump().values()):
+async def update_lead_from_ghl(id, lead: lead_model.UpdateLeadModel):
+    if all(v is None for v in lead.model_dump(mode="python").values()):
         raise LeadEmptyError("No values to update")
     lead_collection = get_lead_collection()
     try:
-        lead = {k: v for k, v in lead.model_dump(by_alias=True).items() if v is not None}
+        lead = {k: v for k, v in lead.model_dump(by_alias=True, mode="python").items() if v is not None}
         if "created_time" in lead:
             lead["created_time"] = formatter.format_time(lead["created_time"])
         if len(lead) >= 1:
@@ -102,17 +102,18 @@ async def get_lead_by_field(**kwargs):
             query["second_chance_buyer_id"] = str(second_chance_buyer_id["_id"])
         except agent_controller.AgentNotFoundError as e:
             raise LeadNotFoundError(str(e))
-    lead = await lead_collection.find_one(query, sort=[("created_time", -1)])
+    lead_in_db = await lead_collection.find_one(query, sort=[("created_time", -1)])
+    lead = lead_model.LeadModel(**lead_in_db).to_json()
     if not lead:
         raise LeadNotFoundError("Lead not found with the provided information.")
 
     return lead
 
 
-async def create_lead(lead: lead.LeadModel):
+async def create_lead(lead: lead_model.LeadModel):
     lead_collection = get_lead_collection()
     new_lead = await lead_collection.insert_one(
-        lead.model_dump(by_alias=True, exclude=["id"])
+        lead.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
     return new_lead
 
@@ -146,7 +147,8 @@ async def get_all_leads(page, limit, sort, filter):
         leads = result[0]["data"]
         total = result[0]["total"][0]["count"] if result[0]["total"] else 0
     else:
-        leads = await lead_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
+        leads_in_db = await lead_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
+        leads = [lead_model.LeadModel(**lead).to_json() for lead in leads_in_db]
         total = await lead_collection.count_documents(filter) if filter else await lead_collection.count_documents({})
 
     return leads, total
@@ -156,8 +158,9 @@ async def get_one_lead(id):
     lead_collection = get_lead_collection()
     try:
         if (
-            lead := await lead_collection.find_one({"_id": ObjectId(id)})
+            lead_in_db := await lead_collection.find_one({"_id": ObjectId(id)})
         ) is not None:
+            lead = lead_model.LeadModel(**lead_in_db)
             return lead
 
         raise LeadNotFoundError(f"Lead with id {id} not found")
