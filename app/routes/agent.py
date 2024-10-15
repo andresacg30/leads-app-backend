@@ -1,4 +1,5 @@
 import ast
+import bson
 import json
 
 from typing import List
@@ -37,7 +38,7 @@ async def get_agent_id_by_field(
         raise HTTPException(status_code=400, detail="First name and last name must be provided together")
     try:
         if not user.is_admin():
-            campaigns = {"$in": user.campaigns}
+            campaigns = {"$in": [bson.ObjectId(campaign) for campaign in user.campaigns]}
         else:
             campaigns = None
         if email:
@@ -69,7 +70,7 @@ async def get_active_agents(user: UserModel = Depends(get_current_user)):
             raise HTTPException(status_code=404, detail="User does not have access to this campaign")
     if user.is_admin():
         campaigns = await campaign_controller.get_campaign_collection().find().to_list(None)
-        campaign_ids = [str(campaign["_id"]) for campaign in campaigns]
+        campaign_ids = [bson.ObjectId(campaign["_id"]) for campaign in campaigns]
         user.campaigns = campaign_ids
     agents, total = await agent_controller.get_active_agents(user_campaigns=user.campaigns)
     return {"data": agents, "total": total}

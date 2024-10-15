@@ -1,3 +1,4 @@
+import bson
 import json
 
 from fastapi import APIRouter, Body, status, HTTPException, Depends
@@ -40,7 +41,7 @@ async def find_leads(
             email=email,
             buyer_name=buyer_name,
             second_chance_buyer_name=second_chance_buyer_name,
-            campaign_id=campaign_id
+            campaign_id=bson.ObjectId(campaign_id)
         )
         return {"id": str(lead["_id"])}
 
