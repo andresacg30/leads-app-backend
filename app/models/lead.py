@@ -145,21 +145,21 @@ class UpdateLeadModel(BaseModel):
         }
     )
 
-    # @field_validator('created_time', 'lead_sold_time', 'second_chance_lead_sold_time',
-    #                  'lead_sold_by_agent_time', 'lead_sold_by_integrity',
-    #                  'lead_received_date', mode='before')
-    # def parse_datetime(cls, v):
-    #     if v is None:
-    #         return v
-    #     if isinstance(v, datetime.datetime):
-    #         return v
-    #     if isinstance(v, str):
-    #         try:
-    #             dt = parser.parse(v)
-    #             return dt
-    #         except Exception as e:
-    #             raise ValueError(f"Invalid datetime format: {v}") from e
-    #     raise ValueError(f"Invalid type for datetime field: {v}")
+    @field_validator('created_time', 'lead_sold_time', 'second_chance_lead_sold_time',
+                     'lead_sold_by_agent_time', 'lead_sold_by_integrity',
+                     'lead_received_date', mode='before')
+    def parse_datetime(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, datetime.datetime):
+            return v
+        if isinstance(v, str):
+            try:
+                dt = parser.parse(v)
+                return dt
+            except Exception as e:
+                raise ValueError(e)
+        raise ValueError(f"Invalid type for datetime field: {v}")
 
 
 class LeadCollection(BaseModel):
