@@ -132,8 +132,8 @@ async def get_all_leads(page, limit, sort, filter):
             return [], 0
         agent_id = filter.pop("agent_id")
         filter["$or"] = [
-            {"buyer_id": agent_id},
-            {"second_chance_buyer_id": agent_id}
+            {"buyer_id": ObjectId(agent_id)},
+            {"second_chance_buyer_id": ObjectId(agent_id)}
         ]
         pipeline = _build_aggregation_pipeline(filter, sort, page, limit, agent_id, date_gte, date_lte)
     else:
@@ -228,6 +228,10 @@ def build_query_filters(filter):
         else:
             filter["$or"] = query_filters
         filter.pop("q")
+    if "buyer_id" in filter:
+        filter["buyer_id"] = ObjectId(filter["buyer_id"])
+    if "second_chance_buyer_id" in filter:
+        filter["second_chance_buyer_id"] = ObjectId(filter["second_chance_buyer_id"])
     filter = _format_created_time_filter(filter)
     filter = _format_lead_sold_time_filter(filter)
     filter = _format_second_chance_lead_sold_time_filter(filter)
