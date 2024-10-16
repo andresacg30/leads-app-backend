@@ -1,8 +1,9 @@
 import datetime
 import math
 from bson import ObjectId
-from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator, validator
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator, validator, field_validator
 from typing import List, Optional
+from dateutil import parser
 
 from app.tools.modifiers import PyObjectId
 
@@ -46,6 +47,7 @@ class LeadModel(BaseModel):
                     custom_fields[key] = ""
         values['custom_fields'] = custom_fields
         return values
+
     @root_validator(pre=True)
     def strip_fields(cls, values):
         fields_to_strip = ['first_name', 'last_name', 'phone', 'email']
@@ -142,6 +144,22 @@ class UpdateLeadModel(BaseModel):
             }
         }
     )
+
+    # @field_validator('created_time', 'lead_sold_time', 'second_chance_lead_sold_time',
+    #                  'lead_sold_by_agent_time', 'lead_sold_by_integrity',
+    #                  'lead_received_date', mode='before')
+    # def parse_datetime(cls, v):
+    #     if v is None:
+    #         return v
+    #     if isinstance(v, datetime.datetime):
+    #         return v
+    #     if isinstance(v, str):
+    #         try:
+    #             dt = parser.parse(v)
+    #             return dt
+    #         except Exception as e:
+    #             raise ValueError(f"Invalid datetime format: {v}") from e
+    #     raise ValueError(f"Invalid type for datetime field: {v}")
 
 
 class LeadCollection(BaseModel):
