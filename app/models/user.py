@@ -1,6 +1,6 @@
 from bson import ObjectId
 from fastapi.security import HTTPBasicCredentials
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator
 from typing import Optional
 
 from app.tools.modifiers import PyObjectId
@@ -15,10 +15,12 @@ class UserModel(BaseModel):
     email: EmailStr = Field(...)
     password: str = Field(...)
     region: str = Field(...)
+    phone: str = Field(default=None)
     agent_id: Optional[PyObjectId] = Field(default=None)
     refresh_token: Optional[str] = Field(default=None)
     permissions: Optional[list[str]] = Field(default=None)
     campaigns: Optional[list[PyObjectId]] = Field(default=None)
+    stripe_customer_id: Optional[str] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -47,6 +49,10 @@ class UserModel(BaseModel):
     def ROLE_ADMIN(self) -> str:
         return "admin"
 
+    @property
+    def ROLE_NEW_USER(self) -> str:
+        return "new_user"
+
     def is_admin(self) -> bool:
         return self.ROLE_ADMIN in self.permissions
 
@@ -56,6 +62,9 @@ class UserModel(BaseModel):
     def is_agency(self) -> bool:
         return self.ROLE_AGENCY in self.permissions
 
+    def is_new_user(self) -> bool:
+        return self.ROLE_NEW_USER in self.permissions
+
     def to_json(self):
         data = self.model_dump()
         for key, value in data.items():
@@ -64,6 +73,14 @@ class UserModel(BaseModel):
             elif isinstance(value, list):
                 data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
         return data
+
+    @root_validator(pre=True)
+    def strip_fields(cls, values):
+        fields_to_strip = ['first_name', 'last_name', 'phone', 'email']
+        for field in fields_to_strip:
+            if field in values and isinstance(values[field], str):
+                values[field] = values[field].strip()
+        return values
 
 
 class UserSignIn(HTTPBasicCredentials):

@@ -1,10 +1,10 @@
-
 from fastapi import Body, APIRouter, HTTPException, Request
 from passlib.context import CryptContext
 
 import app.controllers.user as user_controller
+
 from app.auth.jwt_handler import sign_jwt, decode_jwt
-from app.models.user import UserModel, UserData, UserSignIn, RefreshTokenRequest
+from app.models.user import UserModel, UserSignIn, RefreshTokenRequest
 from settings import Settings
 
 
@@ -66,12 +66,12 @@ async def refresh_token(refresh_request: RefreshTokenRequest = Body(...)):
         raise HTTPException(status_code=403, detail="Invalid refresh token")
 
 
-@router.post("", response_model=UserData)
-async def user_signup(request: Request, user: UserModel = Body(...)):
+@router.post("")
+async def user_signup(request: Request, user=Body(...)):
     if request.headers.get("x-api-key") != settings.api_key:
         raise HTTPException(status_code=403, detail="Invalid API Key")
     try:
-        user_exists = await user_controller.get_user_by_field(email=user.email)
+        user_exists = await user_controller.get_user_by_field(email=user["email"])
     except user_controller.UserNotFoundError:
         user_exists = None
     if user_exists:
@@ -79,8 +79,5 @@ async def user_signup(request: Request, user: UserModel = Body(...)):
             status_code=409, detail="user with email supplied already exists"
         )
 
-    await user_controller.create_user(user)
-    return {
-        "name": user.name,
-        "email": user.email
-    }
+    created_user = await user_controller.create_user(user)
+    return {"id": str(created_user.inserted_id)}
