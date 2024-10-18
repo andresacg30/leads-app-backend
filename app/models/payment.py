@@ -6,14 +6,28 @@ from typing import List, Optional
 from app.tools.modifiers import PyObjectId
 
 
-class InvoiceModel(BaseModel):
+class PaymentTypeRequest(BaseModel):
+    payment_type: str
+
+
+class ProductSelection(BaseModel):
+    product_id: str
+    quantity: int = 1  # Default quantity is 1
+
+
+class CheckoutRequest(BaseModel):
+    payment_type: str  # "one_time" or "recurring"
+    products: List[ProductSelection]
+
+
+class PaymentModel(BaseModel):
     """
-    A container for a single invoice record.
+    A container for a single payment record.
     """
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     amount: float = Field(...)
     created_time: datetime.datetime = Field(...)
-    agent_id: int = Field(...)
+    user_id: PyObjectId = Field(...)
     notes: str = Field(default=None)
     paid: bool = Field(default=False)
     model_config = ConfigDict(
@@ -40,9 +54,9 @@ class InvoiceModel(BaseModel):
         return data
 
 
-class UpdateInvoiceModel(BaseModel):
+class UpdatePaymentModel(BaseModel):
     """
-    A set of optional updates to be made to an invoice document in the database.
+    A set of optional updates to be made to an payment document in the database.
     """
     amount: Optional[float] = None
     created_time: Optional[datetime.datetime] = None
@@ -64,8 +78,8 @@ class UpdateInvoiceModel(BaseModel):
     )
 
 
-class InvoiceCollection(BaseModel):
+class PaymentCollection(BaseModel):
     """
-    A container for a collection of invoice records.
+    A container for a collection of payment records.
     """
-    invoices: List[InvoiceModel]
+    payments: List[PaymentModel]

@@ -59,3 +59,10 @@ state_mappings = {
     "Idaho": ["idaho", "id"],
     "South Dakota": ["south dakota", "south_dakota", "sd"]
     }
+
+
+PRODUCT_PRICE_MAPPING = {
+    "prod_R2f1YcMMFptUoa": "price_1QAZhZIHSqoAsHOYhkbBvVYT",  # Second Chance Lead
+    "prod_R2f02QmgCxq4kr": "price_1QAZgrIHSqoAsHOYJnzI0vU4",   # Fresh Lead
+    "prod_R34vStwnAlhcUa": "price_1QAylHIHSqoAsHOYiIL7sYha"   # Recurring Product
+}

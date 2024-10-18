@@ -38,3 +38,13 @@ def sign_jwt(user_id: str, permissions: Dict[str, str]) -> Dict[str, str]:
 def decode_jwt(token: str) -> dict:
     decoded_token = jwt.decode(token.encode(), secret_key, algorithms=["HS256"])
     return decoded_token if decoded_token["expires"] >= time.time() else {}
+
+
+def create_access_token(user_id: str, permissions: Dict[str, str]) -> str:
+    access_token_payload = {
+        "user_id": user_id,
+        "permissions": permissions,
+        "expires": time.time() + 2400
+    }
+    access_token = jwt.encode(access_token_payload, secret_key, algorithm="HS256")
+    return access_token

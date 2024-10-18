@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     email_port: int = os.environ.get("EMAIL_PORT")
     api_key: str = os.environ.get("API_KEY")
     testing: bool = False
+    stripe_api_key: str = os.environ.get("STRIPE_API_KEY")
+    frontend_url: str = os.environ.get("FRONTEND_URL")
 
 
 def get_settings() -> Settings:
