@@ -251,71 +251,96 @@ def _handle_lead_received_date_filter(filter):
 
 
 def _build_aggregation_pipeline(filter, sort, page, limit, agent_id, date_gte, date_lte):
-    pipeline_filter = filter.copy()
+    match_conditions = []
+
+    if filter:
+        match_conditions.append(filter)
+
+    lead_received_date_expr = {
+        "$cond": [
+            {"$eq": ["$buyer_id", agent_id]},
+            "$lead_sold_time",
+            {
+                "$cond": [
+                    {"$eq": ["$second_chance_buyer_id", agent_id]},
+                    "$second_chance_lead_sold_time",
+                    None
+                ]
+            }
+        ]
+    }
+
+    date_expr_conditions = []
     if date_gte:
-        pipeline_filter["lead_received_date"] = {"$gte": date_gte}
+        date_expr_conditions.append({"$gte": [lead_received_date_expr, date_gte]})
     if date_lte:
-        pipeline_filter["lead_received_date"] = {"$lte": date_lte}
-    if date_gte and date_lte:
-        pipeline_filter["lead_received_date"] = {"$gte": date_gte, "$lte": date_lte}
+        date_expr_conditions.append({"$lte": [lead_received_date_expr, date_lte]})
+
+    if date_expr_conditions:
+        if len(date_expr_conditions) == 1:
+            date_condition = date_expr_conditions[0]
+        else:
+            date_condition = {"$and": date_expr_conditions}
+        match_conditions.append({"$expr": date_condition})
+
+    if match_conditions:
+        if len(match_conditions) == 1:
+            match_stage = {"$match": match_conditions[0]}
+        else:
+            match_stage = {"$match": {"$and": match_conditions}}
+    else:
+        match_stage = {"$match": {}}
+
     pipeline = [
-        {"$project": {
-            "first_name": 1,
-            "last_name": 1,
-            "email": 1,
-            "phone": 1,
-            "state": 1,
-            "origin": 1,
-            "lead_sold_time": 1,
-            "second_chance_lead_sold_time": 1,
-            "buyer_id": 1,
-            "second_chance_buyer_id": 1,
-            "lead_sold_by_agent_time": 1,
-            "campaign_id": 1,
-            "created_time": 1,
-            "custom_fields": 1,
-            "lead_received_date": {
-                "$cond": {
-                    "if": {"$eq": ["$buyer_id", agent_id]},
-                    "then": "$lead_sold_time",
-                    "else": {
-                        "$cond": {
-                            "if": {"$eq": ["$second_chance_buyer_id", agent_id]},
-                            "then": "$second_chance_lead_sold_time",
-                            "else": None
-                        }
-                    }
-                }
-            },
-            "lead_type": {
-                "$cond": {
-                    "if": {"$eq": [agent_id, "$second_chance_buyer_id"]},
-                    "then": "2nd Chance",
-                    "else": "Fresh"
+        match_stage,
+        {
+            "$addFields": {
+                "lead_received_date": lead_received_date_expr,
+                "lead_type": {
+                    "$cond": [
+                        {"$eq": [agent_id, "$second_chance_buyer_id"]},
+                        "2nd Chance",
+                        "Fresh"
+                    ]
+                },
+                "is_second_chance": {
+                    "$eq": ["$lead_type", "2nd Chance"]
                 }
             }
-        }},
-        {"$addFields": {
-            "is_second_chance": {
-                "$cond": {
-                    "if": {"$eq": ["$lead_type", "2nd Chance"]},
-                    "then": True,
-                    "else": False
-                }
+        },
+        {
+            "$project": {
+                "first_name": 1,
+                "last_name": 1,
+                "email": 1,
+                "phone": 1,
+                "state": 1,
+                "origin": 1,
+                "lead_sold_time": 1,
+                "second_chance_lead_sold_time": 1,
+                "buyer_id": 1,
+                "second_chance_buyer_id": 1,
+                "lead_sold_by_agent_time": 1,
+                "campaign_id": 1,
+                "created_time": 1,
+                "custom_fields": 1,
+                "lead_received_date": 1,
+                "lead_type": 1,
+                "is_second_chance": 1
             }
-        }},
-        {"$facet": {
-            "data": [
-                {"$match": pipeline_filter},
-                {"$sort": {sort[0]: sort[1]}},
-                {"$skip": (page - 1) * limit},
-                {"$limit": limit}
-            ],
-            "total": [
-                {"$match": pipeline_filter},
-                {"$count": "count"}
-            ]
-        }}
+        },
+        {
+            "$facet": {
+                "data": [
+                    {"$sort": {sort[0]: sort[1]}},
+                    {"$skip": (page - 1) * limit},
+                    {"$limit": limit}
+                ],
+                "total": [
+                    {"$count": "count"}
+                ]
+            }
+        }
     ]
 
     return pipeline
