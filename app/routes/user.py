@@ -68,8 +68,6 @@ async def refresh_token(refresh_request: RefreshTokenRequest = Body(...)):
 
 @router.post("")
 async def user_signup(request: Request, user=Body(...)):
-    if request.headers.get("x-api-key") != settings.api_key:
-        raise HTTPException(status_code=403, detail="Invalid API Key")
     try:
         user_exists = await user_controller.get_user_by_field(email=user["email"])
     except user_controller.UserNotFoundError:
