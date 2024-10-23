@@ -1,4 +1,5 @@
 import bson
+import datetime
 
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBasicCredentials, HTTPBasic
@@ -11,6 +12,9 @@ from app.controllers import agent as agent_controller
 from app.models.agent import AgentModel
 from app.models import user as user_model
 from app.tools import jwt_helper
+
+
+OTP_EXPIRATION = 15 * 60
 
 
 def get_user_collection() -> AgnosticCollection:
@@ -47,7 +51,7 @@ async def create_user(user):
         last_name=user["last_name"],
         email=user["email"],
         phone=user["phone"],
-        states_with_license=user["states_with_license"]
+        states_with_license=user["states_with_license"],
     )
     created_agent = await agent_controller.create_agent(agent_model)
 
@@ -62,6 +66,8 @@ async def create_user(user):
         region=user["region"],
         agent_id=user["agent_id"],
         permissions=user["permissions"],
+        otp_code=user["otp_code"],
+        otp_expiration=datetime.datetime.utcnow() + datetime.timedelta(seconds=OTP_EXPIRATION),
     )
     stripe_customer_id = _create_stripe_customer(user)
     user.stripe_customer_id = stripe_customer_id
@@ -78,7 +84,8 @@ async def get_user_by_field(**kwargs):
     user_in_db = await user_collection.find_one(query)
     if not user_in_db:
         raise UserNotFoundError("User not found with the provided information.")
-    return user_in_db
+    user = user_model.UserModel(**user_in_db)
+    return user
 
 
 async def update_user(user: user_model.UserModel):
@@ -123,4 +130,14 @@ async def onboard_user(user: user_model.UserModel):
         {"$set": {"campaigns": [bson.ObjectId("6668b634a88f8e5a8dde197e")]}}
     )
     await agent_controller.update_campaigns_for_agent(user_in_db["agent_id"], [bson.ObjectId("6668b634a88f8e5a8dde197e")])
+    return user
+
+
+async def activate_user(email):
+    user_collection = get_user_collection()
+    user = await user_collection.find_one_and_update(
+        {"email": email},
+        {"$set": {"email_verified": True}},
+        return_document=True
+    )
     return user

@@ -59,9 +59,8 @@ async def get_current_user(authorization: str = Depends(JWTBearer())) -> UserMod
     if not payload:
         raise HTTPException(status_code=403, detail="Could not validate credentials")
     try:
-        user_data = await user_controller.get_user_by_field(email=payload.get("user_id"))
+        user = await user_controller.get_user_by_field(email=payload.get("user_id"))
     except user_controller.UserNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    user = UserModel(**user_data)
     return user

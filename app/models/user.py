@@ -1,5 +1,5 @@
+import datetime
 from bson import ObjectId
-from fastapi.security import HTTPBasicCredentials
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator
 from typing import Optional
 
@@ -21,6 +21,9 @@ class UserModel(BaseModel):
     permissions: Optional[list[str]] = Field(default=None)
     campaigns: Optional[list[PyObjectId]] = Field(default=None)
     stripe_customer_id: Optional[str] = Field(default=None)
+    email_verified: bool = Field(default=False)
+    otp_code: Optional[str] = Field(default=None)
+    otp_expiration: Optional[datetime.datetime] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -65,6 +68,9 @@ class UserModel(BaseModel):
     def is_new_user(self) -> bool:
         return self.ROLE_NEW_USER in self.permissions
 
+    def is_email_verified(self) -> bool:
+        return self.email_verified
+
     def to_json(self):
         data = self.model_dump()
         for key, value in data.items():
@@ -83,7 +89,10 @@ class UserModel(BaseModel):
         return values
 
 
-class UserSignIn(HTTPBasicCredentials):
+class UserSignIn(BaseModel):
+    username: str
+    password: str
+    otp: Optional[str] = None
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,

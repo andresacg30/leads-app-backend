@@ -1,4 +1,3 @@
-from app.tools.mappings import PRODUCT_PRICE_MAPPING
 from main import stripe
 from settings import get_settings
 from typing import List
