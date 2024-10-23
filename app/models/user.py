@@ -1,6 +1,5 @@
 import datetime
 from bson import ObjectId
-from fastapi.security import HTTPBasicCredentials
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator
 from typing import Optional
 

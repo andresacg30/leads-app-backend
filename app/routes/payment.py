@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Body, status, HTTPException, Depends, Response
-from bson import ObjectId
 
 import app.controllers.payment as payment_controller
 import app.controllers.user as user_controller
