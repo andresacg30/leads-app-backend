@@ -88,7 +88,7 @@ async def show_lead(id: str, user: UserModel = Depends(get_current_user)):
     try:
         lead = await lead_controller.get_one_lead(id)
         if not user.is_admin():
-            if lead["campaign_id"] not in user.campaigns:
+            if lead.campaign_id not in user.campaigns:
                 raise HTTPException(status_code=404, detail="User does not have access to this campaign")
             if user.is_agent():
                 if id != user.agent_id:
