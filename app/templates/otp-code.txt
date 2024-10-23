@@ -1,0 +1,9 @@
+LEADCONEX
+
+Your One-Time Password (OTP) code is:
+
+{{ otp_code }}
+
+Please use this code to complete your verification process.
+
+© LeadConex. All rights reserved.
