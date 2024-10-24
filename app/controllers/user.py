@@ -12,9 +12,7 @@ from app.controllers import agent as agent_controller
 from app.models.agent import AgentModel
 from app.models import user as user_model
 from app.tools import jwt_helper
-
-
-OTP_EXPIRATION = 15 * 60
+from app.tools.constants import OTP_EXPIRATION
 
 
 def get_user_collection() -> AgnosticCollection:
