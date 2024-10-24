@@ -1,6 +1,7 @@
 import requests
 import logging
 
+from app.tools.constants import FROM_EMAIL_ADDRESS
 from settings import get_settings
 
 settings = get_settings()
@@ -8,7 +9,6 @@ settings = get_settings()
 logging.basicConfig(level=logging.INFO)
 
 MAILGUN_API_URL = "https://api.mailgun.net/v3/mg.leadconex.org/messages"
-FROM_EMAIL_ADDRESS = "info@leadconex.org"
 
 
 def send_single_email(to_address: str, subject: str, template: str, text: str):

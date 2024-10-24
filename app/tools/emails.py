@@ -20,7 +20,7 @@ def send_verify_code_email(first_name, email, otp_code):
 
     send_single_email(
         to_address=email,
-        subject="Activate your account",
+        subject="Your One-Time Code",
         template=rendered_html,
         text=rendered_text
     )

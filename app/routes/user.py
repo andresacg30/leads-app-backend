@@ -1,13 +1,15 @@
 import datetime
 import random
 import string
+import logging
 from fastapi import Body, APIRouter, HTTPException, Request
 from passlib.context import CryptContext
 
 import app.controllers.user as user_controller
 
 from app.auth.jwt_handler import sign_jwt, decode_jwt
-from app.models.user import UserModel, UserSignIn, RefreshTokenRequest
+from app.models.user import UserSignIn, RefreshTokenRequest
+from app.tools.constants import OTP_EXPIRATION
 from app.tools import emails
 from settings import Settings
 
@@ -18,15 +20,21 @@ router = APIRouter()
 
 hash_helper = CryptContext(schemes=["bcrypt"])
 
+logger = logging.getLogger(__name__)
+
 
 @router.post("/verify-otp")
 async def verify_otp(request: Request, email: str = Body(...), otp: str = Body(...)):
-    user = await user_controller.get_user_by_field(email=email)
+    try:
+        user = await user_controller.get_user_by_field(email=email)
+    except user_controller.UserNotFoundError:
+        logging.warning(f"User with email {email} not found", extra={'function': 'verify_otp'})
+        return {"message": "OTP code sent"}
     if user.otp_expiration < datetime.datetime.utcnow():
         raise HTTPException(status_code=403, detail="OTP code has expired")
     if user.otp_code == otp:
         await user_controller.activate_user(email)
-        return {"message": "User account activated successfully"}
+        return {"message": "OTP confirmed"}
     raise HTTPException(status_code=403, detail="Invalid OTP code")
 
 
@@ -35,9 +43,10 @@ async def resend_otp(request: Request, email: str = Body(..., embed=True)):
     try:
         user = await user_controller.get_user_by_field(email=email)
     except user_controller.UserNotFoundError:
-        raise HTTPException(status_code=404, detail="User not found")
+        logging.warning(f"User with email {email} not found", extra={'function': 'resend_otp'})
+        return {"message": "OTP code sent"}
     user.otp_code = _create_otp_code()
-    user.otp_expiration = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
+    user.otp_expiration = datetime.datetime.utcnow() + datetime.timedelta(seconds=OTP_EXPIRATION)
     await user_controller.update_user(user)
     emails.send_verify_code_email(
         email=email,
@@ -71,22 +80,40 @@ async def user_login(user_credentials: UserSignIn = Body(...)):
     raise HTTPException(status_code=403, detail="Incorrect email or password")
 
 
-@router.post("/reset-password")
-async def reset_password(request: Request, user: UserModel = Body(...)):
-    if request.headers.get("x-api-key") != settings.api_key:
-        raise HTTPException(status_code=403, detail="Invalid API Key")
+@router.post("/reset-password-otp")
+async def reset_password_otp(request: Request, email: str = Body(..., embed=True)):
     try:
-        user_exists = await user_controller.get_user_by_field(email=user.email).to_json()
+        user_exists = await user_controller.get_user_by_field(email=email)
     except user_controller.UserNotFoundError:
         user_exists = None
     if not user_exists:
-        raise HTTPException(
-            status_code=404, detail="user with email supplied does not exist"
-        )
+        logging.warning(f"User with email {email} not found", function="reset_password_otp")
+        return {"message": "Password reset code sent successfully"}
 
-    user.password = hash_helper.hash(user.password)
+    user_exists.otp_code = _create_otp_code()
+    user_exists.otp_expiration = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
+    await user_controller.update_user(user_exists)
+    emails.send_verify_code_email(
+        email=email,
+        otp_code=user_exists.otp_code,
+        first_name=user_exists.name.split(" ")[0]
+    )
+    return {"message": "Password reset code sent successfully"}
+
+
+@router.post("/update-password")
+async def update_password(request: Request, email: str = Body(...), newPassword: str = Body(...)):
+    try:
+        user = await user_controller.get_user_by_field(email=email)
+    except user_controller.UserNotFoundError:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.otp_expiration < datetime.datetime.utcnow():
+        raise HTTPException(status_code=403, detail="OTP code has expired")
+    user.password = hash_helper.hash(newPassword)
     await user_controller.update_user(user)
-    return {"message": "Password reset successful"}
+    return {"message": "Password reset successfully"}
+
 
 
 @router.post("/refresh")
