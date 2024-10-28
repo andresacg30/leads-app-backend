@@ -18,6 +18,8 @@ app = FastAPI(
 
 settings = get_settings()
 
+change_stream_task = None
+
 stripe.api_key = settings.stripe_api_key
 
 token_listener = JWTBearer()
@@ -45,6 +47,17 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(user_change_stream_listener())
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    global change_stream_task
+    if change_stream_task:
+        change_stream_task.cancel()
+        try:
+            await change_stream_task
+        except asyncio.CancelledError:
+            pass
 
 
 if __name__ == "__main__":

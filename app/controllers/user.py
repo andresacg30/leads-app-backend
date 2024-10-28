@@ -1,5 +1,7 @@
+import asyncio
 import bson
 import datetime
+import logging
 
 from collections import defaultdict
 from fastapi import HTTPException, Depends, status
@@ -14,6 +16,9 @@ from app.models.agent import AgentModel
 from app.models import user as user_model
 from app.tools import jwt_helper
 from app.tools.constants import OTP_EXPIRATION
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_user_collection() -> AgnosticCollection:
@@ -78,7 +83,7 @@ async def create_user(user):
     return new_user
 
 
-async def get_user_by_field(**kwargs):
+async def get_user_by_field(**kwargs) -> user_model.UserModel:
     user_collection = get_user_collection()
     query = {k: v for k, v in kwargs.items() if v is not None}
     user_in_db = await user_collection.find_one(query)
@@ -163,17 +168,28 @@ async def user_change_stream_listener():
             }
         }
     ]
-    async with user_collection.watch(pipeline) as stream:
-        async for change in stream:
-            user_id = change['documentKey']['_id']
-            updated_fields = change['updateDescription']['updatedFields']
-            total_credit = updated_fields.get('balance')
-            if total_credit is not None:
-                data = {'credit': total_credit}
-                if user_id in user_connections:
-                    for client in user_connections[user_id]:
-                        try:
-                            await client.send_json(data)
-                        except Exception as e:
-                            print(f"Error sending data: {e}")
-                            user_connections[user_id].remove(client)
+    while True:
+        try:
+            async with user_collection.watch(pipeline) as stream:
+                logger.info("Change stream listener started")
+                async for change in stream:
+                    user_id = str(change['documentKey']['_id'])
+                    updated_fields = change['updateDescription']['updatedFields']
+                    balance = updated_fields.get('balance')
+                    if balance is not None:
+                        data = {'balance': balance}
+                        if user_id in user_connections:
+                            logger.info(f"Sending data to user {user_id}: {data}")
+                            for client in user_connections[user_id][:]:
+                                try:
+                                    await client.send_json(data)
+                                except Exception as e:
+                                    logger.error(f"Error sending data to client {client}: {e}")
+                                    user_connections[user_id].remove(client)
+                                    logger.info(f"Removed client {client} from user_connections[{user_id}]")
+        except asyncio.CancelledError:
+            logger.info("Change stream listener cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Change stream listener error: {e}")
+            await asyncio.sleep(5)

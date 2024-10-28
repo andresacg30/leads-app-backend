@@ -33,12 +33,20 @@ async def get_current_user_from_websocket(websocket: WebSocket) -> UserModel:
 async def get_current_credit(websocket: WebSocket):
     user = await get_current_user_from_websocket(websocket)
     if not user:
+        logger.info("Authentication failed; closing connection")
         return
     await websocket.accept()
-    user_connections[user.id].append(websocket)
+    user_id = str(user.id)
+    user_connections[user_id].append(websocket)
+    logger.info(f"User {user_id} connected via WebSocket")
     try:
         while True:
-            await asyncio.sleep(1)
+            await asyncio.sleep(1)  # Keep the connection alive
     except WebSocketDisconnect:
-        user_connections[user.id].remove(websocket)
-        print(f"Client disconnected: {user.id}")
+        logger.info(f"WebSocketDisconnect for user {user_id}")
+    except Exception as e:
+        logger.error(f"Exception in WebSocket for user {user_id}: {e}")
+    finally:
+        if websocket in user_connections[user_id]:
+            user_connections[user_id].remove(websocket)
+            logger.info(f"Removed websocket for user {user_id}")
