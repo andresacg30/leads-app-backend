@@ -2,13 +2,14 @@ import datetime
 import random
 import string
 import logging
-from fastapi import Body, APIRouter, HTTPException, Request
+from fastapi import Body, APIRouter, HTTPException, Request, Depends
 from passlib.context import CryptContext
 
 import app.controllers.user as user_controller
 
 from app.auth.jwt_handler import sign_jwt, decode_jwt
-from app.models.user import UserSignIn, RefreshTokenRequest
+from app.auth.jwt_bearer import get_current_user
+from app.models.user import UserSignIn, RefreshTokenRequest, UserModel
 from app.tools.constants import OTP_EXPIRATION
 from app.tools import emails
 from settings import Settings
@@ -21,6 +22,12 @@ router = APIRouter()
 hash_helper = CryptContext(schemes=["bcrypt"])
 
 logger = logging.getLogger(__name__)
+
+
+@router.get("/get-current-balance")
+async def get_user_balance(user: UserModel = Depends(get_current_user)):
+    user = await user_controller.get_user_by_field(email=user.email)
+    return {"balance": user.balance}
 
 
 @router.post("/verify-otp")
@@ -113,7 +120,6 @@ async def update_password(request: Request, email: str = Body(...), newPassword:
     user.password = hash_helper.hash(newPassword)
     await user_controller.update_user(user)
     return {"message": "Password reset successfully"}
-
 
 
 @router.post("/refresh")

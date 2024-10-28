@@ -1,6 +1,9 @@
+import asyncio
 import bson
 import datetime
+import logging
 
+from collections import defaultdict
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBasicCredentials, HTTPBasic
 from motor.core import AgnosticCollection
@@ -15,6 +18,9 @@ from app.tools import jwt_helper
 from app.tools.constants import OTP_EXPIRATION
 
 
+logger = logging.getLogger(__name__)
+
+
 def get_user_collection() -> AgnosticCollection:
     db = Database.get_db()
     return db["user"]
@@ -25,6 +31,7 @@ class UserNotFoundError(Exception):
 
 
 security = HTTPBasic()
+user_connections = defaultdict(list)
 
 
 async def validate_login(credentials: HTTPBasicCredentials = Depends(security)):
@@ -76,7 +83,7 @@ async def create_user(user):
     return new_user
 
 
-async def get_user_by_field(**kwargs):
+async def get_user_by_field(**kwargs) -> user_model.UserModel:
     user_collection = get_user_collection()
     query = {k: v for k, v in kwargs.items() if v is not None}
     user_in_db = await user_collection.find_one(query)
@@ -139,3 +146,50 @@ async def activate_user(email):
         return_document=True
     )
     return user
+
+
+async def update_user_balance(user_id, amount):
+    user_collection = get_user_collection()
+    user = await user_collection.find_one_and_update(
+        {"_id": bson.ObjectId(user_id)},
+        {"$inc": {"balance": amount}},
+        return_document=True
+    )
+    return user
+
+
+async def user_change_stream_listener():
+    user_collection = get_user_collection()
+    pipeline = [
+        {
+            '$match': {
+                'operationType': 'update',
+                'updateDescription.updatedFields.balance': {'$exists': True}
+            }
+        }
+    ]
+    while True:
+        try:
+            async with user_collection.watch(pipeline) as stream:
+                logger.info("Change stream listener started")
+                async for change in stream:
+                    user_id = str(change['documentKey']['_id'])
+                    updated_fields = change['updateDescription']['updatedFields']
+                    balance = updated_fields.get('balance')
+                    if balance is not None:
+                        data = {'balance': balance}
+                        if user_id in user_connections:
+                            logger.info(f"Sending data to user {user_id}: {data}")
+                            for client in user_connections[user_id][:]:
+                                try:
+                                    await client.send_json(data)
+                                except Exception as e:
+                                    logger.error(f"Error sending data to client {client}: {e}")
+                                    user_connections[user_id].remove(client)
+                                    logger.info(f"Removed client {client} from user_connections[{user_id}]")
+        except asyncio.CancelledError:
+            logger.info("Change stream listener cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Change stream listener error: {e}")
+            await asyncio.sleep(5)
