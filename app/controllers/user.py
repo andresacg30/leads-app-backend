@@ -1,6 +1,7 @@
 import bson
 import datetime
 
+from collections import defaultdict
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBasicCredentials, HTTPBasic
 from motor.core import AgnosticCollection
@@ -25,6 +26,7 @@ class UserNotFoundError(Exception):
 
 
 security = HTTPBasic()
+user_connections = defaultdict(list)
 
 
 async def validate_login(credentials: HTTPBasicCredentials = Depends(security)):
@@ -139,3 +141,39 @@ async def activate_user(email):
         return_document=True
     )
     return user
+
+
+async def update_user_balance(user_id, amount):
+    user_collection = get_user_collection()
+    user = await user_collection.find_one_and_update(
+        {"_id": bson.ObjectId(user_id)},
+        {"$inc": {"balance": amount}},
+        return_document=True
+    )
+    return user
+
+
+async def user_change_stream_listener():
+    user_collection = get_user_collection()
+    pipeline = [
+        {
+            '$match': {
+                'operationType': 'update',
+                'updateDescription.updatedFields.balance': {'$exists': True}
+            }
+        }
+    ]
+    async with user_collection.watch(pipeline) as stream:
+        async for change in stream:
+            user_id = change['documentKey']['_id']
+            updated_fields = change['updateDescription']['updatedFields']
+            total_credit = updated_fields.get('balance')
+            if total_credit is not None:
+                data = {'credit': total_credit}
+                if user_id in user_connections:
+                    for client in user_connections[user_id]:
+                        try:
+                            await client.send_json(data)
+                        except Exception as e:
+                            print(f"Error sending data: {e}")
+                            user_connections[user_id].remove(client)

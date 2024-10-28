@@ -115,7 +115,6 @@ async def update_password(request: Request, email: str = Body(...), newPassword:
     return {"message": "Password reset successfully"}
 
 
-
 @router.post("/refresh")
 async def refresh_token(refresh_request: RefreshTokenRequest = Body(...)):
     try:

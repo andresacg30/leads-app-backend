@@ -1,11 +1,14 @@
+from datetime import datetime
 from fastapi import APIRouter, Body, status, HTTPException, Depends, Response
 
 import app.controllers.payment as payment_controller
+import app.controllers.transaction as transaction_controller
 import app.controllers.user as user_controller
 import app.integrations.stripe as stripe_controller
 
 from app.auth.jwt_bearer import get_current_user
 from app.models.payment import PaymentModel, UpdatePaymentModel, PaymentCollection, CheckoutRequest, PaymentTypeRequest
+from app.models.transaction import TransactionModel
 from app.models.user import UserModel
 from main import stripe
 
@@ -43,8 +46,16 @@ async def verify_session(session_id: str, user: UserModel = Depends(get_current_
             if user.is_new_user():
                 await user_controller.onboard_user(user)
                 access_token = await user_controller.change_user_permissions(user.id, new_permissions=['agent'])
+                await transaction_controller.create_transaction(
+                    transaction=TransactionModel(
+                        user_id=user.id,
+                        amount=session.amount_total / 100,
+                        date=datetime.utcnow(),
+                        type="credit",
+                        description="User added credit"
+                    )
+                )
                 return {"status": "success", "access_token": access_token}
-            return {"status": "success"}
         else:
             return {"status": "pending"}
     except Exception as e:

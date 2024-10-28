@@ -3,6 +3,7 @@ from bson import ObjectId
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator
 from typing import Optional
 
+import app.controllers.transaction as transaction_collection
 from app.tools.modifiers import PyObjectId
 
 
@@ -21,6 +22,7 @@ class UserModel(BaseModel):
     permissions: Optional[list[str]] = Field(default=None)
     campaigns: Optional[list[PyObjectId]] = Field(default=None)
     stripe_customer_id: Optional[str] = Field(default=None)
+    current_credit: Optional[float] = Field(default=None)
     email_verified: bool = Field(default=False)
     otp_code: Optional[str] = Field(default=None)
     otp_expiration: Optional[datetime.datetime] = Field(default=None)
