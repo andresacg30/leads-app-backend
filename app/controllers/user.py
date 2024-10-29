@@ -199,5 +199,7 @@ async def check_user_is_verified_and_delete(user_id):
     user_collection = get_user_collection()
     user = await user_collection.find_one({"_id": bson.ObjectId(user_id)})
     if not user["email_verified"]:
+        agent_collection = agent_controller.get_agent_collection()
+        await agent_collection.delete_one({"_id": bson.ObjectId(user["agent_id"])})
         await user_collection.delete_one({"_id": bson.ObjectId(user_id)})
         return False
