@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     stripe_api_key: str = os.environ.get("STRIPE_API_KEY")
     frontend_url: str = os.environ.get("FRONTEND_URL")
     mailgun_api_key: str = os.environ.get("MAILGUN_API_KEY")
+    redis_api_address: str = os.environ.get("REDIS_API_ADDRESS")
+    redis_api_port: int = os.environ.get("REDIS_API_PORT")
 
 
 def get_settings() -> Settings:
