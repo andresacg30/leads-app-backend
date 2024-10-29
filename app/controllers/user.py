@@ -11,6 +11,7 @@ from motor.core import AgnosticCollection
 from main import stripe
 from app.auth import jwt_handler
 from app.db import Database
+from app.resources import user_connections
 from app.controllers import agent as agent_controller
 from app.models.agent import AgentModel
 from app.models import user as user_model
@@ -31,7 +32,6 @@ class UserNotFoundError(Exception):
 
 
 security = HTTPBasic()
-user_connections = defaultdict(list)
 
 
 async def validate_login(credentials: HTTPBasicCredentials = Depends(security)):
@@ -193,3 +193,11 @@ async def user_change_stream_listener():
         except Exception as e:
             logger.error(f"Change stream listener error: {e}")
             await asyncio.sleep(5)
+
+
+async def check_user_is_verified_and_delete(user_id):
+    user_collection = get_user_collection()
+    user = await user_collection.find_one({"_id": bson.ObjectId(user_id)})
+    if not user["email_verified"]:
+        await user_collection.delete_one({"_id": bson.ObjectId(user_id)})
+        return False

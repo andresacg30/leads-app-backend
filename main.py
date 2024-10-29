@@ -9,7 +9,7 @@ from app.auth.jwt_bearer import JWTBearer
 from app.routes import agent, lead, campaign, payment, user, transaction
 from settings import get_settings
 
-from app.controllers.user import user_change_stream_listener
+import app.controllers.user as user_controller
 
 
 app = FastAPI(
@@ -46,7 +46,7 @@ async def health_check():
 
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(user_change_stream_listener())
+    asyncio.create_task(user_controller.user_change_stream_listener())
 
 
 @app.on_event("shutdown")

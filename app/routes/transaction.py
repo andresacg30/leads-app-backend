@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
-from app.controllers.user import user_connections
+from app.resources import user_connections
 from app.models.user import UserModel
 from app.auth.jwt_bearer import get_current_user
 

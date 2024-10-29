@@ -3,7 +3,6 @@ from bson import ObjectId
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator
 from typing import Optional
 
-import app.controllers.transaction as transaction_collection
 from app.tools.modifiers import PyObjectId
 
 

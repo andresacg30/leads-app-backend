@@ -2,12 +2,14 @@ annotated-types==0.6.0
 anyio==3.7.1
 argon2-cffi==23.1.0
 argon2-cffi-bindings==21.2.0
+async-timeout==4.0.3
 bcrypt==4.1.2
 certifi==2024.2.2
 cffi==1.17.0
 charset-normalizer==3.4.0
 click==8.1.7
 coverage==7.6.0
+crontab==1.0.1
 cryptography==43.0.1
 dnspython==2.4.2
 email-validator==2.1.0.post1
@@ -58,8 +60,11 @@ python-dotenv==1.0.0
 python-multipart==0.0.9
 pytz==2024.1
 PyYAML==6.0.1
+redis==5.2.0
 requests==2.32.3
 rich==13.7.1
+rq==2.0.0
+rq-scheduler==0.14.0
 sentinels==1.0.0
 shellingham==1.5.4
 six==1.16.0
