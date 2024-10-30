@@ -14,6 +14,8 @@ def get_scheduled_jobs():
         return []
     jobs: typing.List[Job] = scheduler.get_jobs()
     logger.info(f"Getting scheduled jobs {jobs}")
+    if len(jobs) == 1:
+        return [jobs.to_dict()]
     return [job.to_dict() for job in jobs]
 
 
@@ -24,4 +26,5 @@ def clear_scheduled_jobs():
     jobs = scheduler.get_jobs()
     for job in jobs:
         job.cancel()
+        job.delete()
     logger.info("Cleared all scheduled jobs")

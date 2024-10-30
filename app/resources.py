@@ -16,7 +16,7 @@ user_connections = defaultdict(list)
 
 try:
     redis = Redis(host=settings.redis_api_address, port=settings.redis_api_port)
-    rq = Queue(connection=redis)
+    rq = Queue('default', connection=redis)
     scheduler = Scheduler(connection=redis)
     logger.info("Connected to Redis and RQ Scheduler")
 except Exception as e:
