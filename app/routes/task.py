@@ -7,6 +7,6 @@ from app.auth.jwt_bearer import get_current_user
 router = APIRouter(prefix="/api/task", tags=["task"])
 
 
-@router.get("/scheduled-jobs")
+@router.get("/scheduled-tasks")
 def scheduled_jobs(user: UserModel = Depends(get_current_user)):
     return get_scheduled_jobs()
