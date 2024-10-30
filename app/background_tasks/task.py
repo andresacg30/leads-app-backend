@@ -10,5 +10,6 @@ def get_scheduled_jobs():
     if scheduler is None:
         logger.warning("Scheduler not initialized")
         return []
-    logger.info("Getting scheduled jobs")
-    return list(scheduler.get_jobs())
+    jobs = scheduler.get_jobs()
+    logger.info(f"Getting scheduled jobs {jobs}")
+    return list(jobs)
