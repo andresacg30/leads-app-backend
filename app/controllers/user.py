@@ -196,10 +196,13 @@ async def user_change_stream_listener():
 
 
 async def check_user_is_verified_and_delete(user_id):
+    logger.info(f"Checking user {user_id} is verified")
     user_collection = get_user_collection()
     user = await user_collection.find_one({"_id": bson.ObjectId(user_id)})
     if not user["email_verified"]:
+        logger.info(f"User {user_id} not verified, deleting")
         agent_collection = agent_controller.get_agent_collection()
         await agent_collection.delete_one({"_id": bson.ObjectId(user["agent_id"])})
         await user_collection.delete_one({"_id": bson.ObjectId(user_id)})
+        logger.info(f"User {user_id} deleted")
         return False
