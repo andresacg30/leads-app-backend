@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from app.background_tasks.job import get_scheduled_jobs,clear_scheduled_jobs
+from app.background_tasks.job import get_scheduled_jobs, clear_scheduled_jobs, cancel_scheduled_jobs
 from app.models.user import UserModel
 from app.auth.jwt_bearer import get_current_user
 
@@ -30,4 +30,15 @@ async def delete_scheduled_jobs(user: UserModel = Depends(get_current_user)):
         return {"message": "Scheduled jobs cleared successfully"}
     except Exception as e:
         logger.error(f"Error clearing scheduled jobs: {e}")
+        return {"error": str(e)}
+
+
+@router.get("/cancel-scheduled-jobs")
+async def cancel_scheduled_tasks(user: UserModel = Depends(get_current_user)):
+    try:
+        cancel_scheduled_jobs()
+        logger.info("Scheduled jobs cleared")
+        return {"message": "Scheduled jobs cancelled successfully"}
+    except Exception as e:
+        logger.error(f"Error cancelling scheduled jobs: {e}")
         return {"error": str(e)}

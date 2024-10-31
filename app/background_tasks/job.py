@@ -25,6 +25,15 @@ def clear_scheduled_jobs():
         return
     jobs = scheduler.get_jobs()
     for job in jobs:
-        job.cancel()
         job.delete()
     logger.info("Cleared all scheduled jobs")
+
+
+def cancel_scheduled_jobs():
+    if scheduler is None:
+        logger.warning("Scheduler not initialized")
+        return
+    jobs = scheduler.get_jobs()
+    for job in jobs:
+        job.cancel()
+    logger.info("Canceled all scheduled jobs")
