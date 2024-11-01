@@ -6,7 +6,7 @@ from fastapi import Body, APIRouter, HTTPException, Request, Depends
 from passlib.context import CryptContext
 
 import app.controllers.user as user_controller
-import app.background_tasks.user as user_background_tasks
+import app.background_jobs.user as user_background_jobs
 
 from app.auth.jwt_handler import sign_jwt, decode_jwt
 from app.auth.jwt_bearer import get_current_user
@@ -149,7 +149,7 @@ async def user_signup(request: Request, user=Body(...)):
         )
     user["otp_code"] = _create_otp_code()
     created_user = await user_controller.create_user(user)
-    user_background_tasks.add_to_otp_verification_queue(
+    user_background_jobs.add_to_otp_verification_queue(
         created_user.inserted_id,
     )
     emails.send_verify_code_email(
