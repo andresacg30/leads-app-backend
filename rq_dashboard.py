@@ -12,7 +12,9 @@ import uvicorn
 def create_rq_dashboard_app():
     redis_address = os.getenv('REDIS_API_ADDRESS', 'localhost')
     redis_port = os.getenv('REDIS_PORT', 6379)
+    redis_password = os.getenv('REDIS_PASSWORD', None)
     redis_url = f'redis://{redis_address}:{redis_port}'
+    os.environ['REDIS_PASSWORD'] = redis_password
     os.environ['REDIS_URL'] = redis_url
 
     app = make_flask_app(default_settings)
