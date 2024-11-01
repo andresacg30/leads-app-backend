@@ -3,12 +3,14 @@ import bson
 from datetime import datetime
 from bson import ObjectId
 from pymongo import ReturnDocument
+from typing import List
 from motor.core import AgnosticCollection
 
 
 from app.db import Database
 from app.controllers import agent as agent_controller
 from app.models import lead as lead_model
+from app.models.user import UserModel
 from app.tools import formatters as formatter
 
 
@@ -344,3 +346,66 @@ def _build_aggregation_pipeline(filter, sort, page, limit, agent_id, date_gte, d
     ]
 
     return pipeline
+
+
+async def get_leads(ids: List[ObjectId], user: UserModel):
+    lead_collection = get_lead_collection()
+    if user.is_agent():
+        lead_received_date_expr = {
+            "$cond": [
+                {"$eq": ["$buyer_id", user.agent_id]},
+                "$lead_sold_time",
+                {
+                    "$cond": [
+                        {"$eq": ["$second_chance_buyer_id", user.agent_id]},
+                        "$second_chance_lead_sold_time",
+                        None
+                    ]
+                }
+            ]
+        }
+        match_conditions = {"_id": {"$in": [ObjectId(id) for id in ids]}}
+        pipeline = [
+            {"$match": match_conditions},
+            {
+                "$addFields": {
+                    "lead_received_date": lead_received_date_expr,
+                    "lead_type": {
+                        "$cond": [
+                            {"$eq": [user.agent_id, "$second_chance_buyer_id"]},
+                            "2nd Chance",
+                            "Fresh"
+                        ]
+                    },
+                    "is_second_chance": {
+                        "$eq": ["$lead_type", "2nd Chance"]
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "first_name": 1,
+                    "last_name": 1,
+                    "email": 1,
+                    "phone": 1,
+                    "state": 1,
+                    "origin": 1,
+                    "lead_sold_time": 1,
+                    "second_chance_lead_sold_time": 1,
+                    "buyer_id": 1,
+                    "second_chance_buyer_id": 1,
+                    "lead_sold_by_agent_time": 1,
+                    "campaign_id": 1,
+                    "created_time": 1,
+                    "custom_fields": 1,
+                    "lead_received_date": 1,
+                    "lead_type": 1,
+                    "is_second_chance": 1
+                }
+            },
+        ]
+        leads_in_db = await lead_collection.aggregate(pipeline).to_list(None)
+    else:
+        leads_in_db = await lead_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
+    leads = [lead_model.LeadModel(**lead).to_json() for lead in leads_in_db]
+    return leads

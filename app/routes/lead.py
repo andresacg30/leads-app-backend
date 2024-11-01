@@ -3,7 +3,7 @@ import json
 
 from fastapi import APIRouter, Body, status, HTTPException, Depends
 from fastapi.responses import Response
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 import app.controllers.lead as lead_controller
 
@@ -14,6 +14,22 @@ from app.tools import mappings
 
 
 router = APIRouter(prefix="/api/lead", tags=["lead"])
+
+
+@router.post(
+    "/get-many",
+    response_description="Get multiple leads",
+    response_model_by_alias=False
+)
+async def get_multiple_leads(ids: List[str] = Body(...), user: UserModel = Depends(get_current_user)):
+    """
+    Get the record for multiple leads, looked up by `ids`.
+    """
+    try:
+        leads = await lead_controller.get_leads(ids=ids, user=user)
+        return {"data": list(campaign.to_json() for campaign in LeadCollection(data=leads).data)}
+    except lead_controller.LeadNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get(

@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from app.background_tasks.job import get_scheduled_jobs, clear_scheduled_jobs, cancel_scheduled_jobs
+from app.background_jobs.job import get_scheduled_jobs, clear_scheduled_jobs, cancel_scheduled_jobs
 from app.models.user import UserModel
 from app.auth.jwt_bearer import get_current_user
 
