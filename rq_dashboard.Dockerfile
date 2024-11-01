@@ -16,4 +16,4 @@ COPY rq_dashboard.py .
 EXPOSE 8080
 
 
-CMD ["python", "rq_dashboard.py"]
+CMD ["python", "rq_dashboard_app.py"]
