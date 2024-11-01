@@ -1,12 +1,18 @@
+# Dockerfile
+
 FROM python:3.9-slim
+
+# Set the working directory
 WORKDIR /app
 
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+# Copy requirements file and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy the application code
+COPY worker.py .
 
-ENV REDIS_URL=${REDIS_URL}
-ENV REDIS_PORT=${REDIS_PORT}
+# Expose the port (optional)
+EXPOSE 8080
 
-CMD ["rq", "worker", "--url", "redis://${REDIS_URL}:${REDIS_PORT}/0", "default"]
+CMD ["python", "worker.py"]

@@ -1,14 +1,19 @@
-# Base image
+# Dockerfile
+
 FROM python:3.9-slim
 
-# Install rq-dashboard
-RUN pip install --no-cache-dir rq-dashboard
+# Set the working directory
+WORKDIR /app
 
-# Expose the port (default is 9181)
-EXPOSE 9181
+# Copy requirements file and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-ENV REDIS_URL=${REDIS_URL}
-ENV REDIS_PORT=${REDIS_PORT}
+# Copy the application code
+COPY rq_dashboard.py .
 
-# Command to run rq-dashboard
-CMD ["rq-dashboard", "--redis-url", "redis://${REDIS_URL}:${REDIS_PORT}/0", "--port", "9181", "--bind", "0.0.0.0"]
+# Expose the port (optional)
+EXPOSE 8080
+
+
+CMD ["python", "rq_dashboard.py"]

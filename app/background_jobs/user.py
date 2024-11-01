@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def add_to_otp_verification_queue(user_id: str):
-    logger.info(f"Adding user {user_id} to OTP verification queue")    
+    logger.info(f"Adding user {user_id} to OTP verification queue")
     task_id = scheduler.enqueue_in(
         timedelta(seconds=15),
         run_async,
