@@ -4,7 +4,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import secrets
 from fastapi import FastAPI
 from starlette.middleware.wsgi import WSGIMiddleware
-from rq_dashboard_app import default_settings
+from rq_dashboard import default_settings
 from rq_dashboard.cli import make_flask_app
 import uvicorn
 from settings import get_settings
