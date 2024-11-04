@@ -20,7 +20,13 @@ def create_rq_dashboard_app():
     os.environ['REDIS_PASSWORD'] = redis_password
     os.environ['REDIS_URL'] = redis_url
 
-    app = make_flask_app(default_settings)
+    app = make_flask_app(
+        config=None,
+        username=os.getenv('DASHBOARD_USERNAME', 'admin'),
+        password=os.getenv('DASHBOARD_PASSWORD', 'password'),
+        url_prefix="/dashboard",
+        compatibility_mode=True
+    )
     return app
 
 
