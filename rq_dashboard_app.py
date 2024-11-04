@@ -37,19 +37,19 @@ flask_app = create_rq_dashboard_app()
 app.mount("/dashboard", WSGIMiddleware(flask_app))
 
 
-security = HTTPBasic()
+# security = HTTPBasic()
 
 
-@app.middleware("http")
-async def basic_auth(request: Request, call_next):
-    if request.url.path.startswith("/dashboard"):
-        credentials: HTTPBasicCredentials = await security(request)
-        correct_username = secrets.compare_digest(credentials.username, os.getenv('DASHBOARD_USERNAME', 'admin'))
-        correct_password = secrets.compare_digest(credentials.password, os.getenv('DASHBOARD_PASSWORD', 'password'))
-        if not (correct_username and correct_password):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, headers={"WWW-Authenticate": "Basic"})
-    response = await call_next(request)
-    return response
+# @app.middleware("http")
+# async def basic_auth(request: Request, call_next):
+#     if request.url.path.startswith("/dashboard"):
+#         credentials: HTTPBasicCredentials = await security(request)
+#         correct_username = secrets.compare_digest(credentials.username, os.getenv('DASHBOARD_USERNAME', 'admin'))
+#         correct_password = secrets.compare_digest(credentials.password, os.getenv('DASHBOARD_PASSWORD', 'password'))
+#         if not (correct_username and correct_password):
+#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, headers={"WWW-Authenticate": "Basic"})
+#     response = await call_next(request)
+#     return response
 
 
 @app.get("/health")
