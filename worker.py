@@ -18,9 +18,8 @@ def health_check():
 def start_worker():
     redis_server = settings.redis_api_address
     redis_port = settings.redis_api_port
-    redis_password = settings.redis_password
     redis_url = f'redis://{redis_server}:{redis_port}'
-    conn = redis.from_url(redis_url, password=redis_password)
+    conn = redis.from_url(redis_url)
     worker = Worker(['default'], connection=conn)
     worker.work()
 
