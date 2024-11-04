@@ -15,9 +15,7 @@ settings = get_redis_settings()
 def create_rq_dashboard_app():
     redis_server = settings.redis_api_address
     redis_port = settings.redis_api_port
-    redis_password = settings.redis_password
     redis_url = f'redis://{redis_server}:{redis_port}'
-    os.environ['REDIS_PASSWORD'] = redis_password
     os.environ['REDIS_URL'] = redis_url
 
     app = make_flask_app(

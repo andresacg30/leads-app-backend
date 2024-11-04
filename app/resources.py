@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 user_connections = defaultdict(list)
 
 try:
-    redis = Redis(host=settings.redis_api_address, port=settings.redis_api_port, password=settings.redis_password)
+    redis = Redis(host=settings.redis_api_address, port=settings.redis_api_port)
     rq = Queue(connection=redis)
     scheduler = Scheduler(connection=redis)
     logger.info("Connected to Redis and RQ Scheduler")
