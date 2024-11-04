@@ -4,10 +4,10 @@ from fastapi import FastAPI
 import uvicorn
 import redis
 from rq import Worker
-from settings import get_settings
+from settings import get_redis_settings
 
 app = FastAPI()
-settings = get_settings()
+settings = get_redis_settings()
 
 
 @app.get("/")

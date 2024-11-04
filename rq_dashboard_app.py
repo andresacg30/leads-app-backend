@@ -7,9 +7,9 @@ from starlette.middleware.wsgi import WSGIMiddleware
 from rq_dashboard import default_settings
 from rq_dashboard.cli import make_flask_app
 import uvicorn
-from settings import get_settings
+from settings import get_redis_settings
 
-settings = get_settings()
+settings = get_redis_settings()
 
 
 def create_rq_dashboard_app():

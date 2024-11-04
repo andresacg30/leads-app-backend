@@ -22,5 +22,15 @@ class Settings(BaseSettings):
     redis_password: str = os.environ.get("REDIS_PASSWORD")
 
 
+class RedisSettings(BaseSettings):
+    redis_api_address: str = os.environ.get("REDIS_API_ADDRESS")
+    redis_api_port: int = os.environ.get("REDIS_API_PORT")
+    redis_password: str = os.environ.get("REDIS_PASSWORD")
+
+
 def get_settings() -> Settings:
     return Settings()
+
+
+def get_redis_settings() -> RedisSettings:
+    return RedisSettings()
