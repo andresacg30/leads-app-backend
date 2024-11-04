@@ -4,16 +4,19 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import secrets
 from fastapi import FastAPI
 from starlette.middleware.wsgi import WSGIMiddleware
-from rq_dashboard import default_settings
+from rq_dashboard_app import default_settings
 from rq_dashboard.cli import make_flask_app
 import uvicorn
+from settings import get_settings
+
+settings = get_settings()
 
 
 def create_rq_dashboard_app():
-    redis_address = os.getenv('REDIS_API_ADDRESS', 'localhost')
-    redis_port = os.getenv('REDIS_PORT', 6379)
-    redis_password = os.getenv('REDIS_PASSWORD', None)
-    redis_url = f'redis://{redis_address}:{redis_port}'
+    redis_server = settings.redis_api_address
+    redis_port = settings.redis_api_port
+    redis_password = settings.redis_password
+    redis_url = f'redis://{redis_server}:{redis_port}'
     os.environ['REDIS_PASSWORD'] = redis_password
     os.environ['REDIS_URL'] = redis_url
 
