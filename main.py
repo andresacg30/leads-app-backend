@@ -6,7 +6,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.jwt_bearer import JWTBearer
-from app.routes import agent, job, lead, campaign, payment, user, transaction
+from app.routes import agent, job, lead, campaign, payment, user, transaction, admin
 from settings import get_settings
 
 import app.controllers.user as user_controller
@@ -38,6 +38,7 @@ app.include_router(lead.router, dependencies=[Depends(token_listener)])
 app.include_router(payment.router, dependencies=[Depends(token_listener)])
 app.include_router(campaign.router, dependencies=[Depends(token_listener)])
 app.include_router(job.router, dependencies=[Depends(token_listener)])
+app.include_router(admin.router, dependencies=[Depends(token_listener)])
 
 
 @app.get("/api/health")
