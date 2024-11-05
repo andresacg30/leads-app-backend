@@ -40,4 +40,4 @@ if __name__ == "__main__":
         logger.error(f"Failed to connect to Redis at {redis_url}")
         raise e
     worker = Worker(['default'], connection=conn)
-    worker.work()
+    worker.work(with_scheduler=True)

@@ -2,7 +2,7 @@ import logging
 import typing
 from rq.job import Job
 
-from app.resources import scheduler
+from app.resources import rq as scheduler
 
 
 logger = logging.getLogger(__name__)
