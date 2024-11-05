@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def add_to_otp_verification_queue(user_id: str):
     logger.info(f"Adding user {user_id} to OTP verification queue")
     task_id = rq.enqueue_in(
-        timedelta(seconds=15),
+        timedelta(minutes=15),
         run_async,
         user_controller.check_user_is_verified_and_delete,
         user_id
