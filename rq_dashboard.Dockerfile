@@ -13,7 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY settings.py .
 COPY rq_dashboard_app.py .
 
-# Expose the port (optional)
 EXPOSE 8080
 
 CMD ["python", "rq_dashboard_app.py"]
