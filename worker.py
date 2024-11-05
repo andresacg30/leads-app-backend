@@ -1,5 +1,4 @@
-# worker.py
-
+import logging
 import os
 import threading
 from fastapi import FastAPI
@@ -8,6 +7,7 @@ import redis
 from rq import Worker
 
 
+logger = logging.getLogger(__name__)
 app = FastAPI()
 
 
@@ -29,6 +29,15 @@ if __name__ == "__main__":
     redis_port = os.getenv('REDIS_PORT', 6379)
     redis_password = os.getenv('REDIS_PASSWORD', None)
     redis_url = f'redis://{redis_server}:{redis_port}'
-    conn = redis.from_url(redis_url, password=redis_password)
+    try:
+        conn = redis.Redis(
+            host=redis_server,
+            port=redis_port
+        )
+        conn.ping()
+        logger.info(f"Connected to Redis at {redis_url}")
+    except Exception as e:
+        logger.error(f"Failed to connect to Redis at {redis_url}")
+        raise e
     worker = Worker(['default'], connection=conn)
     worker.work()
