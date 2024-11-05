@@ -11,9 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code
 COPY settings.py .
-COPY worker.py .
+COPY worker_app.py .
 
 # Expose the port (optional)
 EXPOSE 8080
 
-CMD ["python", "worker.py"]
+CMD ["python", "worker_app.py"]
