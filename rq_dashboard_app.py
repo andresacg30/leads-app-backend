@@ -3,9 +3,12 @@ import rq_dashboard
 import os
 from flask import Flask
 from settings import get_redis_settings
-from fastapi import APIRouter
+from fastapi import APIRouter, FastAPI
+from fastapi.middleware.wsgi import WSGIMiddleware
 
 
+app = FastAPI()
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 settings = get_redis_settings()
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -47,3 +50,6 @@ def create_rq_dashboard_app():
 
 
 flask_app = RootPathMiddleware(create_rq_dashboard_app(), '/admin/dashboard')
+
+
+app.mount('/admin/dashboard', WSGIMiddleware(flask_app))
