@@ -100,6 +100,16 @@ async def get_all_agents(page, limit, sort, filter):
                 {"$sort": {sort[0]: sort[1]}},
                 {"$skip": (page - 1) * limit},
                 {"$limit": limit},
+                {"$lookup": {
+                    "from": "user",
+                    "localField": "_id",
+                    "foreignField": "agent_id",
+                    "as": "user_info"
+                    }},
+                {"$unwind": {
+                    "path": "$user_info",
+                    "preserveNullAndEmptyArrays": True
+                    }},
                 {"$project": {
                     "first_name": 1,
                     "last_name": 1,
@@ -107,6 +117,9 @@ async def get_all_agents(page, limit, sort, filter):
                     "phone": 1,
                     "states_with_license": 1,
                     "CRM": 1,
+                    "balance": {
+                        "$ifNull": ["$user_info.balance", 0]
+                        },
                     "created_time": 1,
                     "campaigns": {
                         "$filter": {
@@ -132,10 +145,13 @@ async def get_all_agents(page, limit, sort, filter):
 
 
 async def get_agent(id):
+    from app.controllers.user import get_user_balance
     agent_collection = get_agent_collection()
     try:
         agent_in_db = await agent_collection.find_one({"_id": ObjectId(id)})
+        agent_balance = await get_user_balance(id)
         agent = AgentModel(**agent_in_db)
+        agent.balance = agent_balance
         return agent
     except bson.errors.InvalidId:
         raise AgentIdInvalidError(f"Invalid id {id} on get agent route.")
