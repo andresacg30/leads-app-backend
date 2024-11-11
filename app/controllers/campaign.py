@@ -1,3 +1,4 @@
+import uuid
 from bson import ObjectId
 from pymongo import ReturnDocument
 from motor.core import AgnosticCollection
@@ -27,6 +28,8 @@ async def get_campaign_by_name(campaign_name: str):
 
 async def create_campaign(campaign: campaign.CampaignModel):
     campaign_collection = get_campaign_collection()
+    sign_up_code = generate_unique_sign_up_code()
+    campaign.sign_up_code = sign_up_code
     new_campaign = await campaign_collection.insert_one(
         campaign.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
@@ -92,3 +95,9 @@ async def delete_campaigns(ids):
     campaign_collection = get_campaign_collection()
     result = await campaign_collection.delete_many({"_id": {"$in": [ObjectId(id) for id in ids if id != "null"]}})
     return result
+
+
+async def generate_unique_sign_up_code():
+    uid = uuid.uuid4()
+    code = uid.int % 1_000_000
+    return f"{code:06d}"
