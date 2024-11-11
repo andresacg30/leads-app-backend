@@ -44,7 +44,6 @@ async def verify_session(session_id: str, user: UserModel = Depends(get_current_
         session = await stripe_controller.verify_checkout_session(session_id)
         if session.payment_status == "paid":
             if user.is_new_user():
-                await user_controller.onboard_user(user)
                 access_token = await user_controller.change_user_permissions(user.id, new_permissions=['agent'])
                 await transaction_controller.create_transaction(
                     transaction=TransactionModel(

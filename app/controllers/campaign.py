@@ -97,7 +97,13 @@ async def delete_campaigns(ids):
     return result
 
 
-async def generate_unique_sign_up_code():
+async def get_campaign_by_sign_up_code(sign_up_code):
+    campaign_collection = get_campaign_collection()
+    campaign = await campaign_collection.find_one({"sign_up_code": sign_up_code})
+    return campaign
+
+
+def generate_unique_sign_up_code():
     uid = uuid.uuid4()
     code = uid.int % 1_000_000
     return f"{code:06d}"

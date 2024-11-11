@@ -13,6 +13,7 @@ from app.auth import jwt_handler
 from app.db import Database
 from app.resources import user_connections
 from app.controllers import agent as agent_controller
+from app.controllers import campaign as campaign_controller
 from app.models.agent import AgentModel
 from app.models import user as user_model
 from app.tools import jwt_helper
@@ -51,12 +52,21 @@ async def validate_login(credentials: HTTPBasicCredentials = Depends(security)):
 
 
 async def create_user(user):
+    if not user["sign_up_codes"]:
+        raise HTTPException(status_code=400, detail="No sign up codes provided")
+    user_campaign_ids = []
+    for sign_up_code in user["sign_up_codes"]:
+        if not await campaign_controller.get_campaign_by_sign_up_code(sign_up_code):
+            raise HTTPException(status_code=404, detail=f"Sign up code {sign_up_code} not found")
+        user_campaign = await campaign_controller.get_campaign_by_sign_up_code(sign_up_code)
+        user_campaign_ids.append(user_campaign["_id"])
     agent_model = AgentModel(
         first_name=user["first_name"],
         last_name=user["last_name"],
         email=user["email"],
         phone=user["phone"],
         states_with_license=user["states_with_license"],
+        campaigns=user_campaign_ids,
     )
     created_agent = await agent_controller.create_agent(agent_model)
 
@@ -72,6 +82,7 @@ async def create_user(user):
         agent_id=user["agent_id"],
         permissions=user["permissions"],
         otp_code=user["otp_code"],
+        campaigns=user_campaign_ids,
         otp_expiration=datetime.datetime.utcnow() + datetime.timedelta(seconds=OTP_EXPIRATION),
     )
     stripe_customer_id = _create_stripe_customer(user)
@@ -125,17 +136,6 @@ async def change_user_permissions(user_id, new_permissions):
         return_document=True
     )
     return jwt_handler.create_access_token(str(user_in_db["email"]), user_in_db["permissions"])
-
-
-async def onboard_user(user: user_model.UserModel):
-    user_collection = get_user_collection()
-    user_in_db = await user_collection.find_one({"_id": bson.ObjectId(user.id)})
-    await user_collection.update_one(
-        {"_id": bson.ObjectId(user.id)},
-        {"$set": {"campaigns": [bson.ObjectId("6668b634a88f8e5a8dde197e")]}}
-    )
-    await agent_controller.update_campaigns_for_agent(user_in_db["agent_id"], [bson.ObjectId("6668b634a88f8e5a8dde197e")])
-    return user
 
 
 async def activate_user(email):
