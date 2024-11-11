@@ -70,6 +70,7 @@ class AgentModel(BaseModel):
     phone: str = Field(...)
     states_with_license: List = Field(...)
     CRM: CRMModel = Field(default_factory=CRMModel)
+    balance: float = Field(default=0)
     created_time: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     campaigns: List[PyObjectId] = Field(default_factory=list)
     credentials: AgentCredentials = Field(default_factory=AgentCredentials)

@@ -206,3 +206,9 @@ async def check_user_is_verified_and_delete(user_id):
         await user_collection.delete_one({"_id": bson.ObjectId(user_id)})
         logger.info(f"User {user_id} deleted")
         return False
+
+
+async def get_user_balance(id: str):
+    user_collection = get_user_collection()
+    user = await user_collection.find_one({"agent_id": bson.ObjectId(id)})
+    return user["balance"]
