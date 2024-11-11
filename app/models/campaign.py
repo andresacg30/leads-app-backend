@@ -14,6 +14,7 @@ class CampaignModel(BaseModel):
     name: str = Field(...)
     active: bool = Field(...)
     start_date: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    sign_up_code: Optional[int] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
