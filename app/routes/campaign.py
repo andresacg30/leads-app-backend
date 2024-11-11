@@ -112,7 +112,7 @@ async def create_campaign(campaign: CampaignModel = Body(...), user: UserModel =
         raise HTTPException(status_code=400, detail=f"Campaign {campaign_name} already exists")
     new_campaign = await campaign_controller.create_campaign(campaign)
     if user.is_agency():
-        user.campaigns.append(str(new_campaign.inserted_id))
+        user.campaigns.append(new_campaign.inserted_id)
         await user_controller.update_user(user)
     return {"id": str(new_campaign.inserted_id)}
 
