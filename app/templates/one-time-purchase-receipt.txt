@@ -1,0 +1,10 @@
+LEADCONEX
+
+{{ first_name }}, thank you for your purchase!
+
+You can view your receipt by clicking the link below:
+{{ receipt_url }}
+
+If you have any questions, feel free to contact us.
+
+© LeadConex. All rights reserved.

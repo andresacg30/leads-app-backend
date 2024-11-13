@@ -32,6 +32,7 @@ idna==3.4
 importlib_metadata==8.5.0
 iniconfig==2.0.0
 itsdangerous==2.2.0
+jellyfish==1.1.0
 Jinja2==3.1.4
 makefun==1.15.4
 markdown-it-py==3.0.0
@@ -85,6 +86,7 @@ typing_extensions==4.8.0
 tzdata==2024.1
 ujson==5.10.0
 urllib3==2.2.3
+us==3.2.0
 uvicorn==0.24.0.post1
 uvloop==0.19.0
 watchfiles==0.21.0

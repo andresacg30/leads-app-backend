@@ -139,6 +139,7 @@ async def change_user_permissions(user_id, new_permissions):
 
 
 async def activate_user(email):
+    
     user_collection = get_user_collection()
     user = await user_collection.find_one_and_update(
         {"email": email},

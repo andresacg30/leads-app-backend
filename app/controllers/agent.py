@@ -278,3 +278,38 @@ def _filter_formatter_helper(filter):
     if "last_name" in filter:
         filter["last_name"] = {"$regex": str.capitalize(filter["last_name"]), "$options": "i"}
     return filter
+
+
+async def get_agents_with_balance(campaign: ObjectId):
+    agent_collection = get_agent_collection()
+    pipeline = [
+                {"$match": {"campaigns": campaign}},
+                {"$lookup": {
+                    "from": "user",
+                    "localField": "_id",
+                    "foreignField": "agent_id",
+                    "as": "user_info"
+                    }},
+                {"$unwind": {
+                    "path": "$user_info",
+                    "preserveNullAndEmptyArrays": True
+                    }},
+                {"$project": {
+                    "first_name": 1,
+                    "last_name": 1,
+                    "email": 1,
+                    "phone": 1,
+                    "states_with_license": 1,
+                    "CRM": 1,
+                    "balance": {
+                        "$ifNull": ["$user_info.balance", 0]
+                        },
+                    "created_time": 1,
+                    "campaigns": 1,
+                    "credentials": 1,
+                    "custom_fields": 1
+                }},
+                {"$match": {"balance": {"$gt": 0}}}
+            ]
+    agents = await agent_collection.aggregate(pipeline).to_list(None)
+    return agents

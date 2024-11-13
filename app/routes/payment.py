@@ -25,6 +25,17 @@ async def get_products(request: PaymentTypeRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/create-customer-portal-session")
+async def create_customer_portal_session(user: UserModel = Depends(get_current_user)):
+    try:
+        if not user.stripe_customer_id:
+            raise HTTPException(status_code=400, detail="User does not have a stripe customer id")
+        session_url = await stripe_controller.create_customer_portal_session(user)
+        return {"url": session_url}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/create-checkout-session")
 async def create_checkout_session(request: CheckoutRequest, user: UserModel = Depends(get_current_user)):
     try:
@@ -45,16 +56,16 @@ async def verify_session(session_id: str, user: UserModel = Depends(get_current_
         if session.payment_status == "paid":
             if user.is_new_user():
                 access_token = await user_controller.change_user_permissions(user.id, new_permissions=['agent'])
-                await transaction_controller.create_transaction(
-                    transaction=TransactionModel(
-                        user_id=user.id,
-                        amount=session.amount_total / 100,
-                        date=datetime.utcnow(),
-                        type="credit",
-                        description="User added credit"
-                    )
+            await transaction_controller.create_transaction(
+                transaction=TransactionModel(
+                    user_id=user.id,
+                    amount=session.amount_total / 100,
+                    date=datetime.utcnow(),
+                    type="credit",
+                    description="User added credit"
                 )
-                return {"status": "success", "access_token": access_token}
+            )
+            return {"status": "success", "access_token": access_token}
         else:
             return {"status": "pending"}
     except Exception as e:

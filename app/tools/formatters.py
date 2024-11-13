@@ -1,4 +1,5 @@
 import datetime
+import us
 
 from zoneinfo import ZoneInfo
 
@@ -29,3 +30,8 @@ def format_string_to_utc_datetime(date: datetime.datetime):
     est_date = date.replace(tzinfo=ZoneInfo("America/New_York"))
     utc_date = est_date.astimezone(ZoneInfo("UTC"))
     return utc_date
+
+
+def format_state_to_abbreviation(state):
+    state_abbr = us.states.lookup(state).abbr
+    return state_abbr
