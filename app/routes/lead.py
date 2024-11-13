@@ -175,8 +175,7 @@ async def create_lead(lead: LeadModel = Body(...), user: UserModel = Depends(get
     A unique `id` will be created and provided in the response.
     """
     if not user.is_admin():
-        if lead.campaign_id not in user.campaigns:
-            raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+        raise HTTPException(status_code=404, detail="User can't create leads")
     for state, state_variations in mappings.state_mappings.items():
         if lead.state.lower() in state_variations:
             lead.state = state

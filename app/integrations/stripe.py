@@ -3,12 +3,14 @@ from settings import get_settings
 from typing import List
 
 from app.models.payment import ProductSelection
+from app.models.user import UserModel
+from app.tools import emails
 
 
 settings = get_settings()
 
 
-async def create_checkout_session(products: List[ProductSelection], payment_type, user):
+async def create_checkout_session(products: List[ProductSelection], payment_type, user: UserModel):
     line_items = []
 
     for product in products:
@@ -55,6 +57,15 @@ async def create_checkout_session(products: List[ProductSelection], payment_type
 
 async def verify_checkout_session(session_id: str):
     session = stripe.checkout.Session.retrieve(session_id)
+    if session.mode == "payment":
+        payment_intent = stripe.PaymentIntent.retrieve(session.payment_intent)
+        charge = stripe.Charge.retrieve(payment_intent.latest_charge)
+        emails.send_one_time_purchase_receipt(
+            receipt_url=charge.receipt_url,
+            email=session.customer_details.email,
+            user_name=session.customer_details.name,
+            amount=charge.amount / 100,
+        )
     return session
 
 
@@ -67,3 +78,11 @@ async def get_products(payment_type: str):
             filtered_products.append(product)
 
     return {"data": filtered_products}
+
+
+async def create_customer_portal_session(user: UserModel):
+    session = stripe.billing_portal.Session.create(
+        customer=user.stripe_customer_id,
+        return_url=f"{settings.frontend_url}/#/"
+    )
+    return session.url

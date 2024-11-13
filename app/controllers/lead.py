@@ -1,4 +1,6 @@
 import bson
+import logging
+import random
 
 from datetime import datetime
 from bson import ObjectId
@@ -8,10 +10,15 @@ from motor.core import AgnosticCollection
 
 
 from app.db import Database
-from app.controllers import agent as agent_controller
+from app.background_jobs import lead as lead_background_jobs
 from app.models import lead as lead_model
+from app.models.transaction import TransactionModel
 from app.models.user import UserModel
 from app.tools import formatters as formatter
+from app.tools import constants
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_lead_collection() -> AgnosticCollection:
@@ -89,6 +96,7 @@ async def update_lead_from_ghl(id, lead: lead_model.UpdateLeadModel):
 
 
 async def get_lead_by_field(**kwargs):
+    from app.controllers import agent as agent_controller
     lead_collection = get_lead_collection()
     query = {k: v for k, v in kwargs.items() if v is not None}
     if "buyer_name" in query:
@@ -115,6 +123,8 @@ async def create_lead(lead: lead_model.LeadModel):
     new_lead = await lead_collection.insert_one(
         lead.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
+    if str(lead.campaign_id) not in constants.OG_CAMPAIGNS:
+        lead_background_jobs.process_lead(lead, lead_id=new_lead.inserted_id)
     return new_lead
 
 
@@ -217,6 +227,7 @@ def _format_second_chance_lead_sold_time_filter(filter):
 
 
 def build_query_filters(filter):
+    #  Whenever i wrote this code, God and I knew how it worked. Now God only knows. Good luck! Attempts to refactor: 69  <- Add yours
     if "q" in filter:
         query_value = filter["q"]
         query_filters = [
@@ -409,3 +420,52 @@ async def get_leads(ids: List[ObjectId], user: UserModel):
         leads_in_db = await lead_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
     leads = [lead_model.LeadModel(**lead).to_json() for lead in leads_in_db]
     return leads
+
+
+async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
+    from app.controllers import agent as agent_controller
+    from app.controllers import transaction as transaction_controller
+    from app.controllers import user as user_controller
+    lead_price = 25
+    lead_collection = get_lead_collection()
+    lead = lead.model_dump(by_alias=True, mode="python")
+    formatted_lead_state = formatter.format_state_to_abbreviation(lead["state"])
+    agents_with_balance = await agent_controller.get_agents_with_balance(campaign=lead["campaign_id"])
+    if not agents_with_balance:
+        logger.warning(f"No agents with balance found for lead {lead_id}")
+        return
+    agents_licensed_in_lead_state = [
+        agent for agent in agents_with_balance if formatted_lead_state in agent["states_with_license"] and agent["balance"] >= lead_price
+    ]
+    if not agents_licensed_in_lead_state:
+        logger.warning(f"No agents licensed in {formatted_lead_state} with balance found for lead {lead_id}")
+        return
+    agent_to_distribute = choose_agent(agents=agents_licensed_in_lead_state, distribution_type="round_robin")
+    if agent_to_distribute:
+        result = await lead_collection.update_one(
+            {"_id": lead_id},
+            {"$set": {
+                "buyer_id": agent_to_distribute["_id"],
+                "lead_sold_time": datetime.utcnow()
+            }}
+        )
+        if result.modified_count == 1:
+            user = await user_controller.get_user_by_field(agent_id=agent_to_distribute["_id"])
+            user_id = user.id
+            await transaction_controller.create_transaction(
+                TransactionModel(
+                    user_id=user_id,
+                    amount=-lead_price,
+                    description="Fresh Lead purchase",
+                    type="debit",
+                    date=datetime.utcnow()
+                )
+            )
+            return True
+
+
+def choose_agent(agents, distribution_type):
+    if distribution_type == "round_robin":
+        return agents[0]
+    elif distribution_type == "random":
+        return random.choice(agents)

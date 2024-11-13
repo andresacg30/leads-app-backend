@@ -24,3 +24,26 @@ def send_verify_code_email(first_name, email, otp_code):
         template=rendered_html,
         text=rendered_text
     )
+
+
+def send_one_time_purchase_receipt(receipt_url, email, user_name, amount):
+    with open("app/templates/one-time-purchase-receipt.html") as receipt_html:
+        receipt_template = Template(receipt_html.read())
+        rendered_html = receipt_template.render(
+            user_name=user_name,
+            receipt_url=receipt_url
+        )
+
+    with open("app/templates/one-time-purchase-receipt.txt") as receipt_text:
+        receipt_text = receipt_text.read()
+        rendered_text = receipt_template.render(
+            user_name=user_name,
+            receipt_url=receipt_url
+        )
+
+    send_single_email(
+        to_address=email,
+        subject=f"Your LeadConex Receipt for your ${amount} purchase",
+        template=rendered_html,
+        text=rendered_text
+    )
