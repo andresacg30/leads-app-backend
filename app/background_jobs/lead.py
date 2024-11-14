@@ -19,4 +19,16 @@ def process_lead(lead: LeadModel, lead_id: str):
         lead_id
     )
     logger.info(f"Task ID for lead {lead.full_name}: {task_id}")
-    return task_id.result
+    return "Success"
+
+
+def send_leads_to_agent(lead_ids: list, agent_id: str):
+    logger.info(f"Sending {len(lead_ids)} leads to agent {agent_id}")
+    task_id = rq.enqueue(
+        run_async,
+        lead_controller.send_leads_to_agent,
+        lead_ids,
+        agent_id
+    )
+    logger.info(f"Task ID for agent {agent_id}: {task_id}")
+    return "Success"

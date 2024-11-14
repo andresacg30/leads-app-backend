@@ -18,6 +18,38 @@ from app.tools import mappings, formatters
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 
+@router.post(
+    "/get-eligible-agents-for-lead-processing",
+    response_description="Get eligible agent for lead processing based on licensed state and current credit",
+    response_model_by_alias=False
+)
+async def get_eligible_agents_for_lead_processing(
+    states: List[str] = Body(...),
+    lead_count: int = Body(...),
+    second_chance_lead_count: int = Body(...),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Get eligible agent for lead processing based on licensed state and current credit
+    """
+    if not states:
+        raise HTTPException(status_code=400, detail="States must be provided")
+    if not lead_count and not second_chance_lead_count:
+        raise HTTPException(status_code=400, detail="Lead count or second chance lead count must be provided")
+    campaigns = [bson.ObjectId(campaign) for campaign in user.campaigns]
+    formatted_states = [formatters.format_state_to_abbreviation(state) for state in states]
+    agents = await agent_controller.get_eligible_agents_for_lead_processing(
+        formatted_states,
+        lead_count,
+        second_chance_lead_count,
+        campaigns
+    )
+    if agents:
+        agent_data = list(agent.to_json() for agent in AgentCollection(data=agents).data)
+        return {"data": agent_data}
+    return {"data": []}
+
+
 @router.get(
     "/find",
     response_description="Get agent id by specified field",

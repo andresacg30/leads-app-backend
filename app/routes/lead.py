@@ -8,12 +8,38 @@ from typing import Optional, Dict, List
 import app.controllers.lead as lead_controller
 
 from app.auth.jwt_bearer import get_current_user
+from app.background_jobs import lead as lead_background_jobs
 from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
 from app.models.user import UserModel
 from app.tools import mappings
 
 
 router = APIRouter(prefix="/api/lead", tags=["lead"])
+
+
+@router.post(
+    "/send-leads-to-agent",
+    response_description="Send leads to agent",
+    response_model_by_alias=False
+)
+async def send_leads_to_agent(
+    lead_ids: List[str] = Body(...),
+    agent_id: str = Body(...),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Send leads to agent
+    """
+    if user.is_agent():
+        raise HTTPException(status_code=404, detail="User does not have required permissions")
+    if not lead_ids:
+        raise HTTPException(status_code=400, detail="Lead ids are required")
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="Agent id is required")
+    if agent_id == "null":
+        agent_id = None
+    lead_background_jobs.send_leads_to_agent(lead_ids, agent_id)
+    return {"message": "Leads queued for sending"}
 
 
 @router.post(

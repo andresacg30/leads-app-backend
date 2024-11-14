@@ -313,3 +313,50 @@ async def get_agents_with_balance(campaign: ObjectId):
             ]
     agents = await agent_collection.aggregate(pipeline).to_list(None)
     return agents
+
+
+async def get_eligible_agents_for_lead_processing(
+    states,
+    lead_count,
+    second_chance_lead_count,
+    campaigns
+):
+    lead_price = 25
+    second_chance_lead_price = 7.50
+    total = lead_count * lead_price + second_chance_lead_count * second_chance_lead_price
+    agent_collection = get_agent_collection()
+    pipeline = [
+        {"$match": {
+            "states_with_license": {"$all": states},
+            "campaigns": {"$in": campaigns}
+        }},
+        {"$lookup": {
+            "from": "user",
+            "localField": "_id",
+            "foreignField": "agent_id",
+            "as": "user_info"
+            }},
+        {"$unwind": {
+            "path": "$user_info",
+            "preserveNullAndEmptyArrays": True
+            }},
+        {"$project": {
+            "first_name": 1,
+            "last_name": 1,
+            "email": 1,
+            "phone": 1,
+            "states_with_license": 1,
+            "CRM": 1,
+            "balance": {
+                "$ifNull": ["$user_info.balance", 0]
+                },
+            "created_time": 1,
+            "campaigns": 1,
+            "credentials": 1,
+            "custom_fields": 1
+        }},
+        {"$match": {"balance": {"$gt": total}}},
+        {"$sort": {"balance": -1}},
+    ]
+    agents = await agent_collection.aggregate(pipeline).to_list(None)
+    return agents

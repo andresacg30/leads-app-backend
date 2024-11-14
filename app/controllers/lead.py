@@ -469,3 +469,23 @@ def choose_agent(agents, distribution_type):
         return agents[0]
     elif distribution_type == "random":
         return random.choice(agents)
+
+
+async def send_leads_to_agent(lead_ids: list, agent_id: str):
+    from app.controllers import agent as agent_controller
+    lead_collection = get_lead_collection()
+    agent_id_obj = ObjectId(agent_id)
+    agent = await agent_controller.get_agent_by_field(_id=agent_id_obj)
+    if not agent:
+        logger.warning(f"Agent {agent_id} not found")
+        return
+    result = await lead_collection.update_many(
+        {"_id": {"$in": [ObjectId(id) for id in lead_ids]}},
+        {"$set": {
+            "buyer_id": agent_id_obj,
+            "lead_sold_time": datetime.utcnow()
+        }}
+    )
+    if result.modified_count == len(lead_ids):
+        return True
+    return False
