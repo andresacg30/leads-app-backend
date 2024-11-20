@@ -47,3 +47,28 @@ def send_one_time_purchase_receipt(receipt_url, email, user_name, amount):
         template=rendered_html,
         text=rendered_text
     )
+
+
+def send_stripe_onboarding_email(email, user_name, onboarding_url, campaign):
+    with open("app/templates/stripe-onboarding.html") as stripe_onboarding_html:
+        stripe_onboarding_template = Template(stripe_onboarding_html.read())
+        rendered_html = stripe_onboarding_template.render(
+            user_name=user_name,
+            stripe_onboarding_url=onboarding_url,
+            campaign=campaign
+        )
+
+    with open("app/templates/stripe-onboarding.txt") as stripe_onboarding_text:
+        stripe_onboarding_text = stripe_onboarding_text.read()
+        rendered_text = stripe_onboarding_template.render(
+            user_name=user_name,
+            stripe_onboarding_url=onboarding_url,
+            campaign=campaign
+        )
+
+    send_single_email(
+        to_address=email,
+        subject="Complete your LeadConex Stripe Account Setup",
+        template=rendered_html,
+        text=rendered_text
+    )

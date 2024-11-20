@@ -1,3 +1,5 @@
+import ast
+import bson
 import datetime
 import random
 import string
@@ -5,12 +7,15 @@ import logging
 from fastapi import Body, APIRouter, HTTPException, Request, Depends
 from passlib.context import CryptContext
 
+import app.controllers.campaign as campaign_controller
 import app.controllers.user as user_controller
 import app.background_jobs.user as user_background_jobs
+import app.integrations.stripe as stripe_integration
 
 from app.auth.jwt_handler import sign_jwt, decode_jwt
 from app.auth.jwt_bearer import get_current_user
-from app.models.user import UserSignIn, RefreshTokenRequest, UserModel
+from app.models.campaign import CampaignModel
+from app.models.user import UserSignIn, RefreshTokenRequest, UserModel, UserCollection
 from app.tools.constants import OTP_EXPIRATION
 from app.tools import emails
 from settings import Settings
@@ -23,6 +28,13 @@ router = APIRouter()
 hash_helper = CryptContext(schemes=["bcrypt"])
 
 logger = logging.getLogger(__name__)
+
+
+@router.post("/onboard-new-campaign")
+async def onboard_new_campaign(request: Request, email: str = Body(..., embed=True)):
+    print("Onboarding new campaign")
+    _, stripe_onboarding_url = await stripe_integration.create_stripe_connect_account(email)
+    return stripe_onboarding_url
 
 
 @router.get("/get-current-balance")
@@ -137,6 +149,15 @@ async def refresh_token(refresh_request: RefreshTokenRequest = Body(...)):
         raise HTTPException(status_code=403, detail="Invalid refresh token")
 
 
+@router.post("/get-many")
+async def get_many_users(request: Request, user_ids: list = Body(...)):
+    try:
+        users = await user_controller.get_users(user_ids)
+        return {"data": list(user.to_json() for user in UserCollection(data=users).data)}
+    except user_controller.UserNotFoundError:
+        raise HTTPException(status_code=404, detail="Users not found")
+
+
 @router.post("")
 async def user_signup(request: Request, user=Body(...)):
     try:
@@ -177,3 +198,30 @@ async def _login_with_otp(user_credentials: UserSignIn):
         return tokens
     else:
         raise HTTPException(status_code=403, detail="Invalid OTP code")
+
+
+@router.get(
+    "",
+    response_description="Get all users",
+    response_model_by_alias=False
+)
+async def list_users(page: int = 1, limit: int = 10, sort: str = "name=ASC", filter: str = None, user: UserModel = Depends(get_current_user)):
+    """
+    List all of the user data in the database within the specified page and limit.
+    """
+    if sort.split('=')[1] not in ["ASC", "DESC"]:
+        raise HTTPException(status_code=400, detail="Invalid sort parameter")
+    try:
+        filter = ast.literal_eval(filter) if filter else None
+        if not user.is_admin():
+            if not user.campaigns:
+                raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+            filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in user.campaigns]}
+        sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
+        users, total = await user_controller.get_all_users(page=page, limit=limit, sort=sort, filter=filter)
+        return {
+            "data": list(user.to_json() for user in UserCollection(data=users).data),
+            "total": total
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -15,8 +15,9 @@ from app.resources import user_connections
 from app.controllers import agent as agent_controller
 from app.controllers import campaign as campaign_controller
 from app.models.agent import AgentModel
+from app.models.campaign import CampaignModel
 from app.models import user as user_model
-from app.tools import jwt_helper
+from app.tools import jwt_helper, emails
 from app.tools.constants import OTP_EXPIRATION
 
 
@@ -128,6 +129,14 @@ def _create_stripe_customer(user: user_model.UserModel):
     return stripe_customer["id"]
 
 
+async def get_users(ids):
+    user_collection = get_user_collection()
+    users = await user_collection.find({"_id": {"$in": [bson.ObjectId(id) for id in ids if id != "null"]}}).to_list(None)
+    if not users:
+        raise UserNotFoundError("No users found with the provided information")
+    return users
+
+
 async def change_user_permissions(user_id, new_permissions):
     user_collection = get_user_collection()
     user_in_db = await user_collection.find_one_and_update(
@@ -139,7 +148,6 @@ async def change_user_permissions(user_id, new_permissions):
 
 
 async def activate_user(email):
-    
     user_collection = get_user_collection()
     user = await user_collection.find_one_and_update(
         {"email": email},
@@ -213,3 +221,45 @@ async def get_user_balance(id: str):
     user_collection = get_user_collection()
     user = await user_collection.find_one({"agent_id": bson.ObjectId(id)}) or {}
     return user.get("balance") or 0
+
+
+async def get_all_users(page, limit, sort, filter):
+    user_collection = get_user_collection()
+    users = await user_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
+    if filter:
+        total = await user_collection.count_documents(filter)
+    else:
+        total = await user_collection.estimated_document_count()
+    return users, total
+
+
+async def onboard_agency_admin(campaign: CampaignModel, user=None):
+    user_collection = get_user_collection()
+    if not user:
+        user_in_db = await user_collection.find_one({"_id": bson.ObjectId(campaign.admin_id)})
+        user = user_model.UserModel(**user_in_db)
+        if not user:
+            raise UserNotFoundError(f"User with id {campaign['admin_id']} not found")
+    user_collection.update_one(
+        {"_id": bson.ObjectId(campaign.admin_id)},
+        {
+            "$set": {"permissions": ["agency_admin_onboarding"]},
+            "$addToSet": {"campaigns": bson.ObjectId(campaign.id)}
+        }
+    )
+    emails.send_stripe_onboarding_email(
+        email=user.email,
+        user_name=user.name,
+        onboarding_url=campaign.stripe_account_onboarding_url,
+        campaign=campaign.name
+    )
+    return
+
+
+async def remove_campaign_from_user(campaign_id):
+    user_collection = get_user_collection()
+    await user_collection.update_many(
+        {"campaigns": bson.ObjectId(campaign_id)},
+        {"$pull": {"campaigns": bson.ObjectId(campaign_id)}}
+    )
+    return

@@ -6,6 +6,7 @@ from fastapi.responses import Response
 
 import app.controllers.campaign as campaign_controller
 import app.controllers.user as user_controller
+import app.integrations.stripe as stripe_integration
 
 from app.auth.jwt_bearer import get_current_user
 from app.models.campaign import CampaignModel, UpdateCampaignModel, CampaignCollection
@@ -13,6 +14,43 @@ from app.models.user import UserModel
 
 
 router = APIRouter(prefix="/api/campaign", tags=["campaign"])
+
+
+@router.get("/get-stripe-account-status")
+async def get_stripe_account_status(user: UserModel = Depends(get_current_user)):
+    user_campaign: CampaignModel = await campaign_controller.get_campaign_by_admin_id(user.id)  # any campaign the user has links to the same stripe account.
+    is_active = await stripe_integration.get_stripe_account_status(account_id=user_campaign.stripe_account_id)
+    if is_active:
+        user_campaign.status = "active"
+        user.permissions = ["agency_admin"]
+        await campaign_controller.update_campaign(user_campaign.id, user_campaign)
+        await user_controller.update_user(user)
+    return {"is_active": is_active}
+
+
+@router.get("/refresh-stripe-onboarding-url")
+async def refresh_stripe_onboarding_url(user: UserModel = Depends(get_current_user)):
+    user_campaign: CampaignModel = await campaign_controller.get_campaign_by_admin_id(bson.ObjectId(user.id))
+    if not user_campaign:
+        raise HTTPException(status_code=404, detail="User does not have admin access to this campaign")
+    stripe_onboarding_url = await stripe_integration.refresh_stripe_account_onboarding_url(user_campaign.stripe_account_id)
+    user_campaign.stripe_account_onboarding_url = stripe_onboarding_url
+    await campaign_controller.update_campaign(user_campaign.id, user_campaign)
+    return {"url": stripe_onboarding_url}
+
+
+@router.get(
+    "/get-stripe-onboarding-url",
+    response_description="Get stripe onboarding url",
+)
+async def get_stripe_onboarding_url(user: UserModel = Depends(get_current_user)):
+    """
+    Get the stripe onboarding url for the user.
+    """
+    if user.is_agent():
+        raise HTTPException(status_code=404, detail="User do not have permission to this action")
+    stripe_account_onboarding_url = await campaign_controller.get_stripe_onboarding_url(user.campaigns[0])  # any campaign the user has will return the same onboarding link.
+    return {"url": stripe_account_onboarding_url}
 
 
 @router.post(
@@ -34,7 +72,6 @@ async def get_multiple_campaigns(ids: List[str] = Body(...), user: UserModel = D
 @router.get(
     "/{id}",
     response_description="Get a single campaign",
-    response_model=CampaignModel,
     response_model_by_alias=False
 )
 async def show_campaign(id: str, user: UserModel = Depends(get_current_user)):
@@ -43,10 +80,10 @@ async def show_campaign(id: str, user: UserModel = Depends(get_current_user)):
     """
     try:
         if not user.is_admin():
-            if not user.campaigns or id not in user.campaigns:
+            if not user.campaigns or bson.ObjectId(id) not in user.campaigns:
                 raise HTTPException(status_code=404, detail="User does not have access to this campaign")
         campaign = await campaign_controller.get_one_campaign(id)
-        return campaign
+        return campaign.to_json()
 
     except campaign_controller.CampaignNotFoundError:
         raise HTTPException(status_code=404, detail=f"Campaign {id} not found")

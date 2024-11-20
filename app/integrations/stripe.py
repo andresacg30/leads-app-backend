@@ -1,3 +1,4 @@
+from bson import ObjectId
 from main import stripe
 from settings import get_settings
 from typing import List
@@ -49,7 +50,7 @@ async def create_checkout_session(products: List[ProductSelection], payment_type
         mode="subscription" if payment_type == "recurring" else "payment",
         success_url=f"{settings.frontend_url}/#/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{settings.frontend_url}/#/cancel",
-        customer=user.stripe_customer_id,
+        customer=user.campaign.stripe_customer_id,
     )
 
     return checkout_session
@@ -86,3 +87,34 @@ async def create_customer_portal_session(user: UserModel):
         return_url=f"{settings.frontend_url}/#/"
     )
     return session.url
+
+
+async def create_stripe_connect_account(email: str):
+    account = stripe.Account.create(
+        email=email,
+        type="standard",
+        country='US'
+    )
+    account_url = stripe.AccountLink.create(
+        account=account.id,
+        refresh_url=f"{settings.frontend_url}/#/redirecting",
+        return_url=f"{settings.frontend_url}/#",
+        type='account_onboarding'
+    )
+    return account, account_url
+
+
+async def get_stripe_account_status(account_id: ObjectId):
+    stripe_account = stripe.Account.retrieve(account_id)
+    is_active = stripe_account.charges_enabled and stripe_account.payouts_enabled
+    return is_active
+
+
+async def refresh_stripe_account_onboarding_url(account_id: ObjectId):
+    account_url = stripe.AccountLink.create(
+        account=account_id,
+        refresh_url=f"{settings.frontend_url}/#/redirecting",
+        return_url=f"{settings.frontend_url}/#",
+        type='account_onboarding'
+    )
+    return account_url.url

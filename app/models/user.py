@@ -1,7 +1,7 @@
 import datetime
 from bson import ObjectId
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator
-from typing import Optional
+from typing import Optional, List
 
 from app.tools.modifiers import PyObjectId
 
@@ -123,3 +123,10 @@ class UserData(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+
+class UserCollection(BaseModel):
+    """
+    Container for a list of User records.
+    """
+    data: List[UserModel]
