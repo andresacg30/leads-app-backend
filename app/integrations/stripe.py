@@ -11,7 +11,7 @@ from app.tools import emails
 settings = get_settings()
 
 
-async def create_checkout_session(products: List[ProductSelection], payment_type, user: UserModel):
+async def create_checkout_session(products: List[ProductSelection], payment_type, user: UserModel, stripe_account_id: str):
     line_items = []
 
     for product in products:
@@ -20,7 +20,8 @@ async def create_checkout_session(products: List[ProductSelection], payment_type
                 product=product.product_id,
                 active=True,
                 type='recurring',
-                limit=1
+                limit=1,
+                stripe_account=stripe_account_id
             )
             quantity = 1
         else:
@@ -28,7 +29,8 @@ async def create_checkout_session(products: List[ProductSelection], payment_type
                 product=product.product_id,
                 active=True,
                 type='one_time',
-                limit=1
+                limit=1,
+                stripe_account=stripe_account_id
             )
             quantity = product.quantity
 
@@ -50,28 +52,29 @@ async def create_checkout_session(products: List[ProductSelection], payment_type
         mode="subscription" if payment_type == "recurring" else "payment",
         success_url=f"{settings.frontend_url}/#/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{settings.frontend_url}/#/cancel",
-        customer=user.campaign.stripe_customer_id,
+        customer=user.stripe_customer_id,
+        stripe_account=stripe_account_id
     )
 
     return checkout_session
 
 
-async def verify_checkout_session(session_id: str):
-    session = stripe.checkout.Session.retrieve(session_id)
+async def verify_checkout_session(session_id: str, stripe_account_id: str):
+    session = stripe.checkout.Session.retrieve(session_id, stripe_account=stripe_account_id)
     if session.mode == "payment":
-        payment_intent = stripe.PaymentIntent.retrieve(session.payment_intent)
-        charge = stripe.Charge.retrieve(payment_intent.latest_charge)
+        payment_intent = stripe.PaymentIntent.retrieve(session.payment_intent, stripe_account=stripe_account_id)
+        charge = stripe.Charge.retrieve(payment_intent.latest_charge, stripe_account=stripe_account_id)
         emails.send_one_time_purchase_receipt(
             receipt_url=charge.receipt_url,
             email=session.customer_details.email,
             user_name=session.customer_details.name,
-            amount=charge.amount / 100,
+            amount=charge.amount / 100
         )
     return session
 
 
-async def get_products(payment_type: str):
-    stripe_products = stripe.Product.list(active=True, limit=100)
+async def get_products(payment_type: str, stripe_account_id: str):
+    stripe_products = stripe.Product.list(active=True, limit=100, stripe_account=stripe_account_id)
     filtered_products = []
 
     for product in stripe_products['data']:
@@ -81,10 +84,11 @@ async def get_products(payment_type: str):
     return {"data": filtered_products}
 
 
-async def create_customer_portal_session(user: UserModel):
+async def create_customer_portal_session(user: UserModel, stripe_account_id: str):
     session = stripe.billing_portal.Session.create(
         customer=user.stripe_customer_id,
-        return_url=f"{settings.frontend_url}/#/"
+        return_url=f"{settings.frontend_url}/#/",
+        stripe_account=stripe_account_id
     )
     return session.url
 
@@ -118,3 +122,14 @@ async def refresh_stripe_account_onboarding_url(account_id: ObjectId):
         type='account_onboarding'
     )
     return account_url.url
+
+
+async def create_customer(user: UserModel, stripe_account_id: str):
+    stripe_customer = stripe.Customer.create(
+        email=user.email,
+        name=user.name,
+        phone=user.phone,
+        stripe_account=stripe_account_id
+    )
+
+    return stripe_customer

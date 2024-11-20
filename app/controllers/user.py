@@ -3,15 +3,14 @@ import bson
 import datetime
 import logging
 
-from collections import defaultdict
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBasicCredentials, HTTPBasic
 from motor.core import AgnosticCollection
 
-from main import stripe
 from app.auth import jwt_handler
 from app.db import Database
 from app.resources import user_connections
+from app.integrations.stripe import create_customer
 from app.controllers import agent as agent_controller
 from app.controllers import campaign as campaign_controller
 from app.models.agent import AgentModel
@@ -60,7 +59,7 @@ async def create_user(user):
         if not await campaign_controller.get_campaign_by_sign_up_code(sign_up_code):
             raise HTTPException(status_code=404, detail=f"Sign up code {sign_up_code} not found")
         user_campaign = await campaign_controller.get_campaign_by_sign_up_code(sign_up_code)
-        user_campaign_ids.append(user_campaign["_id"])
+        user_campaign_ids.append(user_campaign.id)
     agent_model = AgentModel(
         first_name=user["first_name"],
         last_name=user["last_name"],
@@ -86,8 +85,8 @@ async def create_user(user):
         campaigns=user_campaign_ids,
         otp_expiration=datetime.datetime.utcnow() + datetime.timedelta(seconds=OTP_EXPIRATION),
     )
-    stripe_customer_id = _create_stripe_customer(user)
-    user.stripe_customer_id = stripe_customer_id
+    stripe_customer = await create_customer(user=user, stripe_account_id=user_campaign.stripe_account_id)  # last campaign added will have the stripe account id used by any of his campaigns
+    user.stripe_customer_id = stripe_customer["id"]
 
     user_collection = get_user_collection()
     user.password = jwt_helper.encrypt(user.password)
@@ -117,16 +116,6 @@ async def store_refresh_token(username: str, refresh_token: str):
         {"email": username},
         {"$set": {"refresh_token": refresh_token}}
     )
-
-
-def _create_stripe_customer(user: user_model.UserModel):
-    stripe_customer = stripe.Customer.create(
-        email=user.email,
-        name=user.name,
-        phone=user.phone,
-    )
-
-    return stripe_customer["id"]
 
 
 async def get_users(ids):
