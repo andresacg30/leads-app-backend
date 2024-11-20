@@ -1,6 +1,7 @@
 from datetime import datetime
 from fastapi import APIRouter, Body, status, HTTPException, Depends, Response
 
+import app.controllers.campaign as campaign_controller
 import app.controllers.payment as payment_controller
 import app.controllers.transaction as transaction_controller
 import app.controllers.user as user_controller
@@ -17,9 +18,13 @@ router = APIRouter(prefix="/api/payment", tags=["payment"])
 
 
 @router.post("/get-products")
-async def get_products(request: PaymentTypeRequest):
+async def get_products(request: PaymentTypeRequest, user: UserModel = Depends(get_current_user)):
     try:
-        product_list = await stripe_controller.get_products(payment_type=request.payment_type)
+        stripe_account_id = await campaign_controller.get_stripe_account_id(user.campaigns[0])  # is going to be the same for all campaigns
+        product_list = await stripe_controller.get_products(
+            payment_type=request.payment_type,
+            stripe_account_id=stripe_account_id
+        )
         return product_list
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -28,9 +33,10 @@ async def get_products(request: PaymentTypeRequest):
 @router.get("/create-customer-portal-session")
 async def create_customer_portal_session(user: UserModel = Depends(get_current_user)):
     try:
+        stripe_account_id = await campaign_controller.get_stripe_account_id(user.campaigns[0])  # is going to be the same for all campaigns
         if not user.stripe_customer_id:
             raise HTTPException(status_code=400, detail="User does not have a stripe customer id")
-        session_url = await stripe_controller.create_customer_portal_session(user)
+        session_url = await stripe_controller.create_customer_portal_session(user, stripe_account_id=stripe_account_id)
         return {"url": session_url}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -39,10 +45,12 @@ async def create_customer_portal_session(user: UserModel = Depends(get_current_u
 @router.post("/create-checkout-session")
 async def create_checkout_session(request: CheckoutRequest, user: UserModel = Depends(get_current_user)):
     try:
+        stripe_account_id = await campaign_controller.get_stripe_account_id(user.campaigns[0])  # is going to be the same for all campaigns
         checkout_session: stripe.checkout.Session = await stripe_controller.create_checkout_session(
             products=request.products,
             payment_type=request.payment_type,
             user=user,
+            stripe_account_id=stripe_account_id
         )
         return {"checkout_url": checkout_session.url}
     except Exception as e:
@@ -52,7 +60,8 @@ async def create_checkout_session(request: CheckoutRequest, user: UserModel = De
 @router.get("/verify-session")
 async def verify_session(session_id: str, user: UserModel = Depends(get_current_user)):
     try:
-        session = await stripe_controller.verify_checkout_session(session_id)
+        stripe_account_id = await campaign_controller.get_stripe_account_id(user.campaigns[0])  # is going to be the same for all campaigns
+        session = await stripe_controller.verify_checkout_session(session_id, stripe_account_id=stripe_account_id)
         if session.payment_status == "paid":
             if user.is_new_user():
                 access_token = await user_controller.change_user_permissions(user.id, new_permissions=['agent'])

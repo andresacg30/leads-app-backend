@@ -119,8 +119,9 @@ async def delete_campaigns(ids):
 
 async def get_campaign_by_sign_up_code(sign_up_code):
     campaign_collection = get_campaign_collection()
-    campaign = await campaign_collection.find_one({"sign_up_code": sign_up_code})
-    return campaign
+    campaign_in_db = await campaign_collection.find_one({"sign_up_code": sign_up_code})
+    campaign_result = campaign_models.CampaignModel(**campaign_in_db)
+    return campaign_result
 
 
 def generate_unique_sign_up_code():
@@ -143,3 +144,10 @@ async def get_stripe_onboarding_url(campaign_id: ObjectId):
     campaign = await campaign_collection.find_one({"_id": campaign_id})
     stripe_account_onboarding_url = campaign["stripe_account_onboarding_url"]
     return stripe_account_onboarding_url
+
+
+async def get_stripe_account_id(campaign_id: ObjectId):
+    campaign_collection = get_campaign_collection()
+    campaign = await campaign_collection.find_one({"_id": campaign_id})
+    stripe_account_id = campaign["stripe_account_id"]
+    return stripe_account_id
