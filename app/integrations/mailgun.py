@@ -1,6 +1,7 @@
 import requests
 import logging
 
+from app.background_jobs.job import enqueue_background_job
 from app.tools.constants import FROM_EMAIL_ADDRESS
 from settings import get_settings
 
@@ -11,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 MAILGUN_API_URL = "https://api.mailgun.net/v3/mg.leadconex.org/messages"
 
 
-def send_single_email(to_address: str, subject: str, template: str, text: str):
+def mailgun_email(to_address: str, subject: str, template: str, text: str):
     try:
         response = requests.post(
             MAILGUN_API_URL,
@@ -29,3 +30,13 @@ def send_single_email(to_address: str, subject: str, template: str, text: str):
     except Exception as e:
         logging.error(f"Error sending email: {e}")
         raise e
+
+
+def send_single_email(to_address: str, subject: str, template: str, text: str):
+    enqueue_background_job(
+        'app.integrations.mailgun.mailgun_email',
+        to_address,
+        subject,
+        template,
+        text
+    )

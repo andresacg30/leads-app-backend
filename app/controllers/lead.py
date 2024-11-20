@@ -473,6 +473,8 @@ def choose_agent(agents, distribution_type):
 
 async def send_leads_to_agent(lead_ids: list, agent_id: str):
     from app.controllers import agent as agent_controller
+    from app.controllers import transaction as transaction_controller
+    from app.controllers import user as user_controller
     lead_collection = get_lead_collection()
     agent_id_obj = ObjectId(agent_id)
     agent = await agent_controller.get_agent_by_field(_id=agent_id_obj)
@@ -485,6 +487,18 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str):
             "buyer_id": agent_id_obj,
             "lead_sold_time": datetime.utcnow()
         }}
+    )
+    user = await user_controller.get_user_by_field(agent_id=agent_id_obj)
+    user_id = user.id
+    lead_price = 25
+    await transaction_controller.create_transaction(
+        TransactionModel(
+            user_id=user_id,
+            amount=-lead_price * len(lead_ids),
+            description="Leads sent by agency",
+            type="debit",
+            date=datetime.utcnow()
+        )
     )
     if result.modified_count == len(lead_ids):
         return True

@@ -1,0 +1,11 @@
+LEADCONEX
+
+{{ user_name }}, you are now the admin of {{ campaign }}!
+
+To get started, please complete the Stripe onboarding process by clicking the link below:
+
+Complete Stripe Onboarding: {{ stripe_onboarding_url }}
+
+If you have any questions, feel free to contact us.
+
+© LeadConex. All rights reserved.

@@ -12,16 +12,22 @@ class CampaignModel(BaseModel):
     """
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     name: str = Field(...)
-    active: bool = Field(...)
+    status: str = Field(default="not onboarded")
     start_date: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     sign_up_code: Optional[str] = Field(default=None)
+    stripe_account_id: Optional[str] = Field(default=None)
+    stripe_account_onboarding_url: Optional[str] = Field(default=None)
+    admin_id: PyObjectId = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
         json_schema_extra={
             "example": {
                 "name": "Campaign 1",
-                "active": True
+                "status": "active",
+                "start_date": "2020-01-01T00:00:00.000Z",
+                "sign_up_code": "abc123",
+                "admins": "5f0c3e6f8b3b1f5b6f3a9b4b"
             }
         }
     )
@@ -41,8 +47,12 @@ class UpdateCampaignModel(BaseModel):
     A set of optional updates to be made to a Campaign document in the database.
     """
     name: Optional[str] = None
-    active: Optional[bool] = None
+    status: Optional[str] = None
     start_date: Optional[datetime.datetime] = None
+    sign_up_code: Optional[str] = None
+    stripe_account_id: Optional[str] = None
+    stripe_account_onboarding_url: Optional[str] = None
+    admin_id: Optional[PyObjectId] = None
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -50,8 +60,10 @@ class UpdateCampaignModel(BaseModel):
         json_schema_extra={
             "example": {
                 "name": "Campaign 1",
-                "active": True,
-                "start_date": "2020-01-01T00:00:00.000Z"
+                "status": "inactive",
+                "start_date": "2020-01-01T00:00:00.000Z",
+                "sign_up_code": "abc123",
+                "admins": "5f0c3e6f8b3b1f5b6f3a9b4b"
             }
         }
     )
