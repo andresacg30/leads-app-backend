@@ -133,3 +133,8 @@ async def create_customer(user: UserModel, stripe_account_id: str):
     )
 
     return stripe_customer
+
+
+async def get_last_user_payment(stripe_customer_id: str, stripe_account_id: str):
+    payment = stripe.PaymentIntent.list(customer=stripe_customer_id, limit=1, stripe_account=stripe_account_id)
+    return payment

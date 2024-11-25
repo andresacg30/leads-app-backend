@@ -424,26 +424,26 @@ async def get_leads(ids: List[ObjectId], user: UserModel):
 
 async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
     from app.controllers import agent as agent_controller
+    from app.controllers import campaign as campaign_controller
     from app.controllers import transaction as transaction_controller
     from app.controllers import user as user_controller
-    lead_price = 25
     lead_collection = get_lead_collection()
-    lead = lead.model_dump(by_alias=True, mode="python")
-    formatted_lead_state = formatter.format_state_to_abbreviation(lead["state"])
-    agents_with_balance = await agent_controller.get_agents_with_balance(campaign=lead["campaign_id"])
+    campaign = await campaign_controller.get_one_campaign(lead.campaign_id)
+    lead_price = campaign.price_per_lead
+    agents_with_balance = await agent_controller.get_agents_with_balance(campaign=lead.campaign_id)
     if not agents_with_balance:
         logger.warning(f"No agents with balance found for lead {lead_id}")
         return
-    agents_licensed_in_lead_state = [
-        agent for agent in agents_with_balance if formatted_lead_state in agent["states_with_license"] and agent["balance"] >= lead_price
-    ]
-    if not agents_licensed_in_lead_state:
-        logger.warning(f"No agents licensed in {formatted_lead_state} with balance found for lead {lead_id}")
+    eligible_agents = get_eligible_agents_for_lead(agents_with_balance, lead, lead_price)
+    if not eligible_agents:
+        logger.warning(f"No agents licensed in {lead.state} with balance found for lead {lead_id}")
         return
-    agent_to_distribute = choose_agent(agents=agents_licensed_in_lead_state, distribution_type="round_robin")
+    agent_to_distribute = choose_agent(agents=eligible_agents, distribution_type="round_robin")
     if agent_to_distribute:
+        if agent_to_distribute.get("lead_price_override"):
+            lead_price = agent_to_distribute["lead_price_override"]
         result = await lead_collection.update_one(
-            {"_id": lead_id},
+            {"_id": ObjectId(lead_id)},
             {"$set": {
                 "buyer_id": agent_to_distribute["_id"],
                 "lead_sold_time": datetime.utcnow()
@@ -471,11 +471,13 @@ def choose_agent(agents, distribution_type):
         return random.choice(agents)
 
 
-async def send_leads_to_agent(lead_ids: list, agent_id: str):
+async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
     from app.controllers import agent as agent_controller
     from app.controllers import transaction as transaction_controller
     from app.controllers import user as user_controller
+    from app.controllers.campaign import get_one_campaign
     lead_collection = get_lead_collection()
+    campaign = await get_one_campaign(campaign_id)
     agent_id_obj = ObjectId(agent_id)
     agent = await agent_controller.get_agent_by_field(_id=agent_id_obj)
     if not agent:
@@ -490,7 +492,10 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str):
     )
     user = await user_controller.get_user_by_field(agent_id=agent_id_obj)
     user_id = user.id
-    lead_price = 25
+    if agent["lead_price_override"]:
+        lead_price = agent["lead_price_override"]
+    else:
+        lead_price = campaign.price_per_lead
     await transaction_controller.create_transaction(
         TransactionModel(
             user_id=user_id,
@@ -503,3 +508,14 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str):
     if result.modified_count == len(lead_ids):
         return True
     return False
+
+
+def get_eligible_agents_for_lead(agents, lead, lead_price):
+    formatted_lead_state = formatter.format_state_to_abbreviation(lead.state)
+    eligible_agents = []
+    for agent in agents:
+        if agent.get("lead_price_override"):
+            lead_price = agent["lead_price_override"]
+        if formatted_lead_state in agent["states_with_license"] and agent["balance"] >= lead_price:
+            eligible_agents.append(agent)
+    return eligible_agents

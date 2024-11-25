@@ -27,6 +27,7 @@ async def get_eligible_agents_for_lead_processing(
     states: List[str] = Body(...),
     lead_count: int = Body(...),
     second_chance_lead_count: int = Body(...),
+    campaign_id: str = Body(...),
     user: UserModel = Depends(get_current_user)
 ):
     """
@@ -36,13 +37,12 @@ async def get_eligible_agents_for_lead_processing(
         raise HTTPException(status_code=400, detail="States must be provided")
     if not lead_count and not second_chance_lead_count:
         raise HTTPException(status_code=400, detail="Lead count or second chance lead count must be provided")
-    campaigns = [bson.ObjectId(campaign) for campaign in user.campaigns]
     formatted_states = [formatters.format_state_to_abbreviation(state) for state in states]
     agents = await agent_controller.get_eligible_agents_for_lead_processing(
         formatted_states,
         lead_count,
         second_chance_lead_count,
-        campaigns
+        campaign_id=bson.ObjectId(campaign_id)
     )
     if agents:
         agent_data = list(agent.to_json() for agent in AgentCollection(data=agents).data)
@@ -184,9 +184,9 @@ async def list_agents(
                 filter = {}
             if not user.campaigns:
                 raise HTTPException(status_code=404, detail="User does not have access to this campaign")
-            filter["user_campaigns"] = user.campaigns
+            filter["user_campaigns"] = [bson.ObjectId(campaign) for campaign in user.campaigns]
         sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
-        agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter)
+        agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter, user=user)
         return {"data": list(agent.to_json() for agent in AgentCollection(data=agents).data), "total": total}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

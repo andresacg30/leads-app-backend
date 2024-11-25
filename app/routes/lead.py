@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/lead", tags=["lead"])
 async def send_leads_to_agent(
     lead_ids: List[str] = Body(...),
     agent_id: str = Body(...),
+    campaign_id: str = Body(...),
     user: UserModel = Depends(get_current_user)
 ):
     """
@@ -38,7 +39,7 @@ async def send_leads_to_agent(
         raise HTTPException(status_code=400, detail="Agent id is required")
     if agent_id == "null":
         agent_id = None
-    lead_background_jobs.send_leads_to_agent(lead_ids, agent_id)
+    lead_background_jobs.send_leads_to_agent(lead_ids, agent_id, campaign_id)
     return {"message": "Leads queued for sending"}
 
 
@@ -256,17 +257,21 @@ def _handle_user_filters(filter: Dict, user: UserModel) -> Dict:
         if not user.campaigns:
             raise HTTPException(status_code=404, detail="User does not have access to this campaign")
         if "campaign_id" not in filter:
+            user.campaigns = [bson.ObjectId(campaign_id) for campaign_id in user.campaigns]
             filter["campaign_id"] = {"$in": user.campaigns}
         else:
             if any(campaign_id not in user.campaigns for campaign_id in filter["campaign_id"]):
                 raise HTTPException(status_code=404, detail="User does not have access to this campaign")
-            filter["campaign_id"] = {"$in": filter["campaign_id"]}
+            filter["campaign_id"] = {"$in": bson.ObjectId(filter["campaign_id"])}
         if user.is_agent():
             filter["$or"] = [
                 {"buyer_id": user.agent_id},
                 {"second_chance_buyer_id": user.agent_id}
             ]
             filter["agent_id"] = user.agent_id
+    else:
+        if "campaign_id" in filter:
+            filter["campaign_id"] = bson.ObjectId(filter["campaign_id"])
     return filter
 
 

@@ -10,7 +10,6 @@ from motor.core import AgnosticCollection
 from app.auth import jwt_handler
 from app.db import Database
 from app.resources import user_connections
-from app.integrations.stripe import create_customer
 from app.controllers import agent as agent_controller
 from app.controllers import campaign as campaign_controller
 from app.models.agent import AgentModel
@@ -51,7 +50,9 @@ async def validate_login(credentials: HTTPBasicCredentials = Depends(security)):
     )
 
 
-async def create_user(user):
+async def create_user(user) -> user_model.UserModel:
+    from app.integrations.stripe import create_customer
+
     if not user["sign_up_codes"]:
         raise HTTPException(status_code=400, detail="No sign up codes provided")
     user_campaign_ids = []
@@ -91,7 +92,8 @@ async def create_user(user):
     user_collection = get_user_collection()
     user.password = jwt_helper.encrypt(user.password)
     new_user = await user_collection.insert_one(user.model_dump(by_alias=True, exclude=["id"], mode="python"))
-    return new_user
+    user.id = str(new_user.inserted_id)
+    return user
 
 
 async def get_user_by_field(**kwargs) -> user_model.UserModel:
@@ -245,10 +247,10 @@ async def onboard_agency_admin(campaign: CampaignModel, user=None):
     return
 
 
-async def remove_campaign_from_user(campaign_id):
+async def remove_campaign_from_user(user_id, campaign_id):
     user_collection = get_user_collection()
-    await user_collection.update_many(
-        {"campaigns": bson.ObjectId(campaign_id)},
+    user_collection.update_one(
+        {"_id": bson.ObjectId(user_id)},
         {"$pull": {"campaigns": bson.ObjectId(campaign_id)}}
     )
     return
