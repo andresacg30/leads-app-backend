@@ -23,6 +23,7 @@ class UserModel(BaseModel):
     stripe_customer_id: Optional[str] = Field(default=None)
     balance: Optional[float] = Field(default=0)
     email_verified: bool = Field(default=False)
+    account_creation_task_id: Optional[str] = Field(default=None)
     otp_code: Optional[str] = Field(default=None)
     otp_expiration: Optional[datetime.datetime] = Field(default=None)
     model_config = ConfigDict(

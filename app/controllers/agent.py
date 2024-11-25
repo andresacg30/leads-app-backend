@@ -8,8 +8,10 @@ from pymongo import ReturnDocument
 from motor.core import AgnosticCollection
 
 from app.db import Database
+from app.controllers.campaign import get_campaign_collection
 from app.controllers.lead import get_lead_collection
 from app.models.agent import AgentModel, UpdateAgentModel
+from app.models.campaign import CampaignModel
 
 
 def get_agent_collection() -> AgnosticCollection:
@@ -88,55 +90,53 @@ async def create_agent(agent: AgentModel):
     return created_agent
 
 
-async def get_all_agents(page, limit, sort, filter):
+async def get_all_agents(page, limit, sort, filter, user):
     pipeline = []
     if filter:
         filter = _filter_formatter_helper(filter)
-        if "user_campaigns" in filter:
-            campaigns = filter.pop("user_campaigns")
-            filter["campaigns"] = {"$in": campaigns}
-            pipeline = [
-                {"$match": filter},
-                {"$sort": {sort[0]: sort[1]}},
-                {"$skip": (page - 1) * limit},
-                {"$limit": limit},
-                {"$lookup": {
-                    "from": "user",
-                    "localField": "_id",
-                    "foreignField": "agent_id",
-                    "as": "user_info"
-                    }},
-                {"$unwind": {
-                    "path": "$user_info",
-                    "preserveNullAndEmptyArrays": True
-                    }},
-                {"$project": {
-                    "first_name": 1,
-                    "last_name": 1,
-                    "email": 1,
-                    "phone": 1,
-                    "states_with_license": 1,
-                    "CRM": 1,
-                    "balance": {
-                        "$ifNull": ["$user_info.balance", 0]
-                        },
-                    "created_time": 1,
-                    "campaigns": {
-                        "$filter": {
-                            "input": "$campaigns",
-                            "as": "campaign",
-                            "cond": {"$in": ["$$campaign", campaigns]}
-                        }
-                    },
-                    "credentials": 1,
-                    "custom_fields": 1
-                }}
-            ]
+        campaigns = filter.pop("user_campaigns")
+        filter["campaigns"] = {"$in": campaigns}
+    pipeline = [
+        {"$match": filter},
+        {"$lookup": {
+            "from": "user",
+            "localField": "_id",
+            "foreignField": "agent_id",
+            "as": "user_info"
+        }},
+        {"$unwind": {
+            "path": "$user_info",
+            "preserveNullAndEmptyArrays": True
+        }},
+        {"$project": {
+            "first_name": 1,
+            "last_name": 1,
+            "email": 1,
+            "phone": 1,
+            "states_with_license": 1,
+            "CRM": 1,
+            "balance": {
+                "$ifNull": ["$user_info.balance", 0]
+            },
+            "created_time": 1,
+            "campaigns": {
+                "$filter": {
+                    "input": "$campaigns",
+                    "as": "campaign",
+                    "cond": {"$in": ["$$campaign", campaigns]}
+                }
+            } if not user.is_admin else 1,
+            "credentials": 1,
+            "custom_fields": 1,
+            "lead_price_override": 1,
+            "second_chance_lead_price_override": 1
+        }},
+        {"$sort": {sort[0]: sort[1]}},
+        {"$skip": (page - 1) * limit},
+        {"$limit": limit}
+    ]
     agent_collection = get_agent_collection()
-    if pipeline:
-        agents = await agent_collection.aggregate(pipeline).to_list(None)
-    else:
-        agents = await agent_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
+    agents = await agent_collection.aggregate(pipeline).to_list(None)
     if filter:
         total = await agent_collection.count_documents(filter)
     else:
@@ -162,22 +162,28 @@ async def update_agent(id, agent: UpdateAgentModel):
         raise AgentEmptyError("Empty agent fields provided for update.")
     agent_collection = get_agent_collection()
     try:
-        agent = {k: v for k, v in agent.model_dump(by_alias=True, mode="python").items() if v is not None}
+        always_include_fields = ["lead_price_override", "second_chance_lead_price_override"]
 
-        if len(agent) >= 1:
+        agent_dict = agent.model_dump(by_alias=True, mode="python")
+        agent_update = {
+            k: v for k, v in agent_dict.items()
+            if v is not None or k in always_include_fields
+        }
+
+        if len(agent_update) >= 1:
             update_result = await agent_collection.find_one_and_update(
                 {"_id": ObjectId(id)},
-                {"$set": agent},
+                {"$set": agent_update},
                 return_document=ReturnDocument.AFTER,
             )
 
             if update_result is not None:
                 return update_result
-
             else:
                 raise AgentNotFoundError(f"Agent with id {id} not found")
 
-        if (existing_agent := await agent_collection.find_one({"_id": id})) is not None:
+        existing_agent = await agent_collection.find_one({"_id": ObjectId(id)})
+        if existing_agent is not None:
             return existing_agent
     except bson.errors.InvalidId:
         raise AgentIdInvalidError(f"Invalid id {id} on update agent route.")
@@ -307,7 +313,9 @@ async def get_agents_with_balance(campaign: ObjectId):
                     "created_time": 1,
                     "campaigns": 1,
                     "credentials": 1,
-                    "custom_fields": 1
+                    "custom_fields": 1,
+                    "lead_price_override": 1,
+                    "second_chance_lead_price_override": 1
                 }},
                 {"$match": {"balance": {"$gt": 0}}}
             ]
@@ -319,44 +327,82 @@ async def get_eligible_agents_for_lead_processing(
     states,
     lead_count,
     second_chance_lead_count,
-    campaigns
+    campaign_id
 ):
-    lead_price = 25
-    second_chance_lead_price = 7.50
-    total = lead_count * lead_price + second_chance_lead_count * second_chance_lead_price
+    campaign_collection = get_campaign_collection()
+    campaign_in_db = await campaign_collection.find_one({"_id": campaign_id})
+    campaign = CampaignModel(**campaign_in_db)
+    lead_price = campaign.price_per_lead
+    second_chance_lead_price = campaign.price_per_second_chance_lead
     agent_collection = get_agent_collection()
     pipeline = [
-        {"$match": {
-            "states_with_license": {"$all": states},
-            "campaigns": {"$in": campaigns}
-        }},
-        {"$lookup": {
-            "from": "user",
-            "localField": "_id",
-            "foreignField": "agent_id",
-            "as": "user_info"
-            }},
-        {"$unwind": {
-            "path": "$user_info",
-            "preserveNullAndEmptyArrays": True
-            }},
-        {"$project": {
-            "first_name": 1,
-            "last_name": 1,
-            "email": 1,
-            "phone": 1,
-            "states_with_license": 1,
-            "CRM": 1,
-            "balance": {
-                "$ifNull": ["$user_info.balance", 0]
+        {
+            "$match": {
+                "states_with_license": {"$all": states},
+                "campaigns": campaign_id
+            }
+        },
+        {
+            "$lookup": {
+                "from": "user",
+                "localField": "_id",
+                "foreignField": "agent_id",
+                "as": "user_info"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$user_info",
+                "preserveNullAndEmptyArrays": True
+            }
+        },
+        {
+            "$project": {
+                "first_name": 1,
+                "last_name": 1,
+                "email": 1,
+                "phone": 1,
+                "states_with_license": 1,
+                "CRM": 1,
+                "balance": {
+                    "$ifNull": ["$user_info.balance", 0]
                 },
-            "created_time": 1,
-            "campaigns": 1,
-            "credentials": 1,
-            "custom_fields": 1
-        }},
-        {"$match": {"balance": {"$gt": total}}},
-        {"$sort": {"balance": -1}},
+                "created_time": 1,
+                "campaigns": 1,
+                "credentials": 1,
+                "custom_fields": 1,
+                "lead_price_override": 1,
+                "second_chance_lead_price_override": 1
+            }
+        },
+        {
+            "$addFields": {
+                "agent_lead_price": {
+                    "$ifNull": ["$lead_price_override", lead_price]
+                },
+                "agent_second_chance_lead_price": {
+                    "$ifNull": ["$second_chance_lead_price_override", second_chance_lead_price]
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "total_cost": {
+                    "$add": [
+                        {"$multiply": [lead_count, "$agent_lead_price"]},
+                        {"$multiply": [second_chance_lead_count, "$agent_second_chance_lead_price"]}
+                    ]
+                }
+            }
+        },
+        {
+            "$match": {
+                "$expr": {"$gt": ["$balance", "$total_cost"]}
+            }
+        },
+        {
+            "$sort": {"balance": -1}
+        }
     ]
     agents = await agent_collection.aggregate(pipeline).to_list(None)
     return agents

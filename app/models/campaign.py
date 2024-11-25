@@ -12,12 +12,14 @@ class CampaignModel(BaseModel):
     """
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     name: str = Field(...)
-    status: str = Field(default="not onboarded")
+    status: str = Field(default="oboarding")
     start_date: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     sign_up_code: Optional[str] = Field(default=None)
     stripe_account_id: Optional[str] = Field(default=None)
     stripe_account_onboarding_url: Optional[str] = Field(default=None)
     admin_id: PyObjectId = Field(default=None)
+    price_per_lead: Optional[float] = Field(default=None)
+    price_per_second_chance_lead: Optional[float] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -27,7 +29,9 @@ class CampaignModel(BaseModel):
                 "status": "active",
                 "start_date": "2020-01-01T00:00:00.000Z",
                 "sign_up_code": "abc123",
-                "admins": "5f0c3e6f8b3b1f5b6f3a9b4b"
+                "admins": "5f0c3e6f8b3b1f5b6f3a9b4b",
+                "price_per_lead": 5.00,
+                "price_per_second_chance_lead": 2.50
             }
         }
     )
@@ -53,6 +57,8 @@ class UpdateCampaignModel(BaseModel):
     stripe_account_id: Optional[str] = None
     stripe_account_onboarding_url: Optional[str] = None
     admin_id: Optional[PyObjectId] = None
+    price_per_lead: Optional[float] = None
+    price_per_second_chance_lead: Optional[float] = None
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -63,7 +69,9 @@ class UpdateCampaignModel(BaseModel):
                 "status": "inactive",
                 "start_date": "2020-01-01T00:00:00.000Z",
                 "sign_up_code": "abc123",
-                "admins": "5f0c3e6f8b3b1f5b6f3a9b4b"
+                "admin_id": "5f0c3e6f8b3b1f5b6f3a9b4b",
+                "price_per_lead": 5.00,
+                "price_per_second_chance_lead": 2.50
             }
         }
     )

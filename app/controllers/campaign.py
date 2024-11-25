@@ -71,10 +71,11 @@ async def update_campaign(id, campaign: campaign_models.UpdateCampaignModel):
     campaign_collection = get_campaign_collection()
     campaign = {k: v for k, v in campaign.model_dump(by_alias=True, mode="python").items() if v is not None}
     campaign_model = campaign_models.CampaignModel(**campaign)
+    campaign_in_db = await get_one_campaign(id)
 
     if "admin_id" in campaign:
-        if campaign_model.admin_id:
-            await remove_campaign_from_user(id)
+        if campaign_model.admin_id and campaign_model.admin_id != campaign_in_db.admin_id:
+            await remove_campaign_from_user(user_id=campaign_in_db.admin_id, campaign_id=id)
         if campaign_model.status == "onboarding":
             campaign_model.id = id
             await onboard_agency_admin(campaign_model)

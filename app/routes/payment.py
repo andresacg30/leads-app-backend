@@ -8,6 +8,7 @@ import app.controllers.user as user_controller
 import app.integrations.stripe as stripe_controller
 
 from app.auth.jwt_bearer import get_current_user
+from app.auth.jwt_handler import create_access_token
 from app.models.payment import PaymentModel, UpdatePaymentModel, PaymentCollection, CheckoutRequest, PaymentTypeRequest
 from app.models.transaction import TransactionModel
 from app.models.user import UserModel
@@ -63,6 +64,7 @@ async def verify_session(session_id: str, user: UserModel = Depends(get_current_
         stripe_account_id = await campaign_controller.get_stripe_account_id(user.campaigns[0])  # is going to be the same for all campaigns
         session = await stripe_controller.verify_checkout_session(session_id, stripe_account_id=stripe_account_id)
         if session.payment_status == "paid":
+            access_token = None
             if user.is_new_user():
                 access_token = await user_controller.change_user_permissions(user.id, new_permissions=['agent'])
             await transaction_controller.create_transaction(

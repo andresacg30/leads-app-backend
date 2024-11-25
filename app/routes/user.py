@@ -14,6 +14,7 @@ import app.integrations.stripe as stripe_integration
 
 from app.auth.jwt_handler import sign_jwt, decode_jwt
 from app.auth.jwt_bearer import get_current_user
+from app.background_jobs.job import cancel_job
 from app.models.campaign import CampaignModel
 from app.models.user import UserSignIn, RefreshTokenRequest, UserModel, UserCollection
 from app.tools.constants import OTP_EXPIRATION
@@ -28,6 +29,25 @@ router = APIRouter()
 hash_helper = CryptContext(schemes=["bcrypt"])
 
 logger = logging.getLogger(__name__)
+
+
+@router.get("/get-stripe-account-status")
+async def get_stripe_account_status(user: UserModel = Depends(get_current_user)):
+    try:
+        user_campaign = await campaign_controller.get_one_campaign(user.campaigns[0])
+        if not user_campaign:
+            return {"status": "inactive"}
+        has_last_payment = await stripe_integration.get_last_user_payment(
+            stripe_customer_id=user.stripe_customer_id,
+            stripe_account_id=user_campaign.stripe_account_id
+        )
+        if has_last_payment:
+            user.permissions = ["agent"]
+            await user_controller.update_user(user)
+            return {"status": "active", "permissions": user.permissions}
+        return {"status": "inactive"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @router.post("/onboard-new-campaign")
@@ -54,6 +74,8 @@ async def verify_otp(request: Request, email: str = Body(...), otp: str = Body(.
         raise HTTPException(status_code=403, detail="OTP code has expired")
     if user.otp_code == otp:
         await user_controller.activate_user(email)
+        task_id = cancel_job(user.account_creation_task_id) 
+        logger.info(f"User {user.id} has been activated and task {task_id} has been canceled")
         return {"message": "OTP confirmed"}
     raise HTTPException(status_code=403, detail="Invalid OTP code")
 
@@ -169,16 +191,25 @@ async def user_signup(request: Request, user=Body(...)):
             status_code=409, detail="user with email supplied already exists"
         )
     user["otp_code"] = _create_otp_code()
+    user_campaigns = []
+    for sign_up_code in user["sign_up_codes"]:
+        try:
+            campaign = await campaign_controller.get_campaign_by_sign_up_code(sign_up_code)
+        except campaign_controller.CampaignNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Sign up code {sign_up_code} not found")
+        user_campaigns.append(campaign)
+    if any(campaign.status != "active" for campaign in user_campaigns):
+        raise HTTPException(status_code=404, detail="Campaign is not active")
     created_user = await user_controller.create_user(user)
-    user_background_jobs.add_to_otp_verification_queue(
-        created_user.inserted_id,
+    await user_background_jobs.add_to_otp_verification_queue(
+        created_user
     )
     emails.send_verify_code_email(
         first_name=user["first_name"],
         email=user["email"],
         otp_code=user["otp_code"]
     )
-    return {"id": str(created_user.inserted_id)}
+    return {"id": str(created_user.id)}
 
 
 def _create_otp_code():

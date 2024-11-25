@@ -55,3 +55,13 @@ def enqueue_background_job(function_name, *args, **kwargs):
     job = rq.enqueue(function_name, *args, **kwargs)
     logger.info(f"Enqueued job {job.id}")
     return job.id
+
+
+def cancel_job(job_id):
+    if rq is None:
+        logger.warning("rq not initialized")
+        return
+    job = rq.fetch_job(job_id)
+    job.cancel()
+    logger.info(f"Canceled job {job_id}")
+    return job.id
