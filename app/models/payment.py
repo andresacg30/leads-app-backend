@@ -8,6 +8,7 @@ from app.tools.modifiers import PyObjectId
 
 class PaymentTypeRequest(BaseModel):
     payment_type: str
+    campaign_id: str
 
 
 class ProductSelection(BaseModel):
@@ -16,6 +17,7 @@ class ProductSelection(BaseModel):
 
 
 class CheckoutRequest(BaseModel):
+    campaign_id: str
     payment_type: str  # "one_time" or "recurring"
     products: List[ProductSelection]
 

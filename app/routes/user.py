@@ -37,8 +37,9 @@ async def get_stripe_account_status(user: UserModel = Depends(get_current_user))
         user_campaign = await campaign_controller.get_one_campaign(user.campaigns[0])
         if not user_campaign:
             return {"status": "inactive"}
+        stripe_customer_id = user.stripe_customer_ids.get(user_campaign.id)
         has_last_payment = await stripe_integration.get_last_user_payment(
-            stripe_customer_id=user.stripe_customer_id,
+            stripe_customer_id=stripe_customer_id,
             stripe_account_id=user_campaign.stripe_account_id
         )
         if has_last_payment:

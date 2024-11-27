@@ -94,8 +94,9 @@ async def get_all_agents(page, limit, sort, filter, user):
     pipeline = []
     if filter:
         filter = _filter_formatter_helper(filter)
-        campaigns = filter.pop("user_campaigns")
-        filter["campaigns"] = {"$in": campaigns}
+        if not user.is_admin:
+            campaigns = filter.pop("user_campaigns")
+            filter["campaigns"] = {"$in": campaigns}
     pipeline = [
         {"$match": filter},
         {"$lookup": {
@@ -319,6 +320,41 @@ async def get_agents_with_balance(campaign: ObjectId):
                 }},
                 {"$match": {"balance": {"$gt": 0}}}
             ]
+    agents = await agent_collection.aggregate(pipeline).to_list(None)
+    return agents
+
+
+async def get_agents_with_open_orders(campaign_id: ObjectId):
+    agent_collection = get_agent_collection()
+    pipeline = [
+        {"$match": {"campaigns": campaign_id}},
+        {"$lookup": {
+            "from": "order",
+            "localField": "_id",
+            "foreignField": "agent_id",
+            "as": "orders"
+        }},
+        {"$unwind": {
+            "path": "$orders",
+            "preserveNullAndEmptyArrays": True
+        }},
+        {"$match": {"orders.status": "open"}},
+        {"$project": {
+            "first_name": 1,
+            "last_name": 1,
+            "email": 1,
+            "phone": 1,
+            "states_with_license": 1,
+            "CRM": 1,
+            "balance": 1,
+            "created_time": 1,
+            "campaigns": 1,
+            "credentials": 1,
+            "custom_fields": 1,
+            "lead_price_override": 1,
+            "second_chance_lead_price_override": 1
+        }}
+    ]
     agents = await agent_collection.aggregate(pipeline).to_list(None)
     return agents
 

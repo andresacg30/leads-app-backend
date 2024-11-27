@@ -276,12 +276,10 @@ def _handle_user_filters(filter: Dict, user: UserModel) -> Dict:
 
 
 def _handle_buyer_filters(filter: Dict) -> Dict:
-    if "buyer_id" in filter and filter["buyer_id"] == "null":
+    if "buyer_id" in filter and "null" in filter["buyer_id"]:
         filter["buyer_id"] = None
-        filter["is_second_chance"] = False
         filter["$or"] = [{"custom_fields.invalid": "no"}, {"custom_fields.invalid": {"$exists": False}}]
-    if "second_chance_buyer_id" in filter and filter["second_chance_buyer_id"] == "null":
+    if "second_chance_buyer_id" in filter and "null" in filter["second_chance_buyer_id"]:
         filter["second_chance_buyer_id"] = None
-        filter["is_second_chance"] = True
-        filter["custom_fields.invalid"] = "no"
+        filter["$or"] = [{"custom_fields.invalid": "no"}, {"custom_fields.invalid": {"$exists": False}}]
     return filter

@@ -73,6 +73,26 @@ async def update_campaign(id, campaign: campaign_models.UpdateCampaignModel):
     campaign_model = campaign_models.CampaignModel(**campaign)
     campaign_in_db = await get_one_campaign(id)
 
+    if campaign["price_per_lead"] != campaign_in_db.price_per_lead or campaign["price_per_second_chance_lead"] != campaign_in_db.price_per_second_chance_lead:
+        stripe_products = await stripe_integration.get_products(
+            payment_type="one_time",
+            stripe_account_id=campaign_in_db.stripe_account_id
+        )
+        fresh_lead_product = next(filter(lambda x: x["name"] == "Fresh Lead", stripe_products["data"]), None)
+        second_chance_lead_product = next(filter(lambda x: x["name"] == "Aged Lead", stripe_products["data"]), None)
+        if fresh_lead_product:
+            await stripe_integration.update_one_time_product_price(
+                fresh_lead_product["id"],
+                campaign["price_per_lead"],
+                campaign_in_db.stripe_account_id
+            )
+        if second_chance_lead_product:
+            await stripe_integration.update_one_time_product_price(
+                second_chance_lead_product["id"],
+                campaign["price_per_second_chance_lead"],
+                campaign_in_db.stripe_account_id
+            )
+
     if "admin_id" in campaign:
         if campaign_model.admin_id and campaign_model.admin_id != campaign_in_db.admin_id:
             await remove_campaign_from_user(user_id=campaign_in_db.admin_id, campaign_id=id)
