@@ -1,7 +1,7 @@
 import datetime
 from bson import ObjectId
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from app.tools.modifiers import PyObjectId
 
@@ -20,7 +20,7 @@ class UserModel(BaseModel):
     refresh_token: Optional[str] = Field(default=None)
     permissions: Optional[list[str]] = Field(default=None)
     campaigns: Optional[list[PyObjectId]] = Field(default=None)
-    stripe_customer_id: Optional[str] = Field(default=None)
+    stripe_customer_ids: Optional[Dict[PyObjectId, str]] = Field(default=None)
     balance: Optional[float] = Field(default=0)
     email_verified: bool = Field(default=False)
     account_creation_task_id: Optional[str] = Field(default=None)
@@ -126,8 +126,33 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
+class UserResponse(BaseModel):
+    """
+    Container for a single User record without sensitive data.
+    """
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    name: str
+    email: EmailStr
+    region: str
+    phone: str
+    agent_id: Optional[PyObjectId]
+    balance: float
+    permissions: list[str]
+    campaigns: list[PyObjectId]
+    email_verified: bool
+
+    def to_json(self):
+        data = self.model_dump()
+        for key, value in data.items():
+            if isinstance(value, ObjectId):
+                data[key] = str(value)
+            elif isinstance(value, list):
+                data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
+        return data
+
+
 class UserCollection(BaseModel):
     """
     Container for a list of User records.
     """
-    data: List[UserModel]
+    data: List[UserResponse]

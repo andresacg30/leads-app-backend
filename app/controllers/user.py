@@ -87,7 +87,7 @@ async def create_user(user) -> user_model.UserModel:
         otp_expiration=datetime.datetime.utcnow() + datetime.timedelta(seconds=OTP_EXPIRATION),
     )
     stripe_customer = await create_customer(user=user, stripe_account_id=user_campaign.stripe_account_id)  # last campaign added will have the stripe account id used by any of his campaigns
-    user.stripe_customer_id = stripe_customer["id"]
+    user.stripe_customer_ids[user.campaigns[-1]] = stripe_customer["id"]
 
     user_collection = get_user_collection()
     user.password = jwt_helper.encrypt(user.password)
@@ -216,11 +216,33 @@ async def get_user_balance(id: str):
 
 async def get_all_users(page, limit, sort, filter):
     user_collection = get_user_collection()
-    users = await user_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
+    pipeline = []
+
     if filter:
-        total = await user_collection.count_documents(filter)
+        pipeline.append({"$match": filter})
+
+    pipeline.extend([
+        {"$project": {
+            "_id": 1,
+            "name": 1,
+            "email": 1,
+            "region": 1,
+            "phone": 1,
+            "agent_id": 1,
+            "balance": 1,
+            "permissions": 1,
+            "campaigns": 1,
+            "email_verified": 1,
+        }},
+        {"$sort": {sort[0]: sort[1]}},
+        {"$skip": (page - 1) * limit},
+        {"$limit": limit}
+    ])
+    users = await user_collection.aggregate(pipeline).to_list(None)
+    if filter:
+        total = len(users)
     else:
-        total = await user_collection.estimated_document_count()
+        total = await user_collection.count_documents({})
     return users, total
 
 

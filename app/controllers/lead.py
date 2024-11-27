@@ -241,10 +241,12 @@ def build_query_filters(filter):
         else:
             filter["$or"] = query_filters
         filter.pop("q")
-    if "buyer_id" in filter:
+    if "buyer_id" in filter and filter["buyer_id"]:
         filter["buyer_id"] = ObjectId(filter["buyer_id"])
-    if "second_chance_buyer_id" in filter:
+    if "second_chance_buyer_id" in filter and filter["second_chance_buyer_id"]:
         filter["second_chance_buyer_id"] = ObjectId(filter["second_chance_buyer_id"])
+    if "lead_order_id" in filter:
+        filter["lead_order_id"] = ObjectId(filter["lead_order_id"])
     filter = _format_created_time_filter(filter)
     filter = _format_lead_sold_time_filter(filter)
     filter = _format_second_chance_lead_sold_time_filter(filter)
@@ -425,16 +427,17 @@ async def get_leads(ids: List[ObjectId], user: UserModel):
 async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
     from app.controllers import agent as agent_controller
     from app.controllers import campaign as campaign_controller
+    from app.controllers import order as order_controller
     from app.controllers import transaction as transaction_controller
     from app.controllers import user as user_controller
     lead_collection = get_lead_collection()
     campaign = await campaign_controller.get_one_campaign(lead.campaign_id)
     lead_price = campaign.price_per_lead
-    agents_with_balance = await agent_controller.get_agents_with_balance(campaign=lead.campaign_id)
-    if not agents_with_balance:
+    agents_with_open_orders = await agent_controller.get_agents_with_open_orders(campaign_id=lead.campaign_id)
+    if not agents_with_open_orders:
         logger.warning(f"No agents with balance found for lead {lead_id}")
         return
-    eligible_agents = get_eligible_agents_for_lead(agents_with_balance, lead, lead_price)
+    eligible_agents = get_eligible_agents_for_lead(agents_with_open_orders, lead, lead_price)
     if not eligible_agents:
         logger.warning(f"No agents licensed in {lead.state} with balance found for lead {lead_id}")
         return
@@ -442,11 +445,23 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
     if agent_to_distribute:
         if agent_to_distribute.get("lead_price_override"):
             lead_price = agent_to_distribute["lead_price_override"]
+        current_lead_order = await order_controller.get_oldest_open_order_by_agent_and_campaign(
+            agent_id=agent_to_distribute["_id"],
+            campaign_id=lead.campaign_id
+        )
+        if current_lead_order:
+            lead.lead_order_id = current_lead_order.id
+            current_lead_order.fresh_lead_completed += 1
+            if current_lead_order.fresh_lead_completed == current_lead_order.fresh_lead_amount:
+                current_lead_order.status = "closed"
+                current_lead_order.completed_date = datetime.utcnow()
+            await order_controller.update_order(current_lead_order.id, current_lead_order)
         result = await lead_collection.update_one(
             {"_id": ObjectId(lead_id)},
             {"$set": {
                 "buyer_id": agent_to_distribute["_id"],
-                "lead_sold_time": datetime.utcnow()
+                "lead_sold_time": datetime.utcnow(),
+                "lead_order_id": lead.lead_order_id
             }}
         )
         if result.modified_count == 1:
@@ -461,7 +476,6 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
                     date=datetime.utcnow()
                 )
             )
-            return True
 
 
 def choose_agent(agents, distribution_type):
@@ -473,6 +487,7 @@ def choose_agent(agents, distribution_type):
 
 async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
     from app.controllers import agent as agent_controller
+    from app.controllers import order as order_controller
     from app.controllers import transaction as transaction_controller
     from app.controllers import user as user_controller
     from app.controllers.campaign import get_one_campaign
@@ -480,18 +495,23 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
     campaign = await get_one_campaign(campaign_id)
     agent_id_obj = ObjectId(agent_id)
     agent = await agent_controller.get_agent_by_field(_id=agent_id_obj)
+    user = await user_controller.get_user_by_field(agent_id=agent_id_obj)
+    user_id = user.id
     if not agent:
         logger.warning(f"Agent {agent_id} not found")
         return
+    last_user_order = await order_controller.get_oldest_open_order_by_agent_and_campaign(
+        agent_id=agent_id,
+        campaign_id=campaign_id
+    )
     result = await lead_collection.update_many(
         {"_id": {"$in": [ObjectId(id) for id in lead_ids]}},
         {"$set": {
             "buyer_id": agent_id_obj,
-            "lead_sold_time": datetime.utcnow()
+            "lead_sold_time": datetime.utcnow(),
+            "lead_order_id": last_user_order.id
         }}
     )
-    user = await user_controller.get_user_by_field(agent_id=agent_id_obj)
-    user_id = user.id
     if agent["lead_price_override"]:
         lead_price = agent["lead_price_override"]
     else:
@@ -505,6 +525,10 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
             date=datetime.utcnow()
         )
     )
+    last_user_order.fresh_lead_completed += len(lead_ids)
+    if last_user_order.fresh_lead_completed >= last_user_order.fresh_lead_amount:
+        last_user_order.status = "closed"
+    await order_controller.update_order(last_user_order.id, last_user_order)
     if result.modified_count == len(lead_ids):
         return True
     return False
@@ -514,8 +538,6 @@ def get_eligible_agents_for_lead(agents, lead, lead_price):
     formatted_lead_state = formatter.format_state_to_abbreviation(lead.state)
     eligible_agents = []
     for agent in agents:
-        if agent.get("lead_price_override"):
-            lead_price = agent["lead_price_override"]
-        if formatted_lead_state in agent["states_with_license"] and agent["balance"] >= lead_price:
+        if formatted_lead_state in agent["states_with_license"]:
             eligible_agents.append(agent)
     return eligible_agents

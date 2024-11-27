@@ -1,4 +1,5 @@
 from bson import ObjectId
+import urllib.parse
 from main import stripe
 from settings import get_settings
 from typing import List
@@ -11,15 +12,21 @@ from app.tools import emails
 settings = get_settings()
 
 
-async def create_checkout_session(products: List[ProductSelection], payment_type, user: UserModel, stripe_account_id: str):
+async def create_checkout_session(
+    products: List[ProductSelection],
+    payment_type: str,
+    user: UserModel,
+    stripe_account_id: str,
+    campaign_id: str
+):
     line_items = []
+    stripe_product_names = {}
 
     for product in products:
         if payment_type == "recurring":
             prices = stripe.Price.list(
                 product=product.product_id,
                 active=True,
-                type='recurring',
                 limit=1,
                 stripe_account=stripe_account_id
             )
@@ -28,7 +35,6 @@ async def create_checkout_session(products: List[ProductSelection], payment_type
             prices = stripe.Price.list(
                 product=product.product_id,
                 active=True,
-                type='one_time',
                 limit=1,
                 stripe_account=stripe_account_id
             )
@@ -38,21 +44,40 @@ async def create_checkout_session(products: List[ProductSelection], payment_type
             raise Exception(f"No active price found for product {product.product_id}")
 
         price_id = prices.data[0].id
-
-        line_item = {
+        line_items.append({
             "price": price_id,
             "quantity": quantity,
-        }
+        })
 
-        line_items.append(line_item)
+        stripe_product = stripe.Product.retrieve(
+            product.product_id,
+            stripe_account=stripe_account_id
+        )
+        stripe_product_names[stripe_product.name] = quantity
+
+    query_params = {
+        "session_id": "{CHECKOUT_SESSION_ID}",
+        "campaign_id": campaign_id,
+        "payment_type": payment_type
+    }
+
+    if payment_type == "one_time" and stripe_product_names:
+        products_string = ",".join(
+            [f"{name}:{quantity}" for name, quantity in stripe_product_names.items()]
+        )
+        query_params["products"] = products_string
+
+    encoded_params = urllib.parse.urlencode(query_params, safe='{}')
+
+    success_url = f"{settings.frontend_url}/#/success?{encoded_params}"
 
     checkout_session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         line_items=line_items,
         mode="subscription" if payment_type == "recurring" else "payment",
-        success_url=f"{settings.frontend_url}/#/success?session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{settings.frontend_url}/#/cancel",
-        customer=user.stripe_customer_id,
+        success_url=success_url,
+        cancel_url=f"{settings.frontend_url}/#/",
+        customer=user.stripe_customer_ids.get(ObjectId(campaign_id)),
         stripe_account=stripe_account_id
     )
 
@@ -61,7 +86,7 @@ async def create_checkout_session(products: List[ProductSelection], payment_type
 
 async def verify_checkout_session(session_id: str, stripe_account_id: str):
     session = stripe.checkout.Session.retrieve(session_id, stripe_account=stripe_account_id)
-    if session.mode == "payment":
+    if session.mode == "payment" and session.payment_status == "paid":
         payment_intent = stripe.PaymentIntent.retrieve(session.payment_intent, stripe_account=stripe_account_id)
         charge = stripe.Charge.retrieve(payment_intent.latest_charge, stripe_account=stripe_account_id)
         emails.send_one_time_purchase_receipt(
@@ -84,9 +109,10 @@ async def get_products(payment_type: str, stripe_account_id: str):
     return {"data": filtered_products}
 
 
-async def create_customer_portal_session(user: UserModel, stripe_account_id: str):
+async def create_customer_portal_session(user: UserModel, campaign_id, stripe_account_id: str):
+    stripe_customer_id = user.stripe_customer_ids[ObjectId(campaign_id)]
     session = stripe.billing_portal.Session.create(
-        customer=user.stripe_customer_id,
+        customer=stripe_customer_id,
         return_url=f"{settings.frontend_url}/#/",
         stripe_account=stripe_account_id
     )
@@ -138,3 +164,39 @@ async def create_customer(user: UserModel, stripe_account_id: str):
 async def get_last_user_payment(stripe_customer_id: str, stripe_account_id: str):
     payment = stripe.PaymentIntent.list(customer=stripe_customer_id, limit=1, stripe_account=stripe_account_id)
     return payment
+
+
+async def update_one_time_product_price(product_id: str, price: int, stripe_account_id: str):
+    decimal_price = int(price * 100)
+    price_list = stripe.Price.list(
+        product=product_id,
+        active=True,
+        type='one_time',
+        limit=1,
+        stripe_account=stripe_account_id
+    )
+
+    new_price = stripe.Price.create(
+        unit_amount=decimal_price,
+        currency='usd',
+        product=product_id,
+        stripe_account=stripe_account_id,
+        active=True,
+        metadata={"payment_type": "one_time"}
+    )
+
+    stripe.Product.modify(
+        product_id,
+        default_price=new_price.id,
+        stripe_account=stripe_account_id
+    )
+
+    if price_list.data:
+        old_price_id = price_list.data[0].id
+        stripe.Price.modify(
+            old_price_id,
+            active=False,
+            stripe_account=stripe_account_id
+        )
+
+    return new_price.id
