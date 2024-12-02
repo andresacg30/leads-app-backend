@@ -165,7 +165,9 @@ async def update_lead(id: str, lead: UpdateLeadModel = Body(...), user: UserMode
 
     except lead_controller.LeadNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except [lead_controller.LeadIdInvalidError, lead_controller.LeadEmptyError] as e:
+    except lead_controller.LeadIdInvalidError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except lead_controller.LeadEmptyError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
