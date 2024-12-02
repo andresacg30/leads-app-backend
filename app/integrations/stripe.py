@@ -106,6 +106,8 @@ async def get_products(payment_type: str, stripe_account_id: str):
         if 'metadata' in product and product['metadata'].get('payment_type') == payment_type:
             filtered_products.append(product)
 
+    filtered_products.sort(key=lambda product: product['name'])
+
     return {"data": filtered_products}
 
 
