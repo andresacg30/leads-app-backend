@@ -106,7 +106,7 @@ async def get_products(payment_type: str, stripe_account_id: str):
         if 'metadata' in product and product['metadata'].get('payment_type') == payment_type:
             filtered_products.append(product)
 
-    filtered_products.sort(key=lambda product: product['name'])
+    filtered_products.sort(key=lambda product: _extract_amount(product['name']))
 
     return {"data": filtered_products}
 
@@ -202,3 +202,13 @@ async def update_one_time_product_price(product_id: str, price: int, stripe_acco
         )
 
     return new_price.id
+
+
+def _extract_amount(product_name):
+    product_name = product_name.strip()
+    amount_str = product_name.split('/')[0].replace('$', '').replace(',', '')
+    try:
+        amount = float(amount_str)
+    except ValueError:
+        amount = 0
+    return amount
