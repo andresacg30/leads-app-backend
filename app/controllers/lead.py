@@ -40,7 +40,7 @@ class LeadEmptyError(Exception):
 
 async def update_lead(id, lead: lead_model.UpdateLeadModel):
     from app.controllers.campaign import get_one_campaign
-    from app.controllers.user import get_user_by_field
+    from app.controllers.user import get_user_by_field, UserNotFoundError
     from app.controllers.transaction import create_transaction
     if all(v is None for v in lead.model_dump(mode="python").values()):
         raise LeadEmptyError("No values to update")
@@ -65,29 +65,35 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
                     if str(update_result["campaign_id"]) in constants.OG_CAMPAIGNS:
                         campaign = await get_one_campaign(str(update_result["campaign_id"]))
                         if "buyer_id" in lead and lead["buyer_id"]:
-                            user = await get_user_by_field(agent_id=lead["buyer_id"])
-                            if user:
-                                await create_transaction(
-                                    TransactionModel(
-                                        user_id=user.id,
-                                        amount=-campaign.price_per_lead,
-                                        description="Fresh Lead sent",
-                                        type="debit",
-                                        date=datetime.utcnow()
+                            try:
+                                user = await get_user_by_field(agent_id=lead["buyer_id"])
+                                if user:
+                                    await create_transaction(
+                                        TransactionModel(
+                                            user_id=user.id,
+                                            amount=-campaign.price_per_lead,
+                                            description="Fresh Lead sent",
+                                            type="debit",
+                                            date=datetime.utcnow()
+                                        )
                                     )
-                                )
+                            except UserNotFoundError:
+                                pass
                         if "second_chance_buyer_id" in lead and lead["second_chance_buyer_id"]:
-                            user = await get_user_by_field(agent_id=lead["second_chance_buyer_id"])
-                            if user:
-                                await create_transaction(
-                                    TransactionModel(
-                                        user_id=user.id,
-                                        amount=-campaign.price_per_second_chance_lead,
-                                        description="Second Chance Lead purchase",
-                                        type="debit",
-                                        date=datetime.utcnow()
+                            try:
+                                user = await get_user_by_field(agent_id=lead["second_chance_buyer_id"])
+                                if user:
+                                    await create_transaction(
+                                        TransactionModel(
+                                            user_id=user.id,
+                                            amount=-campaign.price_per_second_chance_lead,
+                                            description="Second Chance Lead purchase",
+                                            type="debit",
+                                            date=datetime.utcnow()
+                                        )
                                     )
-                                )
+                            except UserNotFoundError:
+                                pass
                 ### END TEMPORAL FOR OG CAMPAIGNS ###
                 return update_result
 
