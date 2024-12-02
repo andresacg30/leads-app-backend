@@ -262,9 +262,9 @@ def _handle_user_filters(filter: Dict, user: UserModel) -> Dict:
             user.campaigns = [bson.ObjectId(campaign_id) for campaign_id in user.campaigns]
             filter["campaign_id"] = {"$in": user.campaigns}
         else:
-            if any(campaign_id not in user.campaigns for campaign_id in filter["campaign_id"]):
+            filter["campaign_id"] = bson.ObjectId(filter["campaign_id"])
+            if filter["campaign_id"] not in user.campaigns:
                 raise HTTPException(status_code=404, detail="User does not have access to this campaign")
-            filter["campaign_id"] = {"$in": bson.ObjectId(filter["campaign_id"])}
         if user.is_agent():
             filter["$or"] = [
                 {"buyer_id": user.agent_id},
