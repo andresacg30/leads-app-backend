@@ -276,3 +276,12 @@ async def remove_campaign_from_user(user_id, campaign_id):
         {"$pull": {"campaigns": bson.ObjectId(campaign_id)}}
     )
     return
+
+
+async def get_user_by_email(email):
+    user_collection = get_user_collection()
+    user_in_db = await user_collection.find_one({"email": email})
+    if not user_in_db:
+        raise UserNotFoundError(f"User with email {email} not found")
+    user = user_model.UserModel(**user_in_db)
+    return user

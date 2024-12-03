@@ -4,6 +4,12 @@ from main import stripe
 from settings import get_settings
 from typing import List
 
+from app.controllers import campaign as campaign_controller
+from app.controllers import order as order_controller
+from app.controllers import transaction as transaction_controller
+from app.controllers import user as user_controller
+from app.models.transaction import TransactionModel
+from app.models.order import OrderModel
 from app.models.payment import ProductSelection
 from app.models.user import UserModel
 from app.tools import emails
@@ -212,3 +218,51 @@ def _extract_amount(product_name):
     except ValueError:
         amount = 0
     return amount
+
+
+async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe_account_id: str):
+    payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id, stripe_account=stripe_account_id)
+    customer = stripe.Customer.retrieve(payment_intent.customer, stripe_account=stripe_account_id)
+    try:
+        user = await user_controller.get_user_by_email(customer.email)
+    except user_controller.UserNotFoundError:
+        return None, None
+    invoice = stripe.Invoice.retrieve(payment_intent.invoice, stripe_account=stripe_account_id)
+    product = stripe.Product.retrieve(invoice.lines.data[0].price.product, stripe_account=stripe_account_id)
+    campaign_id = await campaign_controller.get_campaign_id_by_stripe_account_id(stripe_account_id)
+    created_transaction = await transaction_controller.create_transaction(
+        TransactionModel(
+            amount=payment_intent.amount / 100,
+            campaign_id=campaign_id,
+            user_id=user.id,
+            payment_intent_id=payment_intent_id,
+            date=payment_intent.created,
+            type="credit"
+        )
+    )
+    created_order = await order_controller.create_order(
+        OrderModel(
+            agent_id=user.agent_id,
+            campaign_id=campaign_id,
+            order_total=payment_intent.amount / 100,
+            status="open",
+            type="recurring",
+            products=[ProductSelection(product_id=product.id, quantity=1)],
+        ),
+        user
+    )
+    return created_transaction.inserted_id, created_order.inserted_id
+
+
+async def construct_event(payload, sig_header, endpoint_secret):
+    try:
+        event = stripe.Webhook.construct_event(
+            payload=payload,
+            sig_header=sig_header,
+            secret=endpoint_secret
+        )
+        return event
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        print(f"Error verifying webhook signature: {str(e)}")
+        return None

@@ -172,3 +172,9 @@ async def get_stripe_account_id(campaign_id: ObjectId):
     campaign = await campaign_collection.find_one({"_id": campaign_id})
     stripe_account_id = campaign["stripe_account_id"]
     return stripe_account_id
+
+
+async def get_campaign_id_by_stripe_account_id(stripe_account_id: str):
+    campaign_collection = get_campaign_collection()
+    campaign = await campaign_collection.find_one({"stripe_account_id": stripe_account_id})
+    return campaign["_id"]
