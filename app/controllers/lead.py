@@ -307,6 +307,12 @@ def _build_aggregation_pipeline(filter, sort, page, limit, agent_id, date_gte, d
     match_conditions = []
 
     if filter:
+        if "lead_type" in filter:
+            if filter["lead_type"] == "Fresh":
+                match_conditions.append({"buyer_id": ObjectId(agent_id)})
+            elif filter["lead_type"] == "2nd Chance":
+                match_conditions.append({"second_chance_buyer_id": ObjectId(agent_id)})
+            filter.pop("lead_type")
         match_conditions.append(filter)
 
     lead_received_date_expr = {
@@ -344,6 +350,7 @@ def _build_aggregation_pipeline(filter, sort, page, limit, agent_id, date_gte, d
     else:
         match_stage = {"$match": {}}
 
+    # Add filter after addFields for Fresh and 2nd Chance leads
     pipeline = [
         match_stage,
         {
