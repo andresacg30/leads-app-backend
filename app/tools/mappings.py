@@ -8,7 +8,7 @@ crm_url_mappings = {
 
 
 state_mappings = {
-    "District Of Columbia": ["dc", "district of columbia, district_of_columbia"],
+    "District Of Columbia": ["dc", "district of columbia", "district_of_columbia"],
     "Georgia": ["ga", "georgia"],
     "New York": ["ny", "new york", "new_york"],
     "Texas": ["texas", "tx"],
