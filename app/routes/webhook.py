@@ -29,7 +29,7 @@ async def create_order_from_stripe_subscription_payment(
         raise HTTPException(status_code=400, detail="Invalid signature")
     payment_intent = event.data.object
     stripe_account = event.account
-    if payment_intent.description != "Subscription creation":
+    if payment_intent.description != "Subscription update":
         return Response(content="Webhook received, not subscription payment", media_type="application/json", status_code=200)
     transaction_id, order_id = await stripe_controller.add_transaction_from_new_payment_intent(
         payment_intent_id=payment_intent.id,
