@@ -31,6 +31,16 @@ hash_helper = CryptContext(schemes=["bcrypt"])
 logger = logging.getLogger(__name__)
 
 
+@router.get("/get-profile")
+async def get_user_profile(user: UserModel = Depends(get_current_user)):
+    user_data = {
+        "first_name": user.name.split(" ")[0],
+        "last_name": user.name.split(" ")[1],
+        "email": user.email
+    }
+    return user_data
+
+
 @router.get("/get-stripe-account-status")
 async def get_stripe_account_status(user: UserModel = Depends(get_current_user)):
     try:
