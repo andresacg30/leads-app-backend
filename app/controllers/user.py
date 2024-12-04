@@ -87,7 +87,7 @@ async def create_user(user) -> user_model.UserModel:
         otp_expiration=datetime.datetime.utcnow() + datetime.timedelta(seconds=OTP_EXPIRATION),
     )
     stripe_customer = await create_customer(user=user, stripe_account_id=user_campaign.stripe_account_id)  # last campaign added will have the stripe account id used by any of his campaigns
-    user.stripe_customer_ids[user.campaigns[-1]] = stripe_customer["id"]
+    user.stripe_customer_ids[str(user.campaigns[-1])] = stripe_customer["id"]
 
     user_collection = get_user_collection()
     user.password = jwt_helper.encrypt(user.password)
