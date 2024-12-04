@@ -302,6 +302,8 @@ def build_query_filters(filter):
         filter["second_chance_buyer_id"] = ObjectId(filter["second_chance_buyer_id"])
     if "lead_order_id" in filter:
         filter["lead_order_id"] = ObjectId(filter["lead_order_id"])
+    if "second_chance_lead_order_id" in filter:
+        filter["second_chance_lead_order_id"] = ObjectId(filter["second_chance_lead_order_id"])
     filter = _format_created_time_filter(filter)
     filter = _format_lead_sold_time_filter(filter)
     filter = _format_second_chance_lead_sold_time_filter(filter)
