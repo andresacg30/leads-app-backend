@@ -94,7 +94,7 @@ async def get_all_agents(page, limit, sort, filter, user):
     pipeline = []
     if filter:
         filter = _filter_formatter_helper(filter)
-        if not user.is_admin:
+        if not user.is_admin():
             campaigns = filter.pop("user_campaigns")
             filter["campaigns"] = {"$in": campaigns}
     pipeline = [
