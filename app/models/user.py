@@ -20,7 +20,7 @@ class UserModel(BaseModel):
     refresh_token: Optional[str] = Field(default=None)
     permissions: Optional[list[str]] = Field(default=None)
     campaigns: Optional[list[PyObjectId]] = Field(default=None)
-    stripe_customer_ids: Optional[Dict[PyObjectId, str]] = Field(default={})
+    stripe_customer_ids: Optional[Dict[str, str]] = Field(default={})
     balance: Optional[float] = Field(default=0)
     email_verified: bool = Field(default=False)
     account_creation_task_id: Optional[str] = Field(default=None)
