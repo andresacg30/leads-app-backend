@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     mailgun_api_key: str = os.environ.get("MAILGUN_API_KEY")
     redis_api_address: str = os.environ.get("REDIS_API_ADDRESS")
     redis_api_port: int = os.environ.get("REDIS_API_PORT")
-    stripe_payment_endpoint_secret: str = os.environ.get("STRIPE_PAYMENT_ENDPOINT_SECRET")
+    stripe_payment_endpoint_secret: str = os.environ.get("STRIPE_PAYMENT_ENDPOINT_SECRET") or None
 
 
 class RedisSettings(BaseSettings):
