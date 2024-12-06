@@ -108,7 +108,7 @@ async def verify_otp(request: Request, email: str = Body(...), otp: str = Body(.
         await user_controller.activate_user(email)
         if user.account_creation_task_id:
             task_id = cancel_job(user.account_creation_task_id) 
-        logger.info(f"User {user.id} has been activated and task {task_id} has been canceled")
+            logger.info(f"User {user.id} has been activated and task {task_id} has been canceled")
         return {"message": "OTP confirmed"}
     raise HTTPException(status_code=403, detail="Invalid OTP code")
 
