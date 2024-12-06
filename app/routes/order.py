@@ -50,7 +50,7 @@ async def list_orders(page: int = 1, limit: int = 10, sort: str = "start_date=DE
             if not user.campaigns:
                 raise HTTPException(status_code=404, detail="User does not have access to this order")
             filter["campaign_id"] = {"$in": [bson.ObjectId(campaign) for campaign in user.campaigns]}
-            if user.is_agent():
+            if user.is_agent() or user.is_new_user():
                 filter["agent_id"] = bson.ObjectId(user.agent_id)
         sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
         orders, total = await order_controller.get_all_orders(page=page, limit=limit, sort=sort, filter=filter)
