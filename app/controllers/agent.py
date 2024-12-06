@@ -119,6 +119,9 @@ async def get_all_agents(page, limit, sort, filter, user):
             "balance": {
                 "$ifNull": ["$user_info.balance", 0]
             },
+            "has_subscription": {
+                "$ifNull": ["$user_info.has_subscription", False]
+            },
             "created_time": 1,
             "campaigns": {
                 "$filter": {
@@ -126,7 +129,7 @@ async def get_all_agents(page, limit, sort, filter, user):
                     "as": "campaign",
                     "cond": {"$in": ["$$campaign", campaigns]}
                 }
-            } if not user.is_admin else 1,
+            } if not user.is_admin() else 1,
             "credentials": 1,
             "custom_fields": 1,
             "lead_price_override": 1,
@@ -211,56 +214,6 @@ async def delete_agents(ids):
     agent_collection = get_agent_collection()
     result = await agent_collection.delete_many({"_id": {"$in": [ObjectId(id) for id in ids if id != "null"]}})
     return result
-
-
-async def get_active_agents(user_campaigns):
-    lead_collection = get_lead_collection()
-    nine_days_ago = datetime.utcnow() - timedelta(days=9)
-
-    pipeline = [
-        {"$match": {
-            "$or": [
-                {"lead_sold_time": {"$gte": nine_days_ago}},
-                {"second_chance_lead_sold_time": {"$gte": nine_days_ago}}
-            ],
-            "campaign_id": {"$in": user_campaigns},
-        }},
-        {"$project": {
-            "buyer_ids": {
-                "$cond": {
-                    "if": {"$gte": ["$lead_sold_time", nine_days_ago]},
-                    "then": "$buyer_id",
-                    "else": None
-                },
-            },
-            "second_chance_buyer_ids": {
-                "$cond": {
-                    "if": {"$gte": ["$second_chance_lead_sold_time", nine_days_ago]},
-                    "then": "$second_chance_buyer_id",
-                    "else": None
-                }
-            }
-        }},
-        {"$project": {
-            "buyer_ids": {
-                "$setUnion": [["$buyer_ids"], ["$second_chance_buyer_ids"]]
-            }
-        }},
-        {"$unwind": "$buyer_ids"},
-        {"$match": {"buyer_ids": {"$ne": None}}},
-        {"$project": {
-            "buyer_ids": {"$toString": "$buyer_ids"}
-        }},
-        {"$group": {
-            "_id": None,
-            "unique_buyer_ids": {"$addToSet": "$buyer_ids"}
-        }}
-    ]
-
-    result = await lead_collection.aggregate(pipeline).to_list(length=None)
-    active_agents = result[0]["unique_buyer_ids"] if result else []
-    total = len(active_agents)
-    return active_agents, total
 
 
 def _filter_formatter_helper(filter):

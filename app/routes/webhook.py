@@ -2,7 +2,7 @@ import app.integrations.stripe as stripe_controller
 
 from fastapi import APIRouter, Request, HTTPException, Response
 
-from app.auth.jwt_bearer import get_current_user
+from app.controllers import user as user_controller
 from settings import get_settings
 
 
@@ -29,15 +29,23 @@ async def create_order_from_stripe_subscription_payment(
         raise HTTPException(status_code=400, detail="Invalid signature")
     payment_intent = event.data.object
     stripe_account = event.account
-    if payment_intent.description != "Subscription update":
-        return Response(content="Webhook received, not subscription payment", media_type="application/json", status_code=200)
-    transaction_id, order_id = await stripe_controller.add_transaction_from_new_payment_intent(
-        payment_intent_id=payment_intent.id,
-        stripe_account_id=stripe_account
-    )
-    if not transaction_id or not order_id:
-        raise HTTPException(status_code=200, detail="Payment received but no user found")
-    return Response(
-        content=f"Webhook received: {event['type']}. Transation: {transaction_id}. Order: {order_id}",
-        media_type="application/json"
-    )
+    if payment_intent.description == "Subscription update":
+        transaction_id, order_id = await stripe_controller.add_transaction_from_new_payment_intent(
+            payment_intent_id=payment_intent.id,
+            stripe_account_id=stripe_account
+        )
+        if not transaction_id or not order_id:
+            raise HTTPException(status_code=200, detail="Payment received but no user found")
+        return Response(
+            content=f"Webhook received: {event['type']}. Transation: {transaction_id}. Order: {order_id}",
+            media_type="application/json"
+        )
+    elif payment_intent.description == "Subscription creation":
+        try:
+            user = await user_controller.get_user_by_stripe_id(payment_intent.customer)
+            user.has_subscription = True
+            await user_controller.update_user(user)
+            return Response(content="Webhook received, subscription creation", media_type="application/json", status_code=200)
+        except user_controller.UserNotFoundError:
+            return Response(content="Webhook received, subscription creation but no user found", media_type="application/json", status_code=200)
+    return Response(content="Webhook received, not subscription payment", media_type="application/json", status_code=200)

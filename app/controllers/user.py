@@ -196,12 +196,16 @@ async def user_change_stream_listener():
 
 
 async def check_user_is_verified_and_delete(user_id):
+    from app.integrations.stripe import delete_customer
     logger.info(f"Checking user {user_id} is verified")
     user_collection = get_user_collection()
     user = await user_collection.find_one({"_id": bson.ObjectId(user_id)})
     if not user["email_verified"]:
         logger.info(f"User {user_id} not verified, deleting")
         agent_collection = agent_controller.get_agent_collection()
+        for campaign_id in user["campaigns"]:
+            campaign = await campaign_controller.get_one_campaign(campaign_id)
+            await delete_customer(user, campaign)
         await agent_collection.delete_one({"_id": bson.ObjectId(user["agent_id"])})
         await user_collection.delete_one({"_id": bson.ObjectId(user_id)})
         logger.info(f"User {user_id} deleted")
@@ -285,3 +289,81 @@ async def get_user_by_email(email):
         raise UserNotFoundError(f"User with email {email} not found")
     user = user_model.UserModel(**user_in_db)
     return user
+
+
+async def get_user_by_stripe_id(stripe_id):
+    user_collection = get_user_collection()
+    user_in_db = await user_collection.find_one({
+        "$expr": {
+            "$in": [
+                stripe_id,
+                {
+                    "$map": {
+                        "input": {
+                            "$objectToArray": {
+                                "$ifNull": ["$stripe_customer_ids", {}]
+                            }
+                        },
+                        "as": "item",
+                        "in": "$$item.v"
+                    }
+                }
+            ]
+        }
+    })
+    if not user_in_db:
+        raise UserNotFoundError(f"User with stripe id {stripe_id} not found")
+    user = user_model.UserModel(**user_in_db)
+    return user
+
+
+async def get_active_users(user_campaigns, user):
+    user_collection = get_user_collection()
+    pipeline = [
+        {"$match": {
+            "campaigns": {"$in": user_campaigns}
+        }},
+        {"$lookup": {
+            "from": "order",
+            "let": {"agent_id": "$agent_id"},
+            "pipeline": [
+                {"$match": {
+                    "$expr": {
+                        "$and": [
+                            {"$eq": ["$agent_id", "$$agent_id"]},
+                            {"$eq": ["$status", "open"]},  # Assuming 'status' indicates order status
+                            {"$in": ["$campaign_id", user_campaigns]}
+                        ]
+                    }
+                }}
+            ],
+            "as": "open_orders"
+        }},
+        {"$addFields": {
+            "has_open_order": {"$gt": [{"$size": "$open_orders"}, 0]}
+        }},
+        {"$match": {
+            "$or": [
+                {"has_subscription": True},
+                {"has_open_order": True}
+            ]
+        }},
+        {"$project": {
+            "first_name": 1,
+            "last_name": 1,
+            "email": 1,
+            "phone": 1,
+            "balance": 1,
+            "has_subscription": 1,
+            "campaigns": 1,
+            "has_open_order": 1,
+            "name": 1,
+            "region": 1,
+            "password": ""
+        }}
+    ]
+
+    result = await user_collection.aggregate(pipeline).to_list(length=None)
+    users = [user_model.UserModel(**user).to_json() for user in result]
+    total = len(result)
+    return users, total
