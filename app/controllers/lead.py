@@ -62,7 +62,7 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
             if agent_most_recent_order:
                 lead["lead_order_id"] = agent_most_recent_order.id
                 agent_most_recent_order.fresh_lead_amount += 1
-            await update_order(agent_most_recent_order.id, agent_most_recent_order)
+                await update_order(agent_most_recent_order.id, agent_most_recent_order)
         if "second_chance_buyer_id" in lead and lead["second_chance_buyer_id"]:
             agent_most_recent_order = await get_oldest_open_order_by_agent_and_campaign(
                 agent_id=lead["second_chance_buyer_id"],
