@@ -1,7 +1,7 @@
 import datetime
 from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from app.tools.modifiers import PyObjectId
 
@@ -17,6 +17,7 @@ class TransactionModel(BaseModel):
     user_id: PyObjectId = Field(...)
     description: str = Field(default=None)
     notes: str = Field(default=None)
+    lead_id: Optional[Union[PyObjectId, List[PyObjectId]]] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -52,6 +53,7 @@ class UpdateTransactionModel(BaseModel):
     user_id: Optional[PyObjectId] = None
     product_description: Optional[str] = None
     notes: Optional[str] = None
+    lead_id: Optional[Union[PyObjectId, List[PyObjectId]]] = None
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,

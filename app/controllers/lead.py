@@ -95,7 +95,8 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
                                             amount=-campaign.price_per_lead,
                                             description="Fresh Lead sent",
                                             type="debit",
-                                            date=datetime.utcnow()
+                                            date=datetime.utcnow(),
+                                            lead_id=ObjectId(id)
                                         )
                                     )
                             except UserNotFoundError:
@@ -110,7 +111,8 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
                                             amount=-campaign.price_per_second_chance_lead,
                                             description="Second Chance Lead purchase",
                                             type="debit",
-                                            date=datetime.utcnow()
+                                            date=datetime.utcnow(),
+                                            lead_id=ObjectId(id)
                                         )
                                     )
                             except UserNotFoundError:
@@ -541,7 +543,8 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
                     amount=-lead_price,
                     description="Fresh Lead purchase",
                     type="debit",
-                    date=datetime.utcnow()
+                    date=datetime.utcnow(),
+                    lead_id=ObjectId(lead_id)
                 )
             )
 
@@ -590,7 +593,8 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
             amount=-lead_price * len(lead_ids),
             description="Leads sent by agency",
             type="debit",
-            date=datetime.utcnow()
+            date=datetime.utcnow(),
+            lead_id=[ObjectId(id) for id in lead_ids]
         )
     )
     last_user_order.fresh_lead_completed += len(lead_ids)
