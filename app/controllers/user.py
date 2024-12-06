@@ -83,7 +83,7 @@ async def create_user(user) -> user_model.UserModel:
     for campaign in user.campaigns:
         user_campaign = await campaign_controller.get_one_campaign(campaign)
         stripe_customer = await create_customer(user=user, stripe_account_id=user_campaign.stripe_account_id)
-        user.stripe_customer_ids[user_campaign.id] = stripe_customer.id
+        user.stripe_customer_ids[str(user_campaign.id)] = stripe_customer.id
     user_collection = get_user_collection()
     user.password = jwt_helper.encrypt(user.password)
     new_user = await user_collection.insert_one(user.model_dump(by_alias=True, exclude=["id"], mode="python"))
