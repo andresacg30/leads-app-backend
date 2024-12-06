@@ -55,19 +55,13 @@ async def create_user(user) -> user_model.UserModel:
 
     if not user["sign_up_codes"]:
         raise HTTPException(status_code=400, detail="No sign up codes provided")
-    user_campaign_ids = []
-    for sign_up_code in user["sign_up_codes"]:
-        if not await campaign_controller.get_campaign_by_sign_up_code(sign_up_code):
-            raise HTTPException(status_code=404, detail=f"Sign up code {sign_up_code} not found")
-        user_campaign = await campaign_controller.get_campaign_by_sign_up_code(sign_up_code)
-        user_campaign_ids.append(user_campaign.id)
     agent_model = AgentModel(
         first_name=user["first_name"],
         last_name=user["last_name"],
         email=user["email"],
         phone=user["phone"],
         states_with_license=user["states_with_license"],
-        campaigns=user_campaign_ids,
+        campaigns=user["campaigns"],
     )
     created_agent = await agent_controller.create_agent(agent_model)
 
@@ -80,15 +74,16 @@ async def create_user(user) -> user_model.UserModel:
         password=user["password"],
         phone=user["phone"],
         region=user["region"],
-        agent_id=user["agent_id"],
+        agent_id=user["agent_id"],  
         permissions=user["permissions"],
         otp_code=user["otp_code"],
-        campaigns=user_campaign_ids,
+        campaigns=user["campaigns"],
         otp_expiration=datetime.datetime.utcnow() + datetime.timedelta(seconds=OTP_EXPIRATION),
     )
-    stripe_customer = await create_customer(user=user, stripe_account_id=user_campaign.stripe_account_id)  # last campaign added will have the stripe account id used by any of his campaigns
-    user.stripe_customer_ids[str(user.campaigns[-1])] = stripe_customer["id"]
-
+    for campaign in user.campaigns:
+        user_campaign = await campaign_controller.get_one_campaign(campaign)
+        stripe_customer = await create_customer(user=user, stripe_account_id=user_campaign.stripe_account_id)
+        user.stripe_customer_ids[user_campaign.id] = stripe_customer.id
     user_collection = get_user_collection()
     user.password = jwt_helper.encrypt(user.password)
     new_user = await user_collection.insert_one(user.model_dump(by_alias=True, exclude=["id"], mode="python"))

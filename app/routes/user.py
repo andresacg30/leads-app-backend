@@ -231,6 +231,7 @@ async def user_signup(request: Request, user=Body(...)):
         user_campaigns.append(campaign)
     if any(campaign.status != "active" for campaign in user_campaigns):
         raise HTTPException(status_code=404, detail="Campaign is not active")
+    user["campaigns"] = [campaign.id for campaign in user_campaigns]
     created_user = await user_controller.create_user(user)
     await user_background_jobs.add_to_otp_verification_queue(
         created_user
