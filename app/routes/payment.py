@@ -59,7 +59,6 @@ async def create_checkout_session(request: CheckoutRequest, user: UserModel = De
             stripe_account_id=stripe_account_id,
             campaign_id=request.campaign_id
         )
-        print("dadsa")
         return {"checkout_url": checkout_session.url}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

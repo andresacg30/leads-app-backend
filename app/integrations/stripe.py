@@ -1,5 +1,6 @@
 from bson import ObjectId
 import urllib.parse
+from app.models.campaign import CampaignModel
 from main import stripe
 from settings import get_settings
 from typing import List
@@ -83,7 +84,7 @@ async def create_checkout_session(
         mode="subscription" if payment_type == "recurring" else "payment",
         success_url=success_url,
         cancel_url=f"{settings.frontend_url}/#/",
-        customer=user.stripe_customer_ids.get(ObjectId(campaign_id)),
+        customer=user.stripe_customer_ids.get(campaign_id),
         stripe_account=stripe_account_id,
         consent_collection={"terms_of_service": "required"}
     )
@@ -119,7 +120,7 @@ async def get_products(payment_type: str, stripe_account_id: str):
 
 
 async def create_customer_portal_session(user: UserModel, campaign_id, stripe_account_id: str):
-    stripe_customer_id = user.stripe_customer_ids[ObjectId(campaign_id)]
+    stripe_customer_id = user.stripe_customer_ids[campaign_id]
     session = stripe.billing_portal.Session.create(
         customer=stripe_customer_id,
         return_url=f"{settings.frontend_url}/#/",
@@ -267,3 +268,21 @@ async def construct_event(payload, sig_header, endpoint_secret):
         # Invalid signature
         print(f"Error verifying webhook signature: {str(e)}")
         return None
+
+
+async def get_user_subscriptions(user: UserModel, campaign: CampaignModel):
+    subscriptions = stripe.Subscription.list(
+        customer=user.stripe_customer_ids[campaign.id],
+        stripe_account=campaign.stripe_account_id
+    )
+    if not subscriptions:
+        return []
+    return subscriptions.data
+
+
+async def delete_customer(user: UserModel, campaign: CampaignModel):
+    stripe.Customer.delete(
+        user.stripe_customer_ids[campaign.id],
+        stripe_account=campaign.stripe_account_id
+    )
+    return True

@@ -26,6 +26,7 @@ class UserModel(BaseModel):
     account_creation_task_id: Optional[str] = Field(default=None)
     otp_code: Optional[str] = Field(default=None)
     otp_expiration: Optional[datetime.datetime] = Field(default=None)
+    has_subscription: Optional[bool] = None
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -81,6 +82,16 @@ class UserModel(BaseModel):
             elif isinstance(value, list):
                 data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
         return data
+
+    async def get_campaigns(self):
+        from app.controllers.campaign import get_one_campaign
+        campaigns = []
+        if self.campaigns:
+            for campaign_id in self.campaigns:
+                campaign = await get_one_campaign(campaign_id)
+                if campaign:
+                    campaigns.append(campaign)
+        return None
 
     @root_validator(pre=True)
     def strip_fields(cls, values):
