@@ -62,6 +62,9 @@ def cancel_job(job_id):
         logger.warning("rq not initialized")
         return
     job = rq.fetch_job(job_id)
+    if job is None:
+        logger.warning(f"Job {job_id} not found")
+        return
     job.cancel()
     logger.info(f"Canceled job {job_id}")
     return job.id
