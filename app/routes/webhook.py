@@ -11,8 +11,29 @@ settings = get_settings()
 
 
 @router.post("/create-order-from-stripe-subscription-payment")
-async def create_order_from_stripe_subscription_payment(
+async def create_order_from_stripe_subscription_payment_connected_accounts(
     request: Request
+):
+    """
+    Create an order record from a Stripe subscription payment.
+    """
+    response = await create_order_from_stripe_subscription_payment(request=request, endpoint_secret=settings.stripe_payment_endpoint_secret)
+    return response
+
+
+@router.post("/create-order-from-stripe-subscription-payment-self-account")
+async def create_order_from_stripe_subscription_payment_self_account(
+    request: Request
+):
+    """
+    Create an order record from a Stripe subscription payment.
+    """
+    response = await create_order_from_stripe_subscription_payment(request=request, endpoint_secret=settings.stripe_self_account_payment_endpoint_secret)
+    return response
+
+
+async def create_order_from_stripe_subscription_payment(
+    request: Request, endpoint_secret
 ):
     """
     Create an order record from a Stripe subscription payment.
@@ -23,12 +44,12 @@ async def create_order_from_stripe_subscription_payment(
     event = await stripe_controller.construct_event(
         payload=payload,
         sig_header=sig_header,
-        endpoint_secret=settings.stripe_payment_endpoint_secret
+        endpoint_secret=endpoint_secret
     )
     if not event:
         raise HTTPException(status_code=400, detail="Invalid signature")
     payment_intent = event.data.object
-    stripe_account = event.account
+    stripe_account = event.account if hasattr(event, "account") else settings.stripe_self_account
     if payment_intent.description == "Subscription update":
         transaction_id, order_id = await stripe_controller.add_transaction_from_new_payment_intent(
             payment_intent_id=payment_intent.id,
