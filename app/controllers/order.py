@@ -49,7 +49,10 @@ async def get_all_orders(page, limit, sort, filter):
         filter = {"_id": {"$in": [ObjectId(id) for id in filter["id"]]}}
     order_collection = get_order_collection()
     orders = await order_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
-    total = await order_collection.count_documents({})
+    if filter:
+        total = await order_collection.count_documents(filter)
+    else:
+        total = await order_collection.count_documents({})
     return orders, total
 
 
