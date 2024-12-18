@@ -52,6 +52,11 @@ async def list_orders(page: int = 1, limit: int = 10, sort: str = "start_date=DE
             filter["campaign_id"] = {"$in": [bson.ObjectId(campaign) for campaign in user.campaigns]}
             if user.is_agent() or user.is_new_user():
                 filter["agent_id"] = bson.ObjectId(user.agent_id)
+        else:
+            if "campaign_id" in filter:
+                filter["campaign_id"] = {"$in": [bson.ObjectId(campaign) for campaign in filter["campaign_id"]]}
+            if "agent_id" in filter:
+                filter["agent_id"] = bson.ObjectId(filter["agent_id"])
         sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
         orders, total = await order_controller.get_all_orders(page=page, limit=limit, sort=sort, filter=filter)
         return {
