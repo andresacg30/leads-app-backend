@@ -11,6 +11,12 @@ class PaymentTypeRequest(BaseModel):
     campaign_id: str
 
 
+class PurchasedProduct(BaseModel):
+    product_id: str
+    product_name: str
+    quantity: int = 1  # Default quantity is 1
+
+
 class ProductSelection(BaseModel):
     product_id: str
     quantity: int = 1  # Default quantity is 1

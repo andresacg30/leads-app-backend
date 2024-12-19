@@ -30,7 +30,7 @@ class OrderIdInvalidError(Exception):
     pass
 
 
-async def create_order(order: OrderModel, user: UserModel, products: dict = None):
+async def create_order(order: OrderModel, user: UserModel, products: list = None):
     from app.controllers.campaign import get_one_campaign
     from app.controllers.agent import get_agent_by_field
     agent_in_db = await get_agent_by_field(_id=user.agent_id)
@@ -118,10 +118,15 @@ async def get_oldest_open_order_by_agent_and_campaign(agent_id: str, campaign_id
     return order
 
 
-def calculate_lead_amounts(order: OrderModel, order_campaign: CampaignModel, agent: AgentModel, products: dict = None):
+def calculate_lead_amounts(order: OrderModel, order_campaign: CampaignModel, agent: AgentModel, products: list = None):
     if products:
-        order.fresh_lead_amount = int(products.get("Fresh Lead", 0))
-        order.second_chance_lead_amount = int(products.get("Aged Lead", 0))
+        for product in products:
+            if product.product_name not in ["Fresh Lead", "Aged Lead"]:
+                raise ValueError("Invalid product type")
+            if product.product_name == "Fresh Lead":
+                order.fresh_lead_amount = product.quantity
+            if product.product_name == "Aged Lead":
+                order.second_chance_lead_amount = product.quantity
     else:
         if agent.lead_price_override:
             lead_price = agent.lead_price_override

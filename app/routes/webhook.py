@@ -63,13 +63,17 @@ async def create_order_from_stripe_subscription_payment(
         )
     elif payment_intent.description == "Subscription creation":
         try:
+            transaction_id, order_id = await stripe_controller.add_transaction_from_new_payment_intent(
+                payment_intent_id=payment_intent.id,
+                stripe_account_id=stripe_account
+            )
             user = await user_controller.get_user_by_stripe_id(payment_intent.customer)
             user.has_subscription = True
             await user_controller.update_user(user)
             return Response(content="Webhook received, subscription creation", media_type="application/json", status_code=200)
         except user_controller.UserNotFoundError:
             return Response(content="Webhook received, subscription creation but no user found", media_type="application/json", status_code=200)
-    elif "One-Time Payment" in payment_intent.description:
+    else:
         transaction_id, order_id = await stripe_controller.add_transaction_from_new_payment_intent(
             payment_intent_id=payment_intent.id,
             stripe_account_id=stripe_account

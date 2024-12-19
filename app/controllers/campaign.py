@@ -51,7 +51,10 @@ async def get_all_campaigns(page, limit, sort, filter):
         filter = {"_id": {"$in": [ObjectId(id) for id in filter["id"]]}}
     campaign_collection = get_campaign_collection()
     campaigns = await campaign_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
-    total = await campaign_collection.count_documents({})
+    if filter:
+        total = await campaign_collection.count_documents(filter)
+    else:
+        total = await campaign_collection.count_documents({})
     return campaigns, total
 
 

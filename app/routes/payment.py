@@ -81,27 +81,6 @@ async def verify_session(
             access_token = None
             if user.is_new_user():
                 access_token = await user_controller.change_user_permissions(user.id, new_permissions=['agent'])
-            await transaction_controller.create_transaction(
-                transaction=TransactionModel(
-                    user_id=user.id,
-                    amount=session.amount_total / 100,
-                    date=datetime.utcnow(),
-                    type="credit",
-                    description="User added credit"
-                )
-            )
-            order = OrderModel(
-                agent_id=user.agent_id,
-                campaign_id=bson.ObjectId(campaign_id),
-                status="open",
-                order_total=session.amount_total / 100,
-                type=payment_type
-            )
-            await order_controller.create_order(
-                order=order,
-                user=user,
-                products=products
-            )
             return {"status": "success", "access_token": access_token}
         else:
             return {"status": "pending"}

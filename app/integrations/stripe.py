@@ -1,3 +1,4 @@
+import json
 from bson import ObjectId
 import urllib.parse
 from app.models.campaign import CampaignModel
@@ -11,7 +12,7 @@ from app.controllers import transaction as transaction_controller
 from app.controllers import user as user_controller
 from app.models.transaction import TransactionModel
 from app.models.order import OrderModel
-from app.models.payment import ProductSelection
+from app.models.payment import ProductSelection, PurchasedProduct
 from app.models.user import UserModel
 from app.tools import emails
 
@@ -28,6 +29,7 @@ async def create_checkout_session(
 ):
     line_items = []
     stripe_product_names = {}
+    payment_intent_product_info = {}
 
     for product in products:
         if payment_type == "recurring":
@@ -61,6 +63,7 @@ async def create_checkout_session(
             stripe_account=stripe_account_id
         )
         stripe_product_names[stripe_product.name] = quantity
+        payment_intent_product_info[stripe_product.id] = quantity
 
     query_params = {
         "session_id": "{CHECKOUT_SESSION_ID}",
@@ -78,16 +81,34 @@ async def create_checkout_session(
 
     success_url = f"{settings.frontend_url}/#/success?{encoded_params}"
 
-    checkout_session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        line_items=line_items,
-        mode="subscription" if payment_type == "recurring" else "payment",
-        success_url=success_url,
-        cancel_url=f"{settings.frontend_url}/#/",
-        customer=user.stripe_customer_ids.get(campaign_id),
-        stripe_account=stripe_account_id,
-        consent_collection={"terms_of_service": "required"}
-    )
+    if payment_type == "one_time":
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=line_items,
+            mode="subscription" if payment_type == "recurring" else "payment",
+            success_url=success_url,
+            cancel_url=f"{settings.frontend_url}/#/",
+            customer=user.stripe_customer_ids.get(campaign_id),
+            stripe_account=stripe_account_id,
+            consent_collection={"terms_of_service": "required"},
+            payment_intent_data={
+                "metadata": {
+                    "campaign_id": campaign_id,
+                    "products": json.dumps(payment_intent_product_info), 
+                }
+            }
+        )
+    else:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=line_items,
+            mode="subscription" if payment_type == "recurring" else "payment",
+            success_url=success_url,
+            cancel_url=f"{settings.frontend_url}/#/",
+            customer=user.stripe_customer_ids.get(campaign_id),
+            stripe_account=stripe_account_id,
+            consent_collection={"terms_of_service": "required"}
+        )
 
     return checkout_session
 
@@ -225,12 +246,22 @@ def _extract_amount(product_name):
 async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe_account_id: str):
     payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id, stripe_account=stripe_account_id)
     customer = stripe.Customer.retrieve(payment_intent.customer, stripe_account=stripe_account_id)
+    products = []
     try:
         user = await user_controller.get_user_by_email(customer.email)
     except user_controller.UserNotFoundError:
         return None, None
-    invoice = stripe.Invoice.retrieve(payment_intent.invoice, stripe_account=stripe_account_id)
-    product = stripe.Product.retrieve(invoice.lines.data[0].price.product, stripe_account=stripe_account_id)
+    if payment_intent.invoice:
+        order_type = "recurring"
+    else:
+        products_metadata = payment_intent.metadata.get("products")
+        if not products_metadata:
+            return None, None
+        product_info = json.loads(products_metadata)
+        for product_id, quantity in product_info.items():
+            prod = stripe.Product.retrieve(product_id, stripe_account=stripe_account_id)
+            products.append(PurchasedProduct(product_id=prod.id, product_name=prod.name, quantity=quantity))
+        order_type = "one_time"
     campaign_id = await campaign_controller.get_campaign_id_by_stripe_account_id(stripe_account_id)
     created_transaction = await transaction_controller.create_transaction(
         TransactionModel(
@@ -242,17 +273,19 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
             type="credit"
         )
     )
+
     created_order = await order_controller.create_order(
         OrderModel(
             agent_id=user.agent_id,
             campaign_id=campaign_id,
             order_total=payment_intent.amount / 100,
             status="open",
-            type="recurring",
-            products=[ProductSelection(product_id=product.id, quantity=1)],
+            type=order_type,
         ),
-        user
+        user,
+        products=products or None
     )
+
     return created_transaction.inserted_id, created_order.inserted_id
 
 
