@@ -38,7 +38,7 @@ async def show_order(id: str, user: UserModel = Depends(get_current_user)):
     response_description="Get all orders",
     response_model_by_alias=False
 )
-async def list_orders(page: int = 1, limit: int = 10, sort: str = "start_date=DESC" , filter: str = None, user: UserModel = Depends(get_current_user)):
+async def list_orders(page: int = 1, limit: int = 10, sort: str = "date=DESC" , filter: str = None, user: UserModel = Depends(get_current_user)):
     """
     List all of the order data in the database within the specified page and limit.
     """
