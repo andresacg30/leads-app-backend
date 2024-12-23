@@ -139,3 +139,17 @@ def calculate_lead_amounts(order: OrderModel, order_campaign: CampaignModel, age
         order.fresh_lead_amount = math.floor((order.order_total * 0.8) / lead_price)
         order.second_chance_lead_amount = math.floor((order.order_total * 0.2) / second_chance_lead_price)
     return order
+
+
+async def get_lead_count(order_id: str):
+    from app.controllers.lead import get_lead_collection
+    lead_collection = get_lead_collection()
+    lead_count = await lead_collection.count_documents({"lead_order_id": ObjectId(order_id)})
+    return lead_count
+
+
+async def get_second_chance_lead_count(order_id: str):
+    from app.controllers.lead import get_lead_collection
+    lead_collection = get_lead_collection()
+    lead_count = await lead_collection.count_documents({"second_chance_lead_order_id": ObjectId(order_id)})
+    return lead_count

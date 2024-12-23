@@ -53,26 +53,6 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
             for field in datetime_fields:
                 if field in lead:
                     lead[field] = formatter.format_string_to_utc_datetime(lead[field])
-        ### TEMPORAL FOR OG CAMPAIGNS ###
-        if "buyer_id" in lead and lead["buyer_id"]:
-            agent_most_recent_order = await get_oldest_open_order_by_agent_and_campaign(
-                agent_id=lead["buyer_id"],
-                campaign_id=lead["campaign_id"]
-            )
-            if agent_most_recent_order:
-                lead["lead_order_id"] = agent_most_recent_order.id
-                agent_most_recent_order.fresh_lead_amount += 1
-                await update_order(agent_most_recent_order.id, agent_most_recent_order)
-        if "second_chance_buyer_id" in lead and lead["second_chance_buyer_id"]:
-            agent_most_recent_order = await get_oldest_open_order_by_agent_and_campaign(
-                agent_id=lead["second_chance_buyer_id"],
-                campaign_id=lead["campaign_id"]
-            )
-            if agent_most_recent_order:
-                lead["second_chance_lead_order_id"] = agent_most_recent_order.id
-                agent_most_recent_order.second_chance_lead_amount += 1
-                await update_order(agent_most_recent_order.id, agent_most_recent_order)
-        ### END TEMPORAL FOR OG CAMPAIGNS ###
         if len(lead) >= 1:
             update_result = await lead_collection.find_one_and_update(
                 {"_id": ObjectId(id)},
@@ -521,7 +501,6 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
         )
         if current_lead_order:
             lead.lead_order_id = current_lead_order.id
-            current_lead_order.fresh_lead_completed += 1
             if current_lead_order.fresh_lead_completed == current_lead_order.fresh_lead_amount:
                 current_lead_order.status = "closed"
                 current_lead_order.completed_date = datetime.utcnow()
@@ -597,7 +576,6 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
             lead_id=[ObjectId(id) for id in lead_ids]
         )
     )
-    last_user_order.fresh_lead_completed += len(lead_ids)
     if last_user_order.fresh_lead_completed >= last_user_order.fresh_lead_amount:
         last_user_order.status = "closed"
     await order_controller.update_order(last_user_order.id, last_user_order)

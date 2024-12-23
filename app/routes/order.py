@@ -1,4 +1,5 @@
 import ast
+import asyncio
 import bson
 
 from fastapi import APIRouter, Body, Request, status, HTTPException, Depends, Response
@@ -26,7 +27,7 @@ async def show_order(id: str, user: UserModel = Depends(get_current_user)):
             if not user.campaigns:
                 raise HTTPException(status_code=404, detail="User does not have access to this order")
         order = await order_controller.get_one_order(id)
-        return order.to_json()
+        return await order.to_json()
 
     except order_controller.OrderNotFoundError:
         raise HTTPException(status_code=404, detail=f"Order {id} not found")
@@ -59,8 +60,9 @@ async def list_orders(page: int = 1, limit: int = 10, sort: str = "date=DESC" , 
                 filter["agent_id"] = bson.ObjectId(filter["agent_id"])
         sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
         orders, total = await order_controller.get_all_orders(page=page, limit=limit, sort=sort, filter=filter)
+        data = await asyncio.gather(*(order.to_json() for order in OrderCollection(data=orders).data))
         return {
-            "data": list(order.to_json() for order in OrderCollection(data=orders).data),
+            "data": data,
             "total": total
         }
     except ValueError as e:

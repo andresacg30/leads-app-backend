@@ -17,20 +17,30 @@ class OrderModel(BaseModel):
     order_total: float = Field(...)
     type: str = Field(...)
     agent_id: PyObjectId = Field(...)
-    fresh_lead_completed: int = Field(default=0)
     fresh_lead_amount: int = Field(default=0)
-    second_chance_lead_completed: int = Field(default=0)
     second_chance_lead_amount: int = Field(default=0)
     rules: dict = Field(default={})
     completed_date: Optional[datetime.datetime] = Field(default=None)
 
-    def to_json(self):
+    @property
+    async def fresh_lead_completed(self):
+        from app.controllers.order import get_lead_count
+        return await get_lead_count(self.id)
+
+    @property
+    async def second_chance_lead_completed(self):
+        from app.controllers.order import get_second_chance_lead_count
+        return await get_second_chance_lead_count(self.id)
+
+    async def to_json(self):
         data = self.model_dump()
         for key, value in data.items():
             if isinstance(value, ObjectId):
                 data[key] = str(value)
             elif isinstance(value, list):
                 data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
+        data["fresh_lead_completed"] = await self.fresh_lead_completed
+        data["second_chance_lead_completed"] = await self.second_chance_lead_completed
         return data
 
 
