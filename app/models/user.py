@@ -17,6 +17,7 @@ class UserModel(BaseModel):
     region: str = Field(...)
     phone: str = Field(default=None)
     agent_id: Optional[PyObjectId] = Field(default=None)
+    last_login: Optional[datetime.datetime] = Field(default=None)
     refresh_token: Optional[str] = Field(default=None)
     permissions: Optional[list[str]] = Field(default=None)
     campaigns: Optional[list[PyObjectId]] = Field(default=None)
