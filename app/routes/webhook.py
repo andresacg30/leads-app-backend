@@ -68,6 +68,8 @@ async def create_order_from_stripe_subscription_payment(
                 stripe_account_id=stripe_account
             )
             user = await user_controller.get_user_by_stripe_id(payment_intent.customer)
+            if not user:
+                return Response(content="Webhook received, subscription creation but no user found", media_type="application/json", status_code=200)
             user.has_subscription = True
             await user_controller.update_user(user)
             return Response(content="Webhook received, subscription creation", media_type="application/json", status_code=200)
