@@ -218,6 +218,7 @@ async def get_many_users(request: Request, user_ids: list = Body(...)):
 @router.post("")
 async def user_signup(request: Request, user=Body(...)):
     try:
+        user["email"] = user["email"].lower()
         user_exists = await user_controller.get_user_by_field(email=user["email"])
     except user_controller.UserNotFoundError:
         user_exists = None
