@@ -53,6 +53,22 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
             for field in datetime_fields:
                 if field in lead:
                     lead[field] = formatter.format_string_to_utc_datetime(lead[field])
+        ### TEMPORAL FOR OG CAMPAIGNS ###
+        if lead.get("buyer_id"):
+            agent_most_recent_order = await get_oldest_open_order_by_agent_and_campaign(
+                agent_id=lead["buyer_id"],
+                campaign_id=lead["campaign_id"]
+            )
+            if agent_most_recent_order:
+                lead["lead_order_id"] = agent_most_recent_order.id
+        if lead.get("second_chance_buyer_id"):
+            agent_most_recent_order = await get_oldest_open_order_by_agent_and_campaign(
+                agent_id=lead["second_chance_buyer_id"],
+                campaign_id=lead["campaign_id"]
+            )
+            if agent_most_recent_order:
+                lead["second_chance_lead_order_id"] = agent_most_recent_order.id
+        ### END TEMPORAL FOR OG CAMPAIGNS ###
         if len(lead) >= 1:
             update_result = await lead_collection.find_one_and_update(
                 {"_id": ObjectId(id)},
