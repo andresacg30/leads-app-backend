@@ -76,14 +76,17 @@ async def create_order_from_stripe_subscription_payment(
         except user_controller.UserNotFoundError:
             return Response(content="Webhook received, subscription creation but no user found", media_type="application/json", status_code=200)
     else:
-        transaction_id, order_id = await stripe_controller.add_transaction_from_new_payment_intent(
-            payment_intent_id=payment_intent.id,
-            stripe_account_id=stripe_account
-        )
-        if not transaction_id or not order_id:
-            raise HTTPException(status_code=200, detail="Payment received but no user found")
-        return Response(
-            content=f"Webhook received: {event['type']}. Transation: {transaction_id}. Order: {order_id}",
-            media_type="application/json"
-        )
+        try:
+            transaction_id, order_id = await stripe_controller.add_transaction_from_new_payment_intent(
+                payment_intent_id=payment_intent.id,
+                stripe_account_id=stripe_account
+            )
+            if not transaction_id or not order_id:
+                raise HTTPException(status_code=200, detail="Payment received but no user found")
+            return Response(
+                content=f"Webhook received: {event['type']}. Transation: {transaction_id}. Order: {order_id}",
+                media_type="application/json"
+            )
+        except Exception:
+            return Response(content="Webhook received, payment received but not leadconex", media_type="application/json", status
     return Response(content="Webhook received, not subscription payment", media_type="application/json", status_code=200)
