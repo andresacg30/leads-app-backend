@@ -263,6 +263,7 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
             products.append(PurchasedProduct(product_id=prod.id, product_name=prod.name, quantity=quantity))
         order_type = "one_time"
     campaign_id = await campaign_controller.get_campaign_id_by_stripe_account_id(stripe_account_id)
+    current_user_balance = await user_controller.get_user_balance_by_agent_id(user.agent_id)
     created_transaction = await transaction_controller.create_transaction(
         TransactionModel(
             amount=payment_intent.amount / 100,
@@ -283,7 +284,8 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
             type=order_type,
         ),
         user,
-        products=products or None
+        products=products or None,
+        leftover_balance=current_user_balance
     )
 
     return created_transaction.inserted_id, created_order.inserted_id

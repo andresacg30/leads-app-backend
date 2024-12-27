@@ -133,7 +133,8 @@ async def get_all_agents(page, limit, sort, filter, user):
             "credentials": 1,
             "custom_fields": 1,
             "lead_price_override": 1,
-            "second_chance_lead_price_override": 1
+            "second_chance_lead_price_override": 1,
+            "distribution_type": 1
         }},
         {"$sort": {sort[0]: sort[1]}},
         {"$skip": (page - 1) * limit},
@@ -149,11 +150,11 @@ async def get_all_agents(page, limit, sort, filter, user):
 
 
 async def get_agent(id):
-    from app.controllers.user import get_user_balance
+    from app.controllers.user import get_user_balance_by_agent_id
     agent_collection = get_agent_collection()
     try:
         agent_in_db = await agent_collection.find_one({"_id": ObjectId(id)})
-        agent_balance = await get_user_balance(id)
+        agent_balance = await get_user_balance_by_agent_id(id)
         agent = AgentModel(**agent_in_db)
         agent.balance = agent_balance
         return agent
@@ -269,7 +270,8 @@ async def get_agents_with_balance(campaign: ObjectId):
                     "credentials": 1,
                     "custom_fields": 1,
                     "lead_price_override": 1,
-                    "second_chance_lead_price_override": 1
+                    "second_chance_lead_price_override": 1,
+                    "distribution_type": 1
                 }},
                 {"$match": {"balance": {"$gt": 0}}}
             ]
@@ -305,7 +307,8 @@ async def get_agents_with_open_orders(campaign_id: ObjectId):
             "credentials": 1,
             "custom_fields": 1,
             "lead_price_override": 1,
-            "second_chance_lead_price_override": 1
+            "second_chance_lead_price_override": 1,
+            "distribution_type": 1
         }}
     ]
     agents = await agent_collection.aggregate(pipeline).to_list(None)

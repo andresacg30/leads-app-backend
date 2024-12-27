@@ -30,14 +30,25 @@ class OrderIdInvalidError(Exception):
     pass
 
 
-async def create_order(order: OrderModel, user: UserModel, products: list = None):
+async def create_order(order: OrderModel, user: UserModel, products: list = None, leftover_balance: float = None):
     from app.controllers.campaign import get_one_campaign
     from app.controllers.agent import get_agent_by_field
     agent_in_db = await get_agent_by_field(_id=user.agent_id)
     agent = AgentModel(**agent_in_db)
     order_campaign = await get_one_campaign(str(order.campaign_id))
     order_collection = get_order_collection()
+    campaign_last_closed_order = await get_most_recent_closed_order_by_agent_and_campaign(str(user.agent_id), str(order.campaign_id))
+    campaign_last_open_order = await get_oldest_open_order_by_agent_and_campaign(str(user.agent_id), str(order.campaign_id))
     order = calculate_lead_amounts(order, order_campaign, agent, products)
+    if campaign_last_closed_order and not campaign_last_open_order:
+        added_fresh_leads, added_second_chance_leads = calculate_extra_leads_for_leftover_balance(
+            agent=agent,
+            order_campaign=order_campaign,
+            leftover_balance=leftover_balance,
+            order=order
+        )
+        order.fresh_lead_amount += added_fresh_leads
+        order.second_chance_lead_amount += added_second_chance_leads
     created_order = await order_collection.insert_one(
         order.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
@@ -118,26 +129,12 @@ async def get_oldest_open_order_by_agent_and_campaign(agent_id: str, campaign_id
     return order
 
 
-def calculate_lead_amounts(order: OrderModel, order_campaign: CampaignModel, agent: AgentModel, products: list = None):
-    if products:
-        for product in products:
-            if product.product_name not in ["Fresh Lead", "Aged Lead"]:
-                raise ValueError("Invalid product type")
-            if product.product_name == "Fresh Lead":
-                order.fresh_lead_amount = product.quantity
-            if product.product_name == "Aged Lead":
-                order.second_chance_lead_amount = product.quantity
-    else:
-        if agent.lead_price_override:
-            lead_price = agent.lead_price_override
-        else:
-            lead_price = order_campaign.price_per_lead
-        if agent.second_chance_lead_price_override:
-            second_chance_lead_price = agent.second_chance_lead_price_override
-        else:
-            second_chance_lead_price = order_campaign.price_per_second_chance_lead
-        order.fresh_lead_amount = math.floor((order.order_total * 0.8) / lead_price)
-        order.second_chance_lead_amount = math.floor((order.order_total * 0.2) / second_chance_lead_price)
+async def get_most_recent_closed_order_by_agent_and_campaign(agent_id: str, campaign_id: str):
+    order_collection = get_order_collection()
+    order_in_db = await order_collection.find_one(
+        {"agent_id": ObjectId(agent_id), "campaign_id": ObjectId(campaign_id), "status": "closed"}, sort=[("date", -1)]
+    )
+    order = OrderModel(**order_in_db) if order_in_db else None
     return order
 
 
@@ -153,3 +150,92 @@ async def get_second_chance_lead_count(order_id: str):
     lead_collection = get_lead_collection()
     lead_count = await lead_collection.count_documents({"second_chance_lead_order_id": ObjectId(order_id)})
     return lead_count
+
+
+def determine_distribution_type(order: OrderModel, agent: AgentModel) -> str:
+    """Determine distribution type based on order type and lead amounts."""
+    if order.type == "one_time":
+        if order.fresh_lead_amount > 0 and order.second_chance_lead_amount == 0:
+            return "fresh_only"
+        elif order.fresh_lead_amount == 0 and order.second_chance_lead_amount > 0:
+            return "second_chance_only"
+        return "mixed"
+    return agent.distribution_type
+
+
+def calculate_lead_amounts_by_distribution(
+    order_total: float,
+    lead_price: float,
+    second_chance_lead_price: float,
+    distribution_type: str
+) -> tuple[int, int]:
+    if distribution_type == "fresh_only":
+        return math.floor(order_total / lead_price), 0
+    elif distribution_type == "second_chance_only":
+        return 0, math.floor(order_total / second_chance_lead_price)
+    else:  # mixed
+        fresh_amount = math.floor((order_total * 0.8) / lead_price)
+        second_chance_amount = math.floor((order_total * 0.2) / second_chance_lead_price)
+        return fresh_amount, second_chance_amount
+
+
+def calculate_lead_amounts(order: OrderModel, order_campaign: CampaignModel, agent: AgentModel, products: list = None):
+    if products:
+        for product in products:
+            if product.product_name not in ["Fresh Lead", "Aged Lead"]:
+                raise ValueError("Invalid product type")
+            if product.product_name == "Fresh Lead":
+                order.fresh_lead_amount = product.quantity
+            if product.product_name == "Aged Lead":
+                order.second_chance_lead_amount = product.quantity
+    else:
+        lead_price = agent.lead_price_override or order_campaign.price_per_lead
+        second_chance_lead_price = agent.second_chance_lead_price_override or order_campaign.price_per_second_chance_lead
+
+        distribution_type = determine_distribution_type(order, agent)
+        fresh_amount, second_chance_amount = calculate_lead_amounts_by_distribution(
+            order_total=order.order_total,
+            lead_price=lead_price,
+            second_chance_lead_price=second_chance_lead_price,
+            distribution_type=distribution_type
+        )
+
+        order.fresh_lead_amount += fresh_amount
+        order.second_chance_lead_amount += second_chance_amount
+    return order
+
+
+def calculate_extra_leads_for_leftover_balance(
+    agent: AgentModel,
+    order_campaign: CampaignModel,
+    leftover_balance: float,
+    order: OrderModel
+) -> tuple[int, int]:
+    """Calculate extra leads based on order type and distribution preferences."""
+    price_per_lead = agent.lead_price_override or order_campaign.price_per_lead
+    price_per_second_chance_lead = (
+        agent.second_chance_lead_price_override or
+        order_campaign.price_per_second_chance_lead
+    )
+
+    distribution_type = determine_distribution_type(order, agent)
+
+    if distribution_type == "fresh_only":
+        fresh_leads = math.floor(leftover_balance / price_per_lead)
+        return fresh_leads, 0
+
+    if distribution_type == "second_chance_only":
+        second_chance_leads = math.floor(leftover_balance / price_per_second_chance_lead)
+        return 0, second_chance_leads
+
+    # Mixed distribution
+    fresh_leads = 0
+    second_chance_leads = 0
+    if leftover_balance >= price_per_lead:
+        fresh_leads = math.floor(leftover_balance / price_per_lead)
+        leftover_balance -= fresh_leads * price_per_lead
+
+    if leftover_balance >= price_per_second_chance_lead:
+        second_chance_leads = math.floor(leftover_balance / price_per_second_chance_lead)
+
+    return fresh_leads, second_chance_leads
