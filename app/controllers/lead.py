@@ -55,19 +55,19 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
                     lead[field] = formatter.format_string_to_utc_datetime(lead[field])
         ### TEMPORAL FOR OG CAMPAIGNS ###
         if lead.get("buyer_id"):
-            agent_most_recent_order = await get_oldest_open_order_by_agent_and_campaign(
+            agent_oldest_open_order = await get_oldest_open_order_by_agent_and_campaign(
                 agent_id=lead["buyer_id"],
                 campaign_id=lead["campaign_id"]
             )
-            if agent_most_recent_order:
-                lead["lead_order_id"] = agent_most_recent_order.id
+            if agent_oldest_open_order:
+                lead["lead_order_id"] = agent_oldest_open_order.id
         if lead.get("second_chance_buyer_id"):
-            agent_most_recent_order = await get_oldest_open_order_by_agent_and_campaign(
+            agent_oldest_open_order = await get_oldest_open_order_by_agent_and_campaign(
                 agent_id=lead["second_chance_buyer_id"],
                 campaign_id=lead["campaign_id"]
             )
-            if agent_most_recent_order:
-                lead["second_chance_lead_order_id"] = agent_most_recent_order.id
+            if agent_oldest_open_order:
+                lead["second_chance_lead_order_id"] = agent_oldest_open_order.id
         ### END TEMPORAL FOR OG CAMPAIGNS ###
         if len(lead) >= 1:
             update_result = await lead_collection.find_one_and_update(
@@ -566,7 +566,7 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
     if not agent:
         logger.warning(f"Agent {agent_id} not found")
         return
-    last_user_order = await order_controller.get_oldest_open_order_by_agent_and_campaign(
+    oldest_open_order = await order_controller.get_oldest_open_order_by_agent_and_campaign(
         agent_id=agent_id,
         campaign_id=campaign_id
     )
@@ -575,7 +575,7 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
         {"$set": {
             "buyer_id": agent_id_obj,
             "lead_sold_time": datetime.utcnow(),
-            "lead_order_id": last_user_order.id
+            "lead_order_id": oldest_open_order.id
         }}
     )
     if agent["lead_price_override"]:
@@ -592,9 +592,9 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
             lead_id=[ObjectId(id) for id in lead_ids]
         )
     )
-    if last_user_order.fresh_lead_completed >= last_user_order.fresh_lead_amount:
-        last_user_order.status = "closed"
-    await order_controller.update_order(last_user_order.id, last_user_order)
+    if oldest_open_order.fresh_lead_completed >= oldest_open_order.fresh_lead_amount:
+        oldest_open_order.status = "closed"
+    await order_controller.update_order(oldest_open_order.id, oldest_open_order)
     if result.modified_count == len(lead_ids):
         return True
     return False

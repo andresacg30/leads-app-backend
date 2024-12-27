@@ -73,6 +73,7 @@ class AgentModel(BaseModel):
     balance: float = Field(default=0)
     lead_price_override: Optional[float] = Field(default=None)
     second_chance_lead_price_override: Optional[float] = Field(default=None)
+    distribution_type: Optional[str] = Field(default="mixed")
     created_time: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     campaigns: List[PyObjectId] = Field(default_factory=list)
     credentials: AgentCredentials = Field(default_factory=AgentCredentials)
@@ -155,6 +156,7 @@ class UpdateAgentModel(BaseModel):
     campaigns: Optional[List[PyObjectId]] = None,
     lead_price_override: Optional[float] = Field(default=None)
     second_chance_lead_price_override: Optional[float] = Field(default=None)
+    distribution_type: Optional[str] = Field(default=None)
     credentials: Optional[AgentCredentials] = None
     custom_fields: Optional[dict] = None
     model_config = ConfigDict(
