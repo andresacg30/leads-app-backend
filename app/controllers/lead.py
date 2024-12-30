@@ -39,7 +39,7 @@ class LeadEmptyError(Exception):
 
 
 async def update_lead(id, lead: lead_model.UpdateLeadModel):
-    from app.controllers.order import get_oldest_open_order_by_agent_and_campaign, update_order
+    from app.controllers.order import get_oldest_open_order_by_agent_and_campaign, check_order_amounts_and_close
     from app.controllers.campaign import get_one_campaign
     from app.controllers.user import get_user_by_field, UserNotFoundError
     from app.controllers.transaction import create_transaction
@@ -80,6 +80,8 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
                 ### TEMPORAL FOR OG CAMPAIGNS ###
                 if "buyer_id" in lead or "second_chance_buyer_id" in lead:
                     if str(update_result["campaign_id"]) in constants.OG_CAMPAIGNS:
+                        if agent_oldest_open_order:
+                            await check_order_amounts_and_close(agent_oldest_open_order)
                         campaign = await get_one_campaign(str(update_result["campaign_id"]))
                         if "buyer_id" in lead and lead["buyer_id"]:
                             try:
@@ -517,10 +519,7 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
         )
         if current_lead_order:
             lead.lead_order_id = current_lead_order.id
-            if current_lead_order.fresh_lead_completed == current_lead_order.fresh_lead_amount:
-                current_lead_order.status = "closed"
-                current_lead_order.completed_date = datetime.utcnow()
-            await order_controller.update_order(current_lead_order.id, current_lead_order)
+            await order_controller.check_order_amounts_and_close(current_lead_order)
         result = await lead_collection.update_one(
             {"_id": ObjectId(lead_id)},
             {"$set": {
@@ -592,8 +591,7 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
             lead_id=[ObjectId(id) for id in lead_ids]
         )
     )
-    if oldest_open_order.fresh_lead_completed >= oldest_open_order.fresh_lead_amount:
-        oldest_open_order.status = "closed"
+    await order_controller.check_order_amounts_and_close(oldest_open_order)
     await order_controller.update_order(oldest_open_order.id, oldest_open_order)
     if result.modified_count == len(lead_ids):
         return True
