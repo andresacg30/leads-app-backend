@@ -183,7 +183,8 @@ async def create_lead(lead: lead_model.LeadModel):
         lead.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
     if str(lead.campaign_id) not in constants.OG_CAMPAIGNS:
-        lead_background_jobs.process_lead(lead, lead_id=new_lead.inserted_id)
+        if not lead.second_chance_buyer_id:
+            lead_background_jobs.process_lead(lead, lead_id=new_lead.inserted_id)
     return new_lead
 
 
