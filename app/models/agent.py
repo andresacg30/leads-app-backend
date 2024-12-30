@@ -14,15 +14,17 @@ class CRMModel(BaseModel):
     """
     name: Optional[str] = Field(default=None)
     url: Optional[str] = Field(default=None)
-    integration_details: Optional[Dict[str, Any]] = Field(default=None)
+    integration_details: Optional[Dict[str, Dict[str, Any]]] = Field(default=None)
 
     @root_validator(pre=True)
     def replace_invalid_with_empty_string(cls, values):
         integration_details = values.get('integration_details', {})
         if isinstance(integration_details, dict):
-            for key, value in integration_details.items():
-                if isinstance(value, float) and math.isnan(value):
-                    integration_details[key] = ""
+            for campaign_id, details_dict in integration_details.items():
+                if isinstance(details_dict, dict):
+                    for key, value in details_dict.items():
+                        if isinstance(value, float) and math.isnan(value):
+                            details_dict[key] = ""
         values['integration_details'] = integration_details
         return values
 
@@ -34,8 +36,14 @@ class CRMModel(BaseModel):
                 "name": "Ringy",
                 "url": "www.ringy.com",
                 "integration_details": {
-                    "auth_token": "value1",
-                    "sid": "value2"
+                    "5f9c0a9e9c6d4b1e9c6d4b1e": {
+                        "auth_token": "value1",
+                        "sid": "value2"
+                    },
+                    "5f9c0a9e9c6d4b1e9c6d4b1f": {
+                        "auth_token": "value3",
+                        "sid": "value4"
+                    }
                 }
             }
         }
