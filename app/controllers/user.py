@@ -53,8 +53,6 @@ async def validate_login(credentials: HTTPBasicCredentials = Depends(security)):
 async def create_user(user) -> user_model.UserModel:
     from app.integrations.stripe import create_customer
 
-    if not user["sign_up_codes"]:
-        raise HTTPException(status_code=400, detail="No sign up codes provided")
     agent_model = AgentModel(
         first_name=user["first_name"],
         last_name=user["last_name"],

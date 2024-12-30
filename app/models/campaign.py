@@ -17,6 +17,7 @@ class CampaignModel(BaseModel):
     sign_up_code: Optional[str] = Field(default=None)
     stripe_account_id: Optional[str] = Field(default=None)
     stripe_account_onboarding_url: Optional[str] = Field(default=None)
+    default: bool = Field(default=False)
     admin_id: PyObjectId = Field(default=None)
     price_per_lead: Optional[float] = Field(default=None)
     price_per_second_chance_lead: Optional[float] = Field(default=None)
@@ -56,6 +57,7 @@ class UpdateCampaignModel(BaseModel):
     sign_up_code: Optional[str] = None
     stripe_account_id: Optional[str] = None
     stripe_account_onboarding_url: Optional[str] = None
+    default: Optional[bool] = None
     admin_id: Optional[PyObjectId] = None
     price_per_lead: Optional[float] = None
     price_per_second_chance_lead: Optional[float] = None

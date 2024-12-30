@@ -228,12 +228,15 @@ async def user_signup(request: Request, user=Body(...)):
         )
     user["otp_code"] = _create_otp_code()
     user_campaigns = []
-    for sign_up_code in user["sign_up_codes"]:
-        try:
-            campaign = await campaign_controller.get_campaign_by_sign_up_code(sign_up_code)
-        except campaign_controller.CampaignNotFoundError:
-            raise HTTPException(status_code=404, detail=f"Sign up code {sign_up_code} not found")
-        user_campaigns.append(campaign)
+    if not user.get("sign_up_codes"):
+        user_campaigns.append(await campaign_controller.get_default_campaign())
+    else:
+        for sign_up_code in user["sign_up_codes"]:
+            try:
+                campaign = await campaign_controller.get_campaign_by_sign_up_code(sign_up_code)
+            except campaign_controller.CampaignNotFoundError:
+                raise HTTPException(status_code=404, detail=f"Sign up code {sign_up_code} not found")
+            user_campaigns.append(campaign)
     if any(campaign.status != "active" for campaign in user_campaigns):
         raise HTTPException(status_code=404, detail="Campaign is not active")
     user["campaigns"] = [campaign.id for campaign in user_campaigns]

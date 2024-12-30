@@ -22,6 +22,15 @@ class CampaignIdInvalidError(Exception):
     pass
 
 
+async def get_default_campaign() -> campaign_models.CampaignModel:
+    campaign_collection = get_campaign_collection()
+    campaign_in_db = await campaign_collection.find_one({"default": True})
+    if not campaign_in_db:
+        return None
+    campaign = campaign_models.CampaignModel(**campaign_in_db)
+    return campaign
+
+
 async def get_campaign_by_name(campaign_name: str):
     campaign_collection = get_campaign_collection()
     campaign = await campaign_collection.find_one({"name": campaign_name})
