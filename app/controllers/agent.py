@@ -225,7 +225,14 @@ def _filter_formatter_helper(filter):
             {"first_name": {"$regex": query_value, "$options": "i"}},
             {"last_name": {"$regex": query_value, "$options": "i"}},
             {"email": {"$regex": query_value, "$options": "i"}},
-            {"phone": {"$regex": query_value, "$options": "i"}}
+            {"phone": {"$regex": query_value, "$options": "i"}},
+            {"$expr": {
+                "$regexMatch": {
+                    "input": {"$concat": ["$first_name", " ", "$last_name"]},
+                    "regex": query_value,
+                    "options": "i"
+                }
+            }}
         ]
         filter.pop("q")
     if "created_time_gte" not in filter and "created_time_lte" not in filter:

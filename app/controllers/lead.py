@@ -287,7 +287,6 @@ def _format_second_chance_lead_sold_time_filter(filter):
 
 
 def build_query_filters(filter):
-    #  Whenever i wrote this code, God and I knew how it worked. Now God only knows. Good luck! Attempts to refactor: 69  <- Add yours
     if "q" in filter:
         query_value = filter["q"]
         query_filters = [
@@ -302,9 +301,9 @@ def build_query_filters(filter):
             filter["$or"] = query_filters
         filter.pop("q")
     if "buyer_id" in filter and filter["buyer_id"]:
-        filter["buyer_id"] = ObjectId(filter["buyer_id"])
+        filter["buyer_id"] = {"$in": [ObjectId(agent_id) for agent_id in filter["buyer_id"]]}
     if "second_chance_buyer_id" in filter and filter["second_chance_buyer_id"]:
-        filter["second_chance_buyer_id"] = ObjectId(filter["second_chance_buyer_id"])
+        filter["second_chance_buyer_id"] = {"$in": [ObjectId(agent_id) for agent_id in filter["second_chance_buyer_id"]]}
     if "lead_order_id" in filter:
         filter["lead_order_id"] = ObjectId(filter["lead_order_id"])
     if "second_chance_lead_order_id" in filter:
