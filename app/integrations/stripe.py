@@ -255,12 +255,11 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
         order_type = "recurring"
     else:
         products_metadata = payment_intent.metadata.get("products")
-        if not products_metadata:
-            return None, None
-        product_info = json.loads(products_metadata)
-        for product_id, quantity in product_info.items():
-            prod = stripe.Product.retrieve(product_id, stripe_account=stripe_account_id)
-            products.append(PurchasedProduct(product_id=prod.id, product_name=prod.name, quantity=quantity))
+        if products_metadata:
+            product_info = json.loads(products_metadata)
+            for product_id, quantity in product_info.items():
+                prod = stripe.Product.retrieve(product_id, stripe_account=stripe_account_id)
+                products.append(PurchasedProduct(product_id=prod.id, product_name=prod.name, quantity=quantity))
         order_type = "one_time"
     campaign_id = await campaign_controller.get_campaign_id_by_stripe_account_id(stripe_account_id)
     current_user_balance = await user_controller.get_user_balance_by_agent_id(user.agent_id)

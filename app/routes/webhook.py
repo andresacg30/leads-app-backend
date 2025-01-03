@@ -87,6 +87,6 @@ async def create_order_from_stripe_subscription_payment(
                 content=f"Webhook received: {event['type']}. Transation: {transaction_id}. Order: {order_id}",
                 media_type="application/json"
             )
-        except Exception:
-            return Response(content="Webhook received, payment received but not leadconex", media_type="application/json", status_code=200)
+        except Exception as e:
+            return Response(content=f"error: {e}", media_type="application/json", status_code=200)
     return Response(content="Webhook received, not subscription payment", media_type="application/json", status_code=200)

@@ -1,6 +1,7 @@
 import bson
 import logging
 import math
+import datetime
 
 from bson import ObjectId
 import bson.errors
@@ -239,3 +240,10 @@ def calculate_extra_leads_for_leftover_balance(
         second_chance_leads = math.floor(leftover_balance / price_per_second_chance_lead)
 
     return fresh_leads, second_chance_leads
+
+
+async def check_order_amounts_and_close(order: OrderModel):
+    if await order.fresh_lead_completed >= order.fresh_lead_amount and await order.second_chance_lead_completed >= order.second_chance_lead_amount:
+        order.status = "closed"
+        order.completed_date = datetime.datetime.utcnow()
+        await update_order(str(order.id), order)

@@ -40,7 +40,7 @@ class LeadEmptyError(Exception):
 
 
 async def update_lead(id, lead: lead_model.UpdateLeadModel):
-    from app.controllers.order import get_oldest_open_order_by_agent_and_campaign, update_order
+    from app.controllers.order import get_oldest_open_order_by_agent_and_campaign, check_order_amounts_and_close
     from app.controllers.campaign import get_one_campaign
     from app.controllers.user import get_user_by_field, UserNotFoundError
     from app.controllers.transaction import create_transaction
@@ -81,6 +81,8 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
                 ### TEMPORAL FOR OG CAMPAIGNS ###
                 if "buyer_id" in lead or "second_chance_buyer_id" in lead:
                     if str(update_result["campaign_id"]) in constants.OG_CAMPAIGNS:
+                        if agent_oldest_open_order:
+                            await check_order_amounts_and_close(agent_oldest_open_order)
                         campaign = await get_one_campaign(str(update_result["campaign_id"]))
                         if "buyer_id" in lead and lead["buyer_id"]:
                             try:
@@ -182,7 +184,8 @@ async def create_lead(lead: lead_model.LeadModel):
         lead.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
     if str(lead.campaign_id) not in constants.OG_CAMPAIGNS:
-        lead_background_jobs.process_lead(lead, lead_id=new_lead.inserted_id)
+        if not lead.second_chance_buyer_id:
+            lead_background_jobs.process_lead(lead, lead_id=new_lead.inserted_id)
     return new_lead
 
 
@@ -285,7 +288,6 @@ def _format_second_chance_lead_sold_time_filter(filter):
 
 
 def build_query_filters(filter):
-    #  Whenever i wrote this code, God and I knew how it worked. Now God only knows. Good luck! Attempts to refactor: 69  <- Add yours
     if "q" in filter:
         query_value = filter["q"]
         query_filters = [
@@ -300,9 +302,9 @@ def build_query_filters(filter):
             filter["$or"] = query_filters
         filter.pop("q")
     if "buyer_id" in filter and filter["buyer_id"]:
-        filter["buyer_id"] = ObjectId(filter["buyer_id"])
+        filter["buyer_id"] = {"$in": [ObjectId(agent_id) for agent_id in filter["buyer_id"]]}
     if "second_chance_buyer_id" in filter and filter["second_chance_buyer_id"]:
-        filter["second_chance_buyer_id"] = ObjectId(filter["second_chance_buyer_id"])
+        filter["second_chance_buyer_id"] = {"$in": [ObjectId(agent_id) for agent_id in filter["second_chance_buyer_id"]]}
     if "lead_order_id" in filter:
         filter["lead_order_id"] = ObjectId(filter["lead_order_id"])
     if "second_chance_lead_order_id" in filter:
@@ -518,9 +520,6 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
         )
         if current_lead_order:
             lead.lead_order_id = current_lead_order.id
-            if await current_lead_order.fresh_lead_completed == current_lead_order.fresh_lead_amount:
-                current_lead_order.status = "closed"
-                current_lead_order.completed_date = datetime.utcnow()
         agent_crm = crm_chooser(agent_to_distribute["CRM"]["name"])
         if agent_crm and agent_to_distribute["CRM"]["integration_details"]:
             agent_integration_details = agent_to_distribute["CRM"]["integration_details"][str(campaign.id)]
@@ -531,6 +530,7 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
             )
             agent_crm.push_lead(lead.crm_json())
             logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_to_distribute['_id']}")
+            
         result = await lead_collection.update_one(
             {"_id": ObjectId(lead_id)},
             {"$set": {
@@ -543,7 +543,7 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
             user = await user_controller.get_user_by_field(agent_id=agent_to_distribute["_id"])
             user_id = user.id
             if current_lead_order:
-                await order_controller.update_order(current_lead_order.id, current_lead_order)
+                await order_controller.check_order_amounts_and_close(current_lead_order)
             await transaction_controller.create_transaction(
                 TransactionModel(
                     user_id=user_id,
@@ -616,8 +616,8 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
             lead_id=[ObjectId(id) for id in lead_ids]
         )
     )
-    if await oldest_open_order.fresh_lead_completed >= oldest_open_order.fresh_lead_amount:
-        oldest_open_order.status = "closed"
+
+    await order_controller.check_order_amounts_and_close(oldest_open_order)
     await order_controller.update_order(oldest_open_order.id, oldest_open_order)
     if result.modified_count == len(lead_ids):
         return True
