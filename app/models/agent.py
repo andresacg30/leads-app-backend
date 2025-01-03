@@ -3,7 +3,7 @@ import math
 from bson import ObjectId
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator
 from pydantic import validator, field_validator
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
 from app.tools.modifiers import PyObjectId
 
@@ -24,7 +24,7 @@ class CRMModel(BaseModel):
     """
     name: Optional[str] = Field(default=None)
     url: Optional[str] = Field(default=None)
-    integration_details: Optional[Dict[str, List[IntegrationDetail]]] = Field(default=None)
+    integration_details: Optional[Dict[str, Union[List[IntegrationDetail], Dict[str, str]]]] = Field(default=None)
 
     @root_validator(pre=True)
     def replace_invalid_with_empty_string(cls, values):
