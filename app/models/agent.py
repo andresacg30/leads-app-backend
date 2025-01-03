@@ -24,18 +24,30 @@ class CRMModel(BaseModel):
     """
     name: Optional[str] = Field(default=None)
     url: Optional[str] = Field(default=None)
-    integration_details: Optional[Dict[str, Union[List[IntegrationDetail], Dict[str, str]]]] = Field(default=None)
+    integration_details: Optional[Dict[str, Union[List[IntegrationDetail], Dict[str, str], str]]] = Field(default=None)
 
     @root_validator(pre=True)
-    def replace_invalid_with_empty_string(cls, values):
+    def handle_integration_details(cls, values):
         integration_details = values.get('integration_details', {})
         if isinstance(integration_details, dict):
-            for campaign_id, details_dict in integration_details.items():
-                if isinstance(details_dict, dict):
-                    for key, value in details_dict.items():
+            for campaign_id, details in integration_details.items():
+                if isinstance(details, dict) and 'SID' in details:
+                    values['integration_details'][campaign_id] = [
+                        IntegrationDetail(
+                            auth_token=details.get('Auth Token', ''),
+                            sid=details.get('SID', ''),
+                            type='fresh'
+                        ),
+                        IntegrationDetail(
+                            auth_token=details.get('Second Chance Auth Token', ''),
+                            sid=details.get('Second Chance SID', ''),
+                            type='second_chance'
+                        )
+                    ]
+                elif isinstance(details, dict):
+                    for key, value in details.items():
                         if isinstance(value, float) and math.isnan(value):
-                            details_dict[key] = ""
-        values['integration_details'] = integration_details
+                            details[key] = ""
         return values
 
     model_config = ConfigDict(
