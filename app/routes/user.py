@@ -15,6 +15,7 @@ import app.integrations.stripe as stripe_integration
 from app.auth.jwt_handler import sign_jwt, decode_jwt
 from app.auth.jwt_bearer import get_current_user
 from app.background_jobs.job import cancel_job
+from app.models.agent import IntegrationDetailsUpdate
 from app.models.campaign import CampaignModel
 from app.models.user import UserSignIn, RefreshTokenRequest, UserModel, UserCollection
 from app.tools.constants import OTP_EXPIRATION
@@ -29,6 +30,51 @@ router = APIRouter()
 hash_helper = CryptContext(schemes=["bcrypt"])
 
 logger = logging.getLogger(__name__)
+
+
+@router.post(
+    "/update-integration-details/{campaign_id}",
+    response_description="Update user integration details",
+    response_model_by_alias=False
+)
+async def update_user_integration_details(campaign_id: str, request: IntegrationDetailsUpdate, user: UserModel = Depends(get_current_user)):
+    """
+    Update the integration details for the user's campaigns.
+    """
+    if not user.is_admin():
+        if not user.campaigns:
+            raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+    if user.is_admin():
+        campaigns = await campaign_controller.get_campaign_collection().find().to_list(None)
+        campaign_ids = [bson.ObjectId(campaign["_id"]) for campaign in campaigns]
+        user.campaigns = campaign_ids
+    if bson.ObjectId(campaign_id) not in user.campaigns:
+        raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+    await user_controller.update_user_integration_details(
+        user_id=user.id,
+        campaign_id=campaign_id,
+        integration_details=request.integration_details)
+    return {"message": "Integration details updated successfully"}
+
+
+@router.get(
+    "/get-user-integration-details/{campaign_id}",
+    response_description="Get user integration details",
+    response_model_by_alias=False
+)
+async def get_user_integration_details(campaign_id: str, user: UserModel = Depends(get_current_user)):
+    """
+    Get the integration details for the user's campaigns.
+    """
+    if not user.is_admin():
+        if not user.campaigns:
+            raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+    if user.is_admin():
+        campaigns = await campaign_controller.get_campaign_collection().find().to_list(None)
+        campaign_ids = [bson.ObjectId(campaign["_id"]) for campaign in campaigns]
+        user.campaigns = campaign_ids
+    integration_details = await user_controller.get_user_integration_details(user_id=user.id, campaign_id=campaign_id)
+    return {"data": integration_details}
 
 
 @router.get(

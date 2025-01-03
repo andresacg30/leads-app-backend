@@ -10,6 +10,7 @@ from motor.core import AgnosticCollection
 
 
 from app.db import Database
+from app.integrations import crm_chooser
 from app.background_jobs import lead as lead_background_jobs
 from app.models import lead as lead_model
 from app.models.transaction import TransactionModel
@@ -519,7 +520,17 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
         )
         if current_lead_order:
             lead.lead_order_id = current_lead_order.id
-            await order_controller.check_order_amounts_and_close(current_lead_order)
+        agent_crm = crm_chooser(agent_to_distribute["CRM"]["name"])
+        if agent_crm and agent_to_distribute["CRM"]["integration_details"]:
+            agent_integration_details = agent_to_distribute["CRM"]["integration_details"][str(campaign.id)]
+            fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')
+            fresh_creds.pop('type')
+            agent_crm = agent_crm(
+                integration_details=fresh_creds
+            )
+            agent_crm.push_lead(lead.crm_json())
+            logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_to_distribute['_id']}")
+            
         result = await lead_collection.update_one(
             {"_id": ObjectId(lead_id)},
             {"$set": {
@@ -531,6 +542,8 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
         if result.modified_count == 1:
             user = await user_controller.get_user_by_field(agent_id=agent_to_distribute["_id"])
             user_id = user.id
+            if current_lead_order:
+                await order_controller.check_order_amounts_and_close(current_lead_order)
             await transaction_controller.create_transaction(
                 TransactionModel(
                     user_id=user_id,
@@ -561,6 +574,18 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
     agent_id_obj = ObjectId(agent_id)
     agent = await agent_controller.get_agent_by_field(_id=agent_id_obj)
     user = await user_controller.get_user_by_field(agent_id=agent_id_obj)
+    agent_crm = crm_chooser(agent["CRM"]["name"])
+    if agent_crm and agent["CRM"]["integration_details"]:
+        agent_integration_details = agent["CRM"]["integration_details"][campaign_id]
+        fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')
+        fresh_creds.pop('type')
+        agent_crm = agent_crm(
+            integration_details=fresh_creds
+        )
+        for lead_id in lead_ids:
+            lead = await get_one_lead(lead_id)
+            agent_crm.push_lead(lead.crm_json())
+            logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_id}")
     user_id = user.id
     if not agent:
         logger.warning(f"Agent {agent_id} not found")
@@ -591,6 +616,7 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
             lead_id=[ObjectId(id) for id in lead_ids]
         )
     )
+
     await order_controller.check_order_amounts_and_close(oldest_open_order)
     await order_controller.update_order(oldest_open_order.id, oldest_open_order)
     if result.modified_count == len(lead_ids):

@@ -9,6 +9,7 @@ from motor.core import AgnosticCollection
 
 from app.auth import jwt_handler
 from app.db import Database
+from app.integrations.ringy import Ringy
 from app.resources import user_connections
 from app.controllers import agent as agent_controller
 from app.controllers import campaign as campaign_controller
@@ -362,3 +363,23 @@ async def get_active_users(user_campaigns, user):
     users = [user_model.UserModel(**user).to_json() for user in result]
     total = len(result)
     return users, total
+
+
+async def get_user_integration_details(user_id, campaign_id):
+    user_collection = get_user_collection()
+    user_in_db = await user_collection.find_one({"_id": bson.ObjectId(user_id)})
+    user = user_model.UserModel(**user_in_db)
+    agent = await agent_controller.get_agent(user.agent_id)
+    return agent.CRM.get_campaign_integration_details(campaign_id)
+
+
+async def update_user_integration_details(user_id, campaign_id, integration_details):
+    user_collection = get_user_collection()
+    user_in_db = await user_collection.find_one({"_id": bson.ObjectId(user_id)})
+    user = user_model.UserModel(**user_in_db)
+    agent = await agent_controller.get_agent(user.agent_id)
+    agent.CRM.update_integration_details(campaign_id, integration_details)
+    updated_agent = await agent_controller.update_agent(id=user.agent_id, agent=agent)
+    if not updated_agent:
+        raise Exception("Failed to update integration details")
+    return updated_agent
