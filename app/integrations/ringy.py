@@ -1,5 +1,9 @@
+import logging
 import requests
 from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
+
 
 class Ringy:
     """
@@ -10,9 +14,9 @@ class Ringy:
         sid (str): Session ID or unique identifier for the account.
     """
 
-    BASE_URL = "https://api.ringy.com"  # Example URL; adjust as needed.
+    BASE_URL = "https://app.ringy.com/api/public"
 
-    def __init__(self, auth_token: str, sid: str) -> None:
+    def __init__(self, integration_details: dict) -> None:
         """
         Initialize the Ringy integration with authentication details.
 
@@ -20,8 +24,8 @@ class Ringy:
             auth_token (str): The Ringy auth token.
             sid (str): The Ringy session ID or account ID.
         """
-        self.auth_token = auth_token
-        self.sid = sid
+        self.auth_token = integration_details.get("auth_token")
+        self.sid = integration_details.get("sid")
 
     def __str__(self) -> str:
         """
@@ -42,6 +46,12 @@ class Ringy:
         Returns:
             dict: The API response, possibly containing the new lead ID or an error.
         """
+        custom_fields = lead_data.pop('custom_fields', {}) or {}
+        lead_data.update(custom_fields)
+        lead_data.update({
+            "sid": self.sid,
+            "authToken": self.auth_token
+        })
         try:
             response = requests.post(
                 f"{self.BASE_URL}/leads/new-lead",
@@ -50,8 +60,10 @@ class Ringy:
                 timeout=10
             )
             response.raise_for_status()
+            logger.info(f"Ringy response: {response.json()}")
             return response.json()
         except requests.RequestException as exc:
+            logger.error(f"Error pushing lead to Ringy: {exc}")
             return {"error": str(exc)}
 
     def _get_headers(self) -> Dict[str, str]:

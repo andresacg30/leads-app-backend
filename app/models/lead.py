@@ -97,6 +97,18 @@ class LeadModel(BaseModel):
                 data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
         return data
 
+    def crm_json(self):
+        json_body = {
+            "full_name": self.full_name,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "email": self.email,
+            "phone_number": self.phone,
+            "state": self.state,
+            "custom_fields": self.custom_fields
+        }
+        return json_body
+
 
 class UpdateLeadModel(BaseModel):
     """

@@ -8,13 +8,23 @@ from typing import List, Optional, Dict, Any
 from app.tools.modifiers import PyObjectId
 
 
+class IntegrationDetail(BaseModel):
+    auth_token: str
+    sid: str
+    type: str
+
+
+class IntegrationDetailsUpdate(BaseModel):
+    integration_details: List
+
+
 class CRMModel(BaseModel):
     """
     Container for a single CRM record.
     """
     name: Optional[str] = Field(default=None)
     url: Optional[str] = Field(default=None)
-    integration_details: Optional[Dict[str, Dict[str, Any]]] = Field(default=None)
+    integration_details: Optional[Dict[str, List[IntegrationDetail]]] = Field(default=None)
 
     @root_validator(pre=True)
     def replace_invalid_with_empty_string(cls, values):
@@ -36,18 +46,56 @@ class CRMModel(BaseModel):
                 "name": "Ringy",
                 "url": "www.ringy.com",
                 "integration_details": {
-                    "5f9c0a9e9c6d4b1e9c6d4b1e": {
-                        "auth_token": "value1",
-                        "sid": "value2"
-                    },
-                    "5f9c0a9e9c6d4b1e9c6d4b1f": {
-                        "auth_token": "value3",
-                        "sid": "value4"
-                    }
+                    "5f9c0a9e9c6d4b1e9c6d4b1e": [
+                        {
+                            "auth_token": "value1",
+                            "sid": "value2",
+                            "type": "fresh"
+                        },
+                        {
+                            "auth_token": "value3",
+                            "sid": "value4",
+                            "type": "second_chance"
+                        }
+                    ],
+                    "5f9c0a9e9c6d4b1e9c6d4b1f": [
+                        {
+                            "auth_token": "value5",
+                            "sid": "value6",
+                            "type": "fresh"
+                        },
+                        {
+                            "auth_token": "value7",
+                            "sid": "value8",
+                            "type": "second_chance"
+                        }
+                    ]
                 }
             }
         }
     )
+
+    def get_campaign_integration_details(self, campaign_id: str) -> Dict[str, Any]:
+        """
+        Retrieve the integration details for a specific campaign.
+
+        Args:
+            campaign_id (str): The ID of the campaign to retrieve details for.
+
+        Returns:
+            dict: The integration details for the specified campaign.
+        """
+        return self.integration_details.get(campaign_id, {})
+
+    def update_integration_details(self, campaign_id: str, details: Dict[str, Any]) -> None:
+        """
+        Update the integration details for a specific campaign.
+
+        Args:
+            campaign_id (str): The ID of the campaign to update details for.
+            details (dict): The new integration details for the specified campaign.
+        """
+        self.integration_details[campaign_id] = details
 
 
 class CRMCollection(BaseModel):
