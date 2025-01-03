@@ -530,7 +530,6 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
             )
             agent_crm.push_lead(lead.crm_json())
             logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_to_distribute['_id']}")
-            
         result = await lead_collection.update_one(
             {"_id": ObjectId(lead_id)},
             {"$set": {
