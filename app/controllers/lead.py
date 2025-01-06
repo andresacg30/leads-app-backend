@@ -502,7 +502,7 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
     lead_collection = get_lead_collection()
     campaign = await campaign_controller.get_one_campaign(lead.campaign_id)
     lead_price = campaign.price_per_lead
-    agents_with_open_orders = await agent_controller.get_agents_with_open_orders(campaign_id=lead.campaign_id)
+    agents_with_open_orders = await agent_controller.get_agents_with_open_orders(campaign_id=lead.campaign_id, lead=lead)
     if not agents_with_open_orders:
         logger.warning(f"No agents with balance found for lead {lead_id}")
         return
@@ -520,7 +520,8 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
         )
         if current_lead_order:
             lead.lead_order_id = current_lead_order.id
-        agent_crm = crm_chooser(agent_to_distribute["CRM"]["name"])
+        if agent_to_distribute["CRM"]["name"]:
+            agent_crm = crm_chooser(agent_to_distribute["CRM"]["name"])
         if agent_crm and agent_to_distribute["CRM"]["integration_details"]:
             agent_integration_details = agent_to_distribute["CRM"]["integration_details"][str(campaign.id)]
             fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')
@@ -573,7 +574,8 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
     agent_id_obj = ObjectId(agent_id)
     agent = await agent_controller.get_agent_by_field(_id=agent_id_obj)
     user = await user_controller.get_user_by_field(agent_id=agent_id_obj)
-    agent_crm = crm_chooser(agent["CRM"]["name"])
+    if agent["CRM"]["name"]:
+        agent_crm = crm_chooser(agent["CRM"]["name"])
     if agent_crm and agent["CRM"]["integration_details"]:
         agent_integration_details = agent["CRM"]["integration_details"][campaign_id]
         fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')

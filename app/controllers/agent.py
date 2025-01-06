@@ -12,6 +12,7 @@ from app.controllers.campaign import get_campaign_collection
 from app.controllers.lead import get_lead_collection
 from app.models.agent import AgentModel, UpdateAgentModel
 from app.models.campaign import CampaignModel
+from app.models.lead import LeadModel
 
 
 def get_agent_collection() -> AgnosticCollection:
@@ -286,7 +287,7 @@ async def get_agents_with_balance(campaign: ObjectId):
     return agents
 
 
-async def get_agents_with_open_orders(campaign_id: ObjectId):
+async def get_agents_with_open_orders(campaign_id: ObjectId, lead: LeadModel):
     agent_collection = get_agent_collection()
     pipeline = [
         {"$match": {"campaigns": campaign_id}},
@@ -300,7 +301,48 @@ async def get_agents_with_open_orders(campaign_id: ObjectId):
             "path": "$orders",
             "preserveNullAndEmptyArrays": True
         }},
-        {"$match": {"orders.status": "open"}},
+        {"$lookup": {
+            "from": "lead",
+            "let": {"order_id": "$orders._id"},
+            "pipeline": [
+                {"$match": {
+                    "$and": [
+                        {"$expr": {"$eq": ["$lead_order_id", "$$order_id"]}},
+                        {"is_second_chance": False}
+                    ]
+                }},
+                {"$count": "fresh_lead_completed"}
+            ],
+            "as": "fresh_leads"
+        }},
+        {"$lookup": {
+            "from": "lead",
+            "let": {"order_id": "$orders._id"},
+            "pipeline": [
+                {"$match": {
+                    "$and": [
+                        {"$expr": {"$eq": ["$second_chance_order_id", "$$order_id"]}},
+                        {"is_second_chance": True}
+                    ]
+                }},
+                {"$count": "second_chance_completed"}
+            ],
+            "as": "second_chance_leads"
+        }},
+        {"$addFields": {
+            "fresh_completed": {"$ifNull": [{"$first": "$fresh_leads.fresh_lead_completed"}, 0]},
+            "second_completed": {"$ifNull": [{"$first": "$second_chance_leads.second_chance_completed"}, 0]}
+        }},
+        {"$match": {
+            "orders.status": "open",
+            "$expr": {
+                "$cond": {
+                    "if": {"$eq": [lead.is_second_chance, True]},
+                    "then": {"$lt": ["$second_completed", "$orders.second_chance_lead_amount"]},
+                    "else": {"$lt": ["$fresh_completed", "$orders.fresh_lead_amount"]}
+                }
+            }
+        }},
         {"$project": {
             "first_name": 1,
             "last_name": 1,
@@ -308,14 +350,8 @@ async def get_agents_with_open_orders(campaign_id: ObjectId):
             "phone": 1,
             "states_with_license": 1,
             "CRM": 1,
-            "balance": 1,
-            "created_time": 1,
-            "campaigns": 1,
-            "credentials": 1,
-            "custom_fields": 1,
-            "lead_price_override": 1,
-            "second_chance_lead_price_override": 1,
-            "distribution_type": 1
+            "fresh_completed": 1,
+            "second_completed": 1
         }}
     ]
     agents = await agent_collection.aggregate(pipeline).to_list(None)
