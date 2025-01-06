@@ -302,9 +302,12 @@ def build_query_filters(filter):
             filter["$or"] = query_filters
         filter.pop("q")
     if "buyer_id" in filter and filter["buyer_id"]:
-        filter["buyer_id"] = {"$in": [ObjectId(agent_id) for agent_id in filter["buyer_id"]]}
+        buyer_ids = filter["buyer_id"] if isinstance(filter["buyer_id"], list) else [filter["buyer_id"]]
+        filter["buyer_id"] = {"$in": [ObjectId(agent_id) for agent_id in buyer_ids]}
+
     if "second_chance_buyer_id" in filter and filter["second_chance_buyer_id"]:
-        filter["second_chance_buyer_id"] = {"$in": [ObjectId(agent_id) for agent_id in filter["second_chance_buyer_id"]]}
+        second_chance_buyer_ids = filter["second_chance_buyer_id"] if isinstance(filter["second_chance_buyer_id"], list) else [filter["second_chance_buyer_id"]]
+        filter["second_chance_buyer_id"] = {"$in": [ObjectId(agent_id) for agent_id in second_chance_buyer_ids]}
     if "lead_order_id" in filter:
         filter["lead_order_id"] = ObjectId(filter["lead_order_id"])
     if "second_chance_lead_order_id" in filter:
