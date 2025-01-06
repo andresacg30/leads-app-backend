@@ -31,23 +31,23 @@ class CRMModel(BaseModel):
         integration_details = values.get('integration_details', {})
         if isinstance(integration_details, dict):
             for campaign_id, details in integration_details.items():
-                if isinstance(details, dict) and 'SID' in details:
-                    values['integration_details'][campaign_id] = [
-                        IntegrationDetail(
-                            auth_token=details.get('Auth Token', ''),
-                            sid=details.get('SID', ''),
-                            type='fresh'
-                        ),
-                        IntegrationDetail(
-                            auth_token=details.get('Second Chance Auth Token', ''),
-                            sid=details.get('Second Chance SID', ''),
-                            type='second_chance'
-                        )
-                    ]
-                elif isinstance(details, dict):
+                if isinstance(details, dict):
                     for key, value in details.items():
                         if isinstance(value, float) and math.isnan(value):
                             details[key] = ""
+                    if 'SID' in details:
+                        values['integration_details'][campaign_id] = [
+                            IntegrationDetail(
+                                auth_token=details.get('Auth Token', ''),
+                                sid=details.get('SID', ''),
+                                type='fresh'
+                            ),
+                            IntegrationDetail(
+                                auth_token=details.get('Second Chance Auth Token', ''),
+                                sid=details.get('Second Chance SID', ''),
+                                type='second_chance'
+                            )
+                        ]
         return values
 
     model_config = ConfigDict(
