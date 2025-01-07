@@ -17,6 +17,7 @@ class TransactionModel(BaseModel):
     user_id: PyObjectId = Field(...)
     description: str = Field(default=None)
     notes: str = Field(default=None)
+    campaign_id: Optional[PyObjectId] = Field(default=None)
     lead_id: Optional[Union[PyObjectId, List[PyObjectId]]] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,

@@ -1,9 +1,14 @@
 import datetime
 from bson import ObjectId
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
 from app.tools.modifiers import PyObjectId
+
+
+class BalanceModel(BaseModel):
+    campaign_id: PyObjectId
+    balance: float
 
 
 class UserModel(BaseModel):
@@ -22,7 +27,7 @@ class UserModel(BaseModel):
     permissions: Optional[list[str]] = Field(default=None)
     campaigns: Optional[list[PyObjectId]] = Field(default=None)
     stripe_customer_ids: Optional[Dict[str, str]] = Field(default={})
-    balance: Optional[float] = Field(default=0)
+    balance: Optional[Union[List[BalanceModel], float, None]] = Field(default=list)
     email_verified: bool = Field(default=False)
     account_creation_task_id: Optional[str] = Field(default=None)
     otp_code: Optional[str] = Field(default=None)
@@ -39,7 +44,14 @@ class UserModel(BaseModel):
                 "region": "USA/Eastern",
                 "agent_id": "5f9c0a9e9c6d4b1e9c6d4b1e",
                 "permissions": ["user"],
-                "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e"]
+                "campaigns": ["5f9c0a9e9c6d4b1e9c6d4b1e"],
+                "stripe_customer_ids": {"5f9c0a9e9c6d4b1e9c6d4b1e": "cus_123456"},
+                "balance": [{"campaign_id": "5f9c0a9e9c6d4b1e9c6d4b1e", "balance": 100}],
+                "email_verified": False,
+                "account_creation_task_id": "5f9c0a9e9c6d4b1e9c6d4b1e",
+                "otp_code": "123456",
+                "otp_expiration": "2021-01-01T00:00:00",
+                "has_subscription": True
             }
         }
     )
@@ -148,7 +160,7 @@ class UserResponse(BaseModel):
     region: str
     phone: str
     agent_id: Optional[PyObjectId]
-    balance: float
+    balance: Union[List[BalanceModel], float]
     permissions: list[str]
     campaigns: list[PyObjectId]
     email_verified: bool
@@ -160,6 +172,8 @@ class UserResponse(BaseModel):
                 data[key] = str(value)
             elif isinstance(value, list):
                 data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
+                if key == "balance":
+                    data[key] = [{"campaign_id": str(v["campaign_id"]), "balance": v["balance"]} for v in value]
         return data
 
 

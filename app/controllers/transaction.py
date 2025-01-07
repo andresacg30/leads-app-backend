@@ -29,7 +29,7 @@ async def create_transaction(transaction: TransactionModel):
     created_transaction = await transaction_collection.insert_one(
         transaction.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
-    await user_controller.update_user_balance(transaction.user_id, transaction.amount)
+    await user_controller.update_user_balance(transaction.user_id, transaction.campaign_id, transaction.amount)
     return created_transaction
 
 

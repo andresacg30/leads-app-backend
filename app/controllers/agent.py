@@ -118,7 +118,17 @@ async def get_all_agents(page, limit, sort, filter, user):
             "states_with_license": 1,
             "CRM": 1,
             "balance": {
-                "$ifNull": ["$user_info.balance", 0]
+                "$cond": {
+                    "if": {"$isArray": "$user_info.balance"},
+                    "then": {
+                        "$reduce": {
+                            "input": "$user_info.balance",
+                            "initialValue": 0,
+                            "in": {"$add": ["$$value", "$$this.balance"]}
+                        }
+                    },
+                    "else": "$user_info.balance"
+                }
             },
             "has_subscription": {
                 "$ifNull": ["$user_info.has_subscription", False]
@@ -252,37 +262,44 @@ def _filter_formatter_helper(filter):
 async def get_agents_with_balance(campaign: ObjectId):
     agent_collection = get_agent_collection()
     pipeline = [
-                {"$match": {"campaigns": campaign}},
-                {"$lookup": {
-                    "from": "user",
-                    "localField": "_id",
-                    "foreignField": "agent_id",
-                    "as": "user_info"
-                    }},
-                {"$unwind": {
-                    "path": "$user_info",
-                    "preserveNullAndEmptyArrays": True
-                    }},
-                {"$project": {
-                    "first_name": 1,
-                    "last_name": 1,
-                    "email": 1,
-                    "phone": 1,
-                    "states_with_license": 1,
-                    "CRM": 1,
-                    "balance": {
-                        "$ifNull": ["$user_info.balance", 0]
-                        },
-                    "created_time": 1,
-                    "campaigns": 1,
-                    "credentials": 1,
-                    "custom_fields": 1,
-                    "lead_price_override": 1,
-                    "second_chance_lead_price_override": 1,
-                    "distribution_type": 1
-                }},
-                {"$match": {"balance": {"$gt": 0}}}
+        {"$match": {"campaigns": campaign}},
+        {"$lookup": {
+            "from": "user",
+            "localField": "_id",
+            "foreignField": "agent_id",
+            "as": "user_info"
+        }},
+        {"$unwind": {
+            "path": "$user_info",
+            "preserveNullAndEmptyArrays": True
+        }},
+        {"$unwind": {
+            "path": "$user_info.balance",
+            "preserveNullAndEmptyArrays": True
+        }},
+        {"$match": {
+            "$and": [
+                {"user_info.balance.campaign_id": campaign},
+                {"user_info.balance.balance": {"$gt": 0}}
             ]
+        }},
+        {"$project": {
+            "first_name": 1,
+            "last_name": 1,
+            "email": 1,
+            "phone": 1,
+            "states_with_license": 1,
+            "CRM": 1,
+            "balance": "$user_info.balance.balance",
+            "created_time": 1,
+            "campaigns": 1,
+            "credentials": 1,
+            "custom_fields": 1,
+            "lead_price_override": 1,
+            "second_chance_lead_price_override": 1,
+            "distribution_type": 1
+        }}
+    ]
     agents = await agent_collection.aggregate(pipeline).to_list(None)
     return agents
 
@@ -392,6 +409,17 @@ async def get_eligible_agents_for_lead_processing(
             }
         },
         {
+            "$unwind": {
+                "path": "$user_info.balance",
+                "preserveNullAndEmptyArrays": True
+            }
+        },
+        {
+            "$match": {
+                "user_info.balance.campaign_id": campaign_id
+            }
+        },
+        {
             "$project": {
                 "first_name": 1,
                 "last_name": 1,
@@ -399,9 +427,7 @@ async def get_eligible_agents_for_lead_processing(
                 "phone": 1,
                 "states_with_license": 1,
                 "CRM": 1,
-                "balance": {
-                    "$ifNull": ["$user_info.balance", 0]
-                },
+                "balance": "$user_info.balance.balance",
                 "created_time": 1,
                 "campaigns": 1,
                 "credentials": 1,
