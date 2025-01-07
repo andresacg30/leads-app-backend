@@ -138,7 +138,16 @@ async def onboard_new_campaign(request: Request, email: str = Body(..., embed=Tr
 @router.get("/get-current-balance")
 async def get_user_balance(user: UserModel = Depends(get_current_user)):
     user = await user_controller.get_user_by_field(email=user.email)
-    return {"balance": user.balance}
+    campaign_names = []
+    response = []
+    for campaign in user.balance:
+        campaign_model = await campaign_controller.get_one_campaign(campaign.campaign_id)
+        campaign_names.append(campaign_model.name)
+        response.append({
+            "campaign_name": campaign_model.name,
+            "balance": campaign.balance
+        })
+    return response
 
 
 @router.post("/verify-otp")

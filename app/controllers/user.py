@@ -144,14 +144,19 @@ async def activate_user(email):
     return user
 
 
-async def update_user_balance(user_id, amount):
+async def update_user_balance(user_id, campaign_id, amount):
     user_collection = get_user_collection()
-    user = await user_collection.find_one_and_update(
-        {"_id": bson.ObjectId(user_id)},
-        {"$inc": {"balance": amount}},
-        return_document=True
-    )
-    return user
+    user = await user_collection.find_one({"_id": bson.ObjectId(user_id)})
+    if not user:
+        raise UserNotFoundError(f"User with id {user_id} not found")
+    balance = user.get("balance", [])
+    for campaign in balance:
+        if campaign["campaign_id"] == campaign_id:
+            campaign["balance"] += amount
+            break
+    else:
+        balance.append({"campaign_id": campaign_id, "balance": amount})
+    await user_collection.update_one({"_id": bson.ObjectId(user_id)}, {"$set": {"balance": balance}})
 
 
 async def user_change_stream_listener():
@@ -173,6 +178,8 @@ async def user_change_stream_listener():
                     updated_fields = change['updateDescription']['updatedFields']
                     balance = updated_fields.get('balance')
                     if balance is not None:
+                        for campaign in balance:
+                            campaign['campaign_id'] = str(campaign['campaign_id'])
                         data = {'balance': balance}
                         if user_id in user_connections:
                             logger.info(f"Sending data to user {user_id}: {data}")
@@ -211,7 +218,7 @@ async def check_user_is_verified_and_delete(user_id):
 async def get_user_balance_by_agent_id(id: str):
     user_collection = get_user_collection()
     user = await user_collection.find_one({"agent_id": bson.ObjectId(id)}) or {}
-    return user.get("balance") or 0
+    return user.get("balance") or []
 
 
 async def get_all_users(page, limit, sort, filter):

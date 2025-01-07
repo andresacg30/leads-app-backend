@@ -165,7 +165,7 @@ async def list_agents(
             if not user.campaigns:
                 raise HTTPException(status_code=404, detail="User does not have access to this campaign")
             filter["user_campaigns"] = [bson.ObjectId(campaign) for campaign in user.campaigns]
-        sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
+        sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]            
         agents, total = await agent_controller.get_all_agents(page=page, limit=limit, sort=sort, filter=filter, user=user)
         return {"data": list(agent.to_json() for agent in AgentCollection(data=agents).data), "total": total}
     except ValueError as e:

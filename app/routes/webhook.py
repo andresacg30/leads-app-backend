@@ -84,7 +84,7 @@ async def create_order_from_stripe_subscription_payment(
             if not transaction_id or not order_id:
                 raise HTTPException(status_code=200, detail="Payment received but no user found")
             return Response(
-                content=f"Webhook received: {event['type']}. Transation: {transaction_id}. Order: {order_id}",
+                content=f"Webhook received: {event['type']}. Transaction: {transaction_id}. Order: {order_id}",
                 media_type="application/json"
             )
         except Exception as e:

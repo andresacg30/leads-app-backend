@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, roo
 from pydantic import validator, field_validator
 from typing import List, Optional, Dict, Any, Union
 
+from app.models.user import BalanceModel
 from app.tools.modifiers import PyObjectId
 
 
@@ -138,7 +139,7 @@ class AgentModel(BaseModel):
     phone: str = Field(...)
     states_with_license: List = Field(...)
     CRM: CRMModel = Field(default_factory=CRMModel)
-    balance: float = Field(default=0)
+    balance: Union[List[BalanceModel], float, None] = Field(default_factory=list)
     lead_price_override: Optional[float] = Field(default=None)
     second_chance_lead_price_override: Optional[float] = Field(default=None)
     distribution_type: Optional[str] = Field(default="mixed")
@@ -207,6 +208,8 @@ class AgentModel(BaseModel):
                 data[key] = str(value)
             elif isinstance(value, list):
                 data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
+                if key == 'balance':
+                    data[key] = [{"campaign_id": str(v['campaign_id']), "balance": v['balance']} for v in value]
         return data
 
 

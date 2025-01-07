@@ -95,9 +95,9 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
                                             description="Fresh Lead sent",
                                             type="debit",
                                             date=datetime.utcnow(),
-                                            lead_id=ObjectId(id)
+                                            lead_id=ObjectId(id),
+                                            campaign_id=lead.campaign_id)
                                         )
-                                    )
                             except UserNotFoundError:
                                 pass
                         if "second_chance_buyer_id" in lead and lead["second_chance_buyer_id"]:
@@ -111,7 +111,8 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
                                             description="Second Chance Lead purchase",
                                             type="debit",
                                             date=datetime.utcnow(),
-                                            lead_id=ObjectId(id)
+                                            lead_id=ObjectId(id),
+                                            campaign_id=lead.campaign_id
                                         )
                                     )
                             except UserNotFoundError:
@@ -554,7 +555,8 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
                     description="Fresh Lead purchase",
                     type="debit",
                     date=datetime.utcnow(),
-                    lead_id=ObjectId(lead_id)
+                    lead_id=ObjectId(lead_id),
+                    campaign_id=lead.campaign_id
                 )
             )
 
@@ -617,7 +619,8 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
             description="Leads sent by agency",
             type="debit",
             date=datetime.utcnow(),
-            lead_id=[ObjectId(id) for id in lead_ids]
+            lead_id=[ObjectId(id) for id in lead_ids],
+            campaign_id=campaign_id
         )
     )
 
