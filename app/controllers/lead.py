@@ -96,7 +96,7 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
                                             type="debit",
                                             date=datetime.utcnow(),
                                             lead_id=ObjectId(id),
-                                            campaign_id=lead.campaign_id)
+                                            campaign_id=lead.get("campaign_id"))
                                         )
                             except UserNotFoundError:
                                 pass
@@ -112,7 +112,7 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
                                             type="debit",
                                             date=datetime.utcnow(),
                                             lead_id=ObjectId(id),
-                                            campaign_id=lead.campaign_id
+                                            campaign_id=lead.get("campaign_id")
                                         )
                                     )
                             except UserNotFoundError:
