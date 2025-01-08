@@ -56,3 +56,36 @@ async def update_agent_balance():
 
     result = await agents_collection.bulk_write(updates)
     print(f"Agent balances updated successfully. Result: {result}")
+    
+    
+async def fix_user_balance():
+    from app.controllers.user import get_user_collection
+    
+    users_collection = get_user_collection()
+    updates = []
+    
+    users = await users_collection.find().to_list(None)
+    
+    for user in users:
+        balance = user.get("balance", [])
+        if not balance or not isinstance(balance, list):
+            continue
+            
+        first_balance = balance[0]
+        if isinstance(first_balance.get("balance"), list):
+            # Fix the nested balance
+            correct_balance = first_balance["balance"][0]["balance"]
+            new_balance = [{"campaign_id": first_balance["campaign_id"], "balance": correct_balance}]
+            
+            updates.append(UpdateOne(
+                {"_id": user.get("_id")},
+                {"$set": {"balance": new_balance}}
+            ))
+    
+    if updates:
+        result = await users_collection.bulk_write(updates)
+        print(f"User balances fixed successfully. Result: {result}")
+    else:
+        print("No balances needed fixing")
+    
+    

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Body, status, HTTPException, Depends
 from fastapi.responses import Response
 
 import app.controllers.agent as agent_controller
-import app.controllers.campaign as campaign_controller
+import app.controllers.user as user_controller
 
 from app.auth.jwt_bearer import get_current_user
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
@@ -16,6 +16,41 @@ from app.tools import mappings, formatters
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
+
+
+@router.post(
+    "/refund-credit",
+    response_description="Refund credit to agent",
+    response_model_by_alias=False
+)
+async def refund_credit_to_agent(
+    campaign_id: str = Body(...),
+    agent_id: str = Body(...),
+    amount: float = Body(...),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Refund credit to agent
+    """
+    if user.is_agent():
+        raise HTTPException(status_code=404, detail="User does not have permission to refund credit to agent")
+    try:
+        agent_user = await user_controller.get_user_by_field(agent_id=bson.ObjectId(agent_id))
+        if not agent_user.is_agent():
+            if agent_user.is_new_user():
+                await user_controller.change_user_permissions(agent_user.id, ["agent"])
+            else:
+                raise HTTPException(status_code=404, detail="User is not an agent")
+        created_transaccion, created_order = await user_controller.refund_credit(
+            campaign_id=campaign_id,
+            user=agent_user,
+            amount=amount
+        )
+        return {"transaction_id": str(created_transaccion.inserted_id), "order_id": str(created_order.inserted_id) if created_order else None}
+    except user_controller.UserNotFoundError:
+        raise HTTPException(status_code=404, detail="Agent does not have an user associated with it")
+    except user_controller.RefundError as e:
+        raise HTTPException(status_code=400, detail=str(f"Error refunding: {e}"))
 
 
 @router.post(

@@ -3,4 +3,4 @@ import asyncio
 
 
 if __name__ == "__main__":
-    asyncio.run(change_balance_to_list.update_agent_balance())
+    asyncio.run(change_balance_to_list.fix_user_balance())
