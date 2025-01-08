@@ -161,6 +161,8 @@ def determine_distribution_type(order: OrderModel, agent: AgentModel) -> str:
         elif order.fresh_lead_amount == 0 and order.second_chance_lead_amount > 0:
             return "second_chance_only"
         return "mixed"
+    elif order.type == "refund":
+        return "fresh_only"
     return agent.distribution_type
 
 

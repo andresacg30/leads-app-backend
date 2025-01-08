@@ -13,6 +13,7 @@ from app.controllers.lead import get_lead_collection
 from app.models.agent import AgentModel, UpdateAgentModel
 from app.models.campaign import CampaignModel
 from app.models.lead import LeadModel
+from app.models.transaction import TransactionModel
 
 
 def get_agent_collection() -> AgnosticCollection:
@@ -117,7 +118,8 @@ async def get_all_agents(page, limit, sort, filter, user):
             "phone": 1,
             "states_with_license": 1,
             "CRM": 1,
-            "balance": {
+            "balance": "$user_info.balance",
+            "balance_total": {
                 "$cond": {
                     "if": {"$isArray": "$user_info.balance"},
                     "then": {

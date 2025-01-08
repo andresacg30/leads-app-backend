@@ -140,6 +140,7 @@ class AgentModel(BaseModel):
     states_with_license: List = Field(...)
     CRM: CRMModel = Field(default_factory=CRMModel)
     balance: Union[List[BalanceModel], float, None] = Field(default_factory=list)
+    balance_total: Optional[float] = Field(default=None)
     lead_price_override: Optional[float] = Field(default=None)
     second_chance_lead_price_override: Optional[float] = Field(default=None)
     distribution_type: Optional[str] = Field(default="mixed")

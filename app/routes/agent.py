@@ -24,8 +24,9 @@ router = APIRouter(prefix="/api/agent", tags=["agent"])
     response_model_by_alias=False
 )
 async def refund_credit_to_agent(
+    campaign_id: str = Body(...),
     agent_id: str = Body(...),
-    credit: float = Body(...),
+    amount: float = Body(...),
     user: UserModel = Depends(get_current_user)
 ):
     """
@@ -33,14 +34,23 @@ async def refund_credit_to_agent(
     """
     if user.is_agent():
         raise HTTPException(status_code=404, detail="User does not have permission to refund credit to agent")
-    agent_user = await user_controller.get_user_by_field(_id=bson.ObjectId(agent_id))
-    if not agent_user:
+    try:
+        agent_user = await user_controller.get_user_by_field(agent_id=bson.ObjectId(agent_id))
+        if not agent_user.is_agent():
+            if agent_user.is_new_user():
+                await user_controller.change_user_permissions(agent_user.id, ["agent"])
+            else:
+                raise HTTPException(status_code=404, detail="User is not an agent")
+        created_transaccion, created_order = await user_controller.refund_credit(
+            campaign_id=campaign_id,
+            user=agent_user,
+            amount=amount
+        )
+        return {"transaction_id": str(created_transaccion.inserted_id), "order_id": str(created_order.inserted_id) if created_order else None}
+    except user_controller.UserNotFoundError:
         raise HTTPException(status_code=404, detail="Agent does not have an user associated with it")
-    if not agent_user.is_agent():
-        raise HTTPException(status_code=404, detail="User is not an agent")
-    if not agent_user.balance:
-        pass
-    
+    except user_controller.RefundError as e:
+        raise HTTPException(status_code=400, detail=str(f"Error refunding: {e}"))
 
 
 @router.post(
