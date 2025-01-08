@@ -29,26 +29,34 @@ class CRMModel(BaseModel):
 
     @root_validator(pre=True)
     def handle_integration_details(cls, values):
+        def clean_nan_values(obj):
+            if isinstance(obj, dict):
+                return {k: clean_nan_values(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [clean_nan_values(v) for v in obj]
+            elif isinstance(obj, float) and math.isnan(obj):
+                return None
+            return obj
+
         integration_details = values.get('integration_details', {})
         if isinstance(integration_details, dict):
+            integration_details = clean_nan_values(integration_details)
+
             for campaign_id, details in integration_details.items():
-                if isinstance(details, dict):
-                    for key, value in details.items():
-                        if isinstance(value, float) and math.isnan(value):
-                            details[key] = ""
-                    if 'SID' in details:
-                        values['integration_details'][campaign_id] = [
-                            IntegrationDetail(
-                                auth_token=details.get('Auth Token', ''),
-                                sid=details.get('SID', ''),
-                                type='fresh'
-                            ),
-                            IntegrationDetail(
-                                auth_token=details.get('Second Chance Auth Token', ''),
-                                sid=details.get('Second Chance SID', ''),
-                                type='second_chance'
-                            )
-                        ]
+                if isinstance(details, dict) and 'SID' in details:
+                    values['integration_details'][campaign_id] = [
+                        IntegrationDetail(
+                            auth_token=details.get('Auth Token', ''),
+                            sid=details.get('SID', ''),
+                            type='fresh'
+                        ),
+                        IntegrationDetail(
+                            auth_token=details.get('Second Chance Auth Token', ''),
+                            sid=details.get('Second Chance SID', ''),
+                            type='second_chance'
+                        )
+                    ]
+        values['integration_details'] = integration_details
         return values
 
     model_config = ConfigDict(
