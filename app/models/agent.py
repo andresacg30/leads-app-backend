@@ -25,7 +25,7 @@ class CRMModel(BaseModel):
     """
     name: Optional[str] = Field(default=None)
     url: Optional[str] = Field(default=None)
-    integration_details: Optional[Dict[str, Union[List[IntegrationDetail], Dict[str, str], str]]] = Field(default=None)
+    integration_details: Optional[Dict[str, Union[List[IntegrationDetail, str, float, None], Dict[str, str], str]]] = Field(default=None)
 
     @root_validator(pre=True)
     def handle_integration_details(cls, values):
