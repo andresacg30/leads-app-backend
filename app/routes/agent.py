@@ -7,7 +7,7 @@ from fastapi import APIRouter, Body, status, HTTPException, Depends
 from fastapi.responses import Response
 
 import app.controllers.agent as agent_controller
-import app.controllers.campaign as campaign_controller
+import app.controllers.user as user_controller
 
 from app.auth.jwt_bearer import get_current_user
 from app.models.agent import AgentModel, UpdateAgentModel, AgentCollection
@@ -16,6 +16,31 @@ from app.tools import mappings, formatters
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
+
+
+@router.post(
+    "/refund-credit",
+    response_description="Refund credit to agent",
+    response_model_by_alias=False
+)
+async def refund_credit_to_agent(
+    agent_id: str = Body(...),
+    credit: float = Body(...),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Refund credit to agent
+    """
+    if user.is_agent():
+        raise HTTPException(status_code=404, detail="User does not have permission to refund credit to agent")
+    agent_user = await user_controller.get_user_by_field(_id=bson.ObjectId(agent_id))
+    if not agent_user:
+        raise HTTPException(status_code=404, detail="Agent does not have an user associated with it")
+    if not agent_user.is_agent():
+        raise HTTPException(status_code=404, detail="User is not an agent")
+    if not agent_user.balance:
+        pass
+    
 
 
 @router.post(
