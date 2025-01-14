@@ -27,7 +27,7 @@ class UserModel(BaseModel):
     permissions: Optional[list[str]] = Field(default=None)
     campaigns: Optional[list[PyObjectId]] = Field(default=None)
     stripe_customer_ids: Optional[Dict[str, str]] = Field(default={})
-    balance: Optional[Union[List[BalanceModel], float, None]] = Field(default=list)
+    balance: Optional[Union[List[BalanceModel], float, None]] = Field(default=[])
     email_verified: bool = Field(default=False)
     account_creation_task_id: Optional[str] = Field(default=None)
     otp_code: Optional[str] = Field(default=None)
