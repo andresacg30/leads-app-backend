@@ -107,7 +107,8 @@ async def create_checkout_session(
             cancel_url=f"{settings.frontend_url}/#/",
             customer=user.stripe_customer_ids.get(campaign_id),
             stripe_account=stripe_account_id,
-            consent_collection={"terms_of_service": "required"}
+            consent_collection={"terms_of_service": "required"},
+            allow_promotion_codes=True
         )
 
     return checkout_session

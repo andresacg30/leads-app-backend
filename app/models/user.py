@@ -94,6 +94,8 @@ class UserModel(BaseModel):
                 data[key] = str(value)
             elif isinstance(value, list):
                 data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
+                if key == 'balance':
+                    data[key] = [{"campaign_id": str(v['campaign_id']), "balance": v['balance']} for v in value]
         return data
 
     async def get_campaigns(self):
