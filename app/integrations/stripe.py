@@ -264,6 +264,7 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
         order_type = "one_time"
     campaign_id = await campaign_controller.get_campaign_id_by_stripe_account_id(stripe_account_id)
     current_user_balance = await user_controller.get_user_balance_by_agent_id(user.agent_id)
+    campaign_balance = 0
     for campaign in current_user_balance:
         if campaign.get("campaign_id") == campaign_id:
             campaign_balance = campaign.get("balance")
