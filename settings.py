@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     stripe_self_account: str = os.environ.get("STRIPE_SELF_ACCOUNT_ID")
     stripe_payment_endpoint_secret: Optional[str] = os.environ.get("STRIPE_PAYMENT_ENDPOINT_SECRET") or None
     stripe_self_account_payment_endpoint_secret: Optional[str] = os.environ.get("STRIPE_SELF_ACCOUNT_PAYMENT_ENDPOINT_SECRET") or None
+    stripe_cancel_subscription_endpoint_secret: Optional[str] = os.environ.get("STRIPE_CANCEL_SUBSCRIPTION_ENDPOINT_SECRET") or None
 
 
 class RedisSettings(BaseSettings):

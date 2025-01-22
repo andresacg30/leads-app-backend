@@ -5,15 +5,18 @@ import difflib
 from bson import ObjectId
 import bson.errors
 from pymongo import ReturnDocument
+from typing import List, Dict
 from motor.core import AgnosticCollection
 
 from app.db import Database
 from app.controllers.campaign import get_campaign_collection
-from app.controllers.lead import get_lead_collection
+from app.controllers.order import get_order_collection
 from app.models.agent import AgentModel, UpdateAgentModel
 from app.models.campaign import CampaignModel
 from app.models.lead import LeadModel
+from app.models.order import OrderModel
 from app.models.transaction import TransactionModel
+from app.models.user import UserModel
 
 
 def get_agent_collection() -> AgnosticCollection:
@@ -381,7 +384,8 @@ async def get_eligible_agents_for_lead_processing(
     states,
     lead_count,
     second_chance_lead_count,
-    campaign_id
+    campaign_id,
+    is_second_chance=False
 ):
     campaign_collection = get_campaign_collection()
     campaign_in_db = await campaign_collection.find_one({"_id": campaign_id})
@@ -419,6 +423,76 @@ async def get_eligible_agents_for_lead_processing(
         {
             "$match": {
                 "user_info.balance.campaign_id": campaign_id
+            }
+        },
+        {
+            "$lookup": {
+                "from": "order",
+                "let": {"agent_id": "$_id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {"$eq": ["$agent_id", "$$agent_id"]},
+                            "status": "open",
+                            "campaign_id": campaign_id
+                        }
+                    },
+                    {
+                        "$lookup": {
+                            "from": "lead",
+                            "let": {"order_id": "$_id"},
+                            "pipeline": [
+                                {
+                                    "$match": {
+                                        "$expr": {"$eq": ["$lead_order_id", "$$order_id"]}
+                                    }
+                                },
+                                {"$count": "fresh_count"}
+                            ],
+                            "as": "fresh_leads"
+                        }
+                    },
+                    {
+                        "$lookup": {
+                            "from": "lead",
+                            "let": {"order_id": "$_id"},
+                            "pipeline": [
+                                {
+                                    "$match": {
+                                        "$expr": {"$eq": ["$second_chance_lead_order_id", "$$order_id"]}
+                                    }
+                                },
+                                {"$count": "second_chance_count"}
+                            ],
+                            "as": "second_chance_leads"
+                        }
+                    },
+                    {
+                        "$addFields": {
+                            "fresh_completed": {"$ifNull": [{"$first": "$fresh_leads.fresh_count"}, 0]},
+                            "second_completed": {"$ifNull": [{"$first": "$second_chance_leads.second_chance_count"}, 0]}
+                        }
+                    },
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$cond": {
+                                    "if": {"$eq": [is_second_chance, True]},
+                                    "then": {"$lt": ["$second_completed", "$second_chance_lead_amount"]},
+                                    "else": {"$lt": ["$fresh_completed", "$fresh_lead_amount"]}
+                                }
+                            }
+                        }
+                    },
+                    {"$sort": {"created_time": 1}},
+                    {"$limit": 1}
+                ],
+                "as": "open_orders"
+            }
+        },
+        {
+            "$match": {
+                "open_orders": {"$ne": []}
             }
         },
         {
@@ -469,3 +543,32 @@ async def get_eligible_agents_for_lead_processing(
     ]
     agents = await agent_collection.aggregate(pipeline).to_list(None)
     return agents
+
+
+async def get_agent_metrics(campaigns: List[bson.ObjectId]) -> Dict[str, int]:
+    from app.controllers.user import get_user_collection
+
+    agent_collection = get_agent_collection()
+    user_collection = get_user_collection()
+
+    query = {
+        "campaigns": {"$in": campaigns}
+    }
+    total_agents = await agent_collection.count_documents(query)
+    agents_in_db = await agent_collection.find(query).limit(10).sort([("created_time", -1)]).to_list(None)
+    agents = [AgentModel(**agent).to_json() for agent in agents_in_db]
+
+    active_query = {
+        **query,
+        "has_subscription": True
+    }
+    active_agents_total = await user_collection.count_documents(active_query)
+    active_agents_in_db = await user_collection.find(active_query).sort([("created_time", -1)]).to_list(None)
+    active_agents = [UserModel(**agent).to_json() for agent in active_agents_in_db]
+
+    return {
+        "agents": agents,
+        "total_agents": total_agents,
+        "active_agents": active_agents,
+        "active_agents_total": active_agents_total,
+    }

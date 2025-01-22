@@ -6,6 +6,7 @@ import datetime
 from bson import ObjectId
 import bson.errors
 from pymongo import ReturnDocument
+from typing import List, Dict, Optional
 from motor.core import AgnosticCollection
 
 from app.db import Database
@@ -39,9 +40,10 @@ async def create_order(order: OrderModel, user: UserModel, products: list = None
     order_campaign = await get_one_campaign(str(order.campaign_id))
     order_collection = get_order_collection()
     campaign_last_closed_order = await get_most_recent_closed_order_by_agent_and_campaign(str(user.agent_id), str(order.campaign_id))
-    campaign_last_open_order = await get_oldest_open_order_by_agent_and_campaign(str(user.agent_id), str(order.campaign_id))
+    campaign_last_open_order_fresh = await get_oldest_open_order_by_agent_and_campaign(str(user.agent_id), str(order.campaign_id), is_second_chance=False)
+    campaign_last_open_order_second_chance = await get_oldest_open_order_by_agent_and_campaign(str(user.agent_id), str(order.campaign_id), is_second_chance=True)
     order = calculate_lead_amounts(order, order_campaign, agent, products)
-    if campaign_last_closed_order and not campaign_last_open_order:
+    if campaign_last_closed_order and not (campaign_last_open_order_fresh or campaign_last_open_order_second_chance):
         added_fresh_leads, added_second_chance_leads = calculate_extra_leads_for_leftover_balance(
             agent=agent,
             order_campaign=order_campaign,
@@ -121,13 +123,87 @@ async def get_oldest_open_order_by_agent(agent_id: str):
     return order
 
 
-async def get_oldest_open_order_by_agent_and_campaign(agent_id: str, campaign_id: str):
+async def get_oldest_open_order_by_agent_and_campaign(
+    agent_id: str,
+    campaign_id: str,
+    is_second_chance: bool = False
+) -> Optional[OrderModel]:
     order_collection = get_order_collection()
-    order_in_db = await order_collection.find_one(
-        {"agent_id": ObjectId(agent_id), "campaign_id": ObjectId(campaign_id), "status": "open"}, sort=[("date", 1)]
-    )
-    order = OrderModel(**order_in_db) if order_in_db else None
-    return order
+
+    pipeline = [
+        {
+            "$match": {
+                "agent_id": ObjectId(agent_id),
+                "campaign_id": ObjectId(campaign_id),
+                "status": "open"
+            }
+        },
+        # Lookup for how many fresh leads are associated with each order
+        {
+            "$lookup": {
+                "from": "lead",
+                "let": {"order_id": "$_id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$eq": ["$lead_order_id", "$$order_id"]
+                            }
+                        }
+                    },
+                    {"$count": "fresh_count"}
+                ],
+                "as": "fresh_leads"
+            }
+        },
+        # Lookup for how many second-chance leads are associated with each order
+        {
+            "$lookup": {
+                "from": "lead",
+                "let": {"order_id": "$_id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$eq": ["$second_chance_lead_order_id", "$$order_id"]
+                            }
+                        }
+                    },
+                    {"$count": "second_chance_count"}
+                ],
+                "as": "second_chance_leads"
+            }
+        },
+        {
+            "$addFields": {
+                "fresh_completed": {
+                    "$ifNull": [{"$first": "$fresh_leads.fresh_count"}, 0]
+                },
+                "second_completed": {
+                    "$ifNull": [{"$first": "$second_chance_leads.second_chance_count"}, 0]
+                }
+            }
+        },
+        {
+            # Only keep orders that haven't fulfilled their needed leads
+            "$match": {
+                "$expr": {
+                    "$cond": {
+                        "if": {"$eq": [is_second_chance, True]},
+                        "then": {"$lt": ["$second_completed", "$second_chance_lead_amount"]},
+                        "else": {"$lt": ["$fresh_completed", "$fresh_lead_amount"]}
+                    }
+                }
+            }
+        },
+        # Sort by date ascending
+        {"$sort": {"date": 1}},
+        # Limit to the oldest single match
+        {"$limit": 1}
+    ]
+
+    docs = await order_collection.aggregate(pipeline).to_list(None)
+    return OrderModel(**docs[0]) if docs else None
 
 
 async def get_most_recent_closed_order_by_agent_and_campaign(agent_id: str, campaign_id: str):
@@ -249,3 +325,88 @@ async def check_order_amounts_and_close(order: OrderModel):
         order.status = "closed"
         order.completed_date = datetime.datetime.utcnow()
         await update_order(str(order.id), order)
+
+
+async def get_order_metrics(campaigns: List[bson.ObjectId]) -> Dict[str, int]:
+
+    order_collection = get_order_collection()
+
+    pipeline = [
+        {
+            "$match": {
+                "campaign_id": {"$in": campaigns},
+                "status": "open"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "lead",
+                "let": {"order_id": "$_id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$eq": ["$lead_order_id", "$$order_id"]
+                            }
+                        }
+                    },
+                    {"$count": "fresh_count"}
+                ],
+                "as": "fresh_leads"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "lead",
+                "let": {"order_id": "$_id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$eq": ["$second_chance_lead_order_id", "$$order_id"]
+                            }
+                        }
+                    },
+                    {"$count": "second_chance_count"}
+                ],
+                "as": "second_chance_leads"
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "total_open_orders": {"$sum": 1},
+                "fresh_leads_remaining": {
+                    "$sum": {
+                        "$subtract": [
+                            "$fresh_lead_amount",
+                            {"$ifNull": [{"$first": "$fresh_leads.fresh_count"}, 0]}
+                        ]
+                    }
+                },
+                "second_chance_leads_remaining": {
+                    "$sum": {
+                        "$subtract": [
+                            "$second_chance_lead_amount",
+                            {"$ifNull": [{"$first": "$second_chance_leads.second_chance_count"}, 0]}
+                        ]
+                    }
+                }
+            }
+        }
+    ]
+
+    result = await order_collection.aggregate(pipeline).to_list(None)
+
+    return {
+        "total_open_orders": result[0].get("total_open_orders", 0) if result else 0,
+        "fresh_leads_needed": result[0].get("fresh_leads_remaining", 0) if result else 0,
+        "second_chance_leads_needed": result[0].get("second_chance_leads_remaining", 0) if result else 0
+    }
+
+
+async def get_many_orders(ids: List[str], user: UserModel):
+    order_collection = get_order_collection()
+    orders_in_db = await order_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
+    orders = [OrderModel(**order) for order in orders_in_db]
+    return orders

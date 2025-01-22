@@ -54,7 +54,7 @@ async def get_multiple_leads(ids: List[str] = Body(...), user: UserModel = Depen
     """
     try:
         leads = await lead_controller.get_leads(ids=ids, user=user)
-        return {"data": list(campaign.to_json() for campaign in LeadCollection(data=leads).data)}
+        return {"data": list(lead.to_json() for lead in LeadCollection(data=leads).data)}
     except lead_controller.LeadNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

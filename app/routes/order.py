@@ -1,5 +1,6 @@
 import ast
 import asyncio
+from typing import List
 import bson
 
 from fastapi import APIRouter, Body, Request, status, HTTPException, Depends, Response
@@ -33,6 +34,26 @@ async def show_order(id: str, user: UserModel = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail=f"Order {id} not found")
 
 
+@router.post(
+    "/get-many",
+    response_description="Get multiple orders",
+    response_model_by_alias=False
+)
+async def show_orders(ids: List[str] = Body(...), user: UserModel = Depends(get_current_user)):
+    """
+    Get the record for multiple orders, looked up by `ids`.
+    """
+    try:
+        if not user.is_admin():
+            if not user.campaigns:
+                raise HTTPException(status_code=404, detail="User does not have access to this order")
+        orders = await order_controller.get_many_orders(ids=ids, user=user)
+        data = await asyncio.gather(*(order.to_json() for order in OrderCollection(data=orders).data))
+        return {"data": data}
+    except order_controller.OrderNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Order {ids} not found")
+
+
 
 @router.get(
     "",
@@ -51,6 +72,8 @@ async def list_orders(page: int = 1, limit: int = 10, sort: str = "date=DESC" , 
             if not user.campaigns:
                 raise HTTPException(status_code=404, detail="User does not have access to this order")
             filter["campaign_id"] = {"$in": [bson.ObjectId(campaign) for campaign in user.campaigns]}
+            if "agent_id" in filter:
+                filter["agent_id"] = {"$in": [bson.ObjectId(agent) for agent in filter["agent_id"]]}
             if user.is_agent() or user.is_new_user():
                 filter["agent_id"] = bson.ObjectId(user.agent_id)
         else:
