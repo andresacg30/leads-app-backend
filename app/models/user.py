@@ -6,6 +6,17 @@ from typing import Optional, List, Dict, Union
 from app.tools.modifiers import PyObjectId
 
 
+class SubscriptionDetailsModel(BaseModel):
+    start_date: Optional[datetime.datetime] = Field(default=None)
+    end_date: Optional[datetime.datetime] = Field(default=None)
+    amount_per_week: Optional[float] = Field(default=None)
+
+
+class SubscriptionModel(BaseModel):
+    current_subscriptions: Optional[List[SubscriptionDetailsModel]] = Field(default=[])
+    past_subscriptions: Optional[List[SubscriptionDetailsModel]] = Field(default=[])
+
+
 class BalanceModel(BaseModel):
     campaign_id: PyObjectId
     balance: float
@@ -33,6 +44,7 @@ class UserModel(BaseModel):
     otp_code: Optional[str] = Field(default=None)
     otp_expiration: Optional[datetime.datetime] = Field(default=None)
     has_subscription: Optional[bool] = None
+    subscription_details: Optional[SubscriptionModel] = None
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,

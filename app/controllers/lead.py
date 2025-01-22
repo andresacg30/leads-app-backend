@@ -1,11 +1,11 @@
 import bson
 import logging
 import random
-
-from datetime import datetime
+from enum import Enum
+from typing import Dict, Any, List, Optional
+from datetime import datetime, timedelta
 from bson import ObjectId
 from pymongo import ReturnDocument
-from typing import List
 from motor.core import AgnosticCollection
 
 
@@ -20,6 +20,12 @@ from app.tools import constants
 
 
 logger = logging.getLogger(__name__)
+
+
+class DateField(Enum):
+    CREATED = "created_time"
+    SOLD = "lead_sold_time"
+    SECOND_CHANCE_SOLD = "second_chance_lead_sold_time"
 
 
 def get_lead_collection() -> AgnosticCollection:
@@ -58,14 +64,16 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
         if lead.get("buyer_id"):
             agent_oldest_open_order = await get_oldest_open_order_by_agent_and_campaign(
                 agent_id=lead["buyer_id"],
-                campaign_id=lead["campaign_id"]
+                campaign_id=lead["campaign_id"],
+                is_second_chance=False
             )
             if agent_oldest_open_order:
                 lead["lead_order_id"] = agent_oldest_open_order.id
         if lead.get("second_chance_buyer_id"):
             agent_oldest_open_order = await get_oldest_open_order_by_agent_and_campaign(
                 agent_id=lead["second_chance_buyer_id"],
-                campaign_id=lead["campaign_id"]
+                campaign_id=lead["campaign_id"],
+                is_second_chance=True
             )
             if agent_oldest_open_order:
                 lead["second_chance_lead_order_id"] = agent_oldest_open_order.id
@@ -289,6 +297,16 @@ def _format_second_chance_lead_sold_time_filter(filter):
 
 
 def build_query_filters(filter):
+    if "custom_fields" in filter and isinstance(filter["custom_fields"], dict):
+        nested_dict = filter.pop("custom_fields")
+        for key, val in nested_dict.items():
+            if key == "invalid" and val == "no":
+                filter["$or"] = [
+                    {"custom_fields.invalid": "no"},
+                    {"custom_fields.invalid": {"$exists": False}}
+                ]
+            else:
+                filter[f"custom_fields.{key}"] = val
     if "q" in filter:
         query_value = filter["q"]
         query_filters = [
@@ -520,7 +538,8 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
             lead_price = agent_to_distribute["lead_price_override"]
         current_lead_order = await order_controller.get_oldest_open_order_by_agent_and_campaign(
             agent_id=agent_to_distribute["_id"],
-            campaign_id=lead.campaign_id
+            campaign_id=lead.campaign_id,
+            is_second_chance=False
         )
         if current_lead_order:
             lead.lead_order_id = current_lead_order.id
@@ -598,7 +617,8 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
         return
     oldest_open_order = await order_controller.get_oldest_open_order_by_agent_and_campaign(
         agent_id=agent_id,
-        campaign_id=campaign_id
+        campaign_id=campaign_id,
+        is_second_chance=False
     )
     result = await lead_collection.update_many(
         {"_id": {"$in": [ObjectId(id) for id in lead_ids]}},
@@ -638,3 +658,123 @@ def get_eligible_agents_for_lead(agents, lead, lead_price):
         if formatted_lead_state in agent["states_with_license"]:
             eligible_agents.append(agent)
     return eligible_agents
+
+
+def _build_date_range_query(date_range: Dict[str, datetime],
+                            date_field: str,
+                            campaigns: List[bson.ObjectId],
+                            is_second_chance: Optional[bool] = None) -> Dict:
+    base_query = {
+        date_field: {
+            "$gte": date_range["start"],
+            "$lte": date_range["end"]
+        }
+    }
+
+    if campaigns:
+        base_query["campaign_id"] = {"$in": campaigns}
+
+    if is_second_chance is not None:
+        if is_second_chance:
+            base_query["$or"] = [
+                {"is_second_chance": True},
+                {"second_chance_buyer_id": {"$exists": True}}
+            ]
+        else:
+            base_query["$and"] = [
+                {"is_second_chance": False},
+                {"buyer_id": {"$exists": True}}
+            ]
+
+    return base_query
+
+
+async def get_lead_counts(date_ranges: Dict[str, Any], campaigns: List[bson.ObjectId]) -> Dict[str, Dict[str, int]]:
+    if not date_ranges:
+        return {}
+
+    lead_collection = get_lead_collection()
+    result = {
+        "created": {},
+        "fresh_sold": {},
+        "second_chance_sold": {}
+    }
+
+    for period in ["thisWeek", "lastWeek", "thisMonth", "lastMonth"]:
+        if period in date_ranges:
+            created_query = _build_date_range_query(
+                date_ranges[period],
+                DateField.CREATED.value,
+                campaigns
+            )
+            result["created"][period] = await lead_collection.count_documents(created_query)
+            fresh_query = _build_date_range_query(
+                date_ranges[period],
+                DateField.SOLD.value,
+                campaigns,
+                False
+            )
+            result["fresh_sold"][period] = await lead_collection.count_documents(fresh_query)
+            second_chance_query = _build_date_range_query(
+                date_ranges[period],
+                DateField.SECOND_CHANCE_SOLD.value,
+                campaigns,
+                True
+            )
+            result["second_chance_sold"][period] = await lead_collection.count_documents(second_chance_query)
+
+    return result
+
+
+async def get_unsold_leads(campaigns):
+    lead_collection = get_lead_collection()
+    now = datetime.utcnow()
+    seven_days_ago = now - timedelta(days=7)
+    thirty_days_ago = now - timedelta(days=30)
+    three_months_ago = now - timedelta(days=90)
+    
+    fresh_unsold_query = {
+        "campaign_id": {"$in": campaigns},
+        "created_time": {"$gte": seven_days_ago},
+        "buyer_id": None,
+        "is_second_chance": False,
+        "$or": [
+            {"custom_fields.invalid": {"$exists": False}},
+            {"custom_fields.invalid": "no"}
+        ]
+    }
+
+    second_chance_query = {
+        "campaign_id": {"$in": campaigns},
+        "created_time": {
+            "$lte": thirty_days_ago,
+            "$gte": three_months_ago
+        },
+        "second_chance_buyer_id": None,
+        "is_second_chance": True,
+        "$or": [
+            {"custom_fields.invalid": {"$exists": False}},
+            {"custom_fields.invalid": "no"}
+        ]
+    }
+
+    invalid_query = {
+        "campaign_id": {"$in": campaigns},
+        "created_time": {"$gte": three_months_ago},
+        "custom_fields.invalid": "yes"
+    }
+
+    fresh_unsold_in_db = await lead_collection.find(fresh_unsold_query).to_list(None)
+    fresh_unsold = [lead_model.LeadModel(**lead).to_json() for lead in fresh_unsold_in_db]
+    fresh_unsold_total = await lead_collection.count_documents(fresh_unsold_query)
+    second_chance_unsold_in_db = await lead_collection.find(second_chance_query).to_list(None)
+    second_chance_unsold = [lead_model.LeadModel(**lead).to_json() for lead in second_chance_unsold_in_db]
+
+    second_chance_unsold_total = await lead_collection.count_documents(second_chance_query)
+
+    return {
+        "fresh_unsold": fresh_unsold,
+        "fresh_unsold_total": fresh_unsold_total,
+        "second_chance_unsold": second_chance_unsold,
+        "second_chance_unsold_total": second_chance_unsold_total
+    }

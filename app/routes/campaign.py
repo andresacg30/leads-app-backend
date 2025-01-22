@@ -117,7 +117,8 @@ async def delete_campaign(id: str, user: UserModel = Depends(get_current_user)):
     """
     Remove a single campaign record from the database.
     """
-    _is_agent_check(user)
+    if not user.is_admin():
+        raise HTTPException(status_code=404, detail="User do not have permission to this action")
     if len(id.split(",")) > 1:
         id = id.split(",")
         delete_result = await campaign_controller.delete_campaigns(ids=id)
