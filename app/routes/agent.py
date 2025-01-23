@@ -166,12 +166,20 @@ async def create_agent(agent: AgentModel = Body(...), user: UserModel = Depends(
             agent_in_db_campaigns.append(agent.campaigns[0])
             agent_in_db_found['campaigns'] = agent_in_db_campaigns
             await agent_controller.update_campaigns_for_agent(agent_in_db_found['_id'], agent_in_db_campaigns)
+            agent = AgentModel(**agent_in_db_found)
+            await user_controller.create_user_from_agent(agent=agent)
             return {"id": str(agent_in_db_found["_id"])}
     agent.CRM.url = mappings.crm_url_mappings[agent.CRM.name]
     if len(agent.states_with_license) == 1:
         agent.states_with_license = formatters.format_state_list(agent.states_with_license)
     agent.email = agent.email.lower()
     new_agent = await agent_controller.create_agent(agent=agent)
+    try:
+        agent.id = str(new_agent.inserted_id)
+        await user_controller.create_user_from_agent(agent=agent)
+    except Exception as e:
+        await agent_controller.delete_agent(id=str(new_agent.inserted_id))
+        raise HTTPException(status_code=400, detail=str(e))
     return {"id": str(new_agent.inserted_id)}
 
 

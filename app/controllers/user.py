@@ -8,6 +8,8 @@ from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBasicCredentials, HTTPBasic
 from motor.core import AgnosticCollection
 
+
+
 from app.auth import jwt_handler
 from app.db import Database
 from app.integrations.ringy import Ringy
@@ -16,6 +18,7 @@ from app.models.transaction import TransactionModel
 from app.resources import user_connections
 from app.controllers import agent as agent_controller
 from app.controllers import campaign as campaign_controller
+from app.integrations import stripe as stripe_controller
 from app.models.agent import AgentModel
 from app.models.campaign import CampaignModel
 from app.models import user as user_model
@@ -437,3 +440,38 @@ async def refund_credit(
     except Exception as e:
         logger.error(f"Error refunding credit: {e}")
         raise RefundError(e)
+
+
+async def create_user_from_agent(agent: AgentModel):
+    try:
+        user_exists = await get_user_by_email(agent.email)
+        user_exists.campaigns.extend(agent.campaigns)
+        await update_user(user_exists)
+        return user_exists
+    except UserNotFoundError:
+        user_collection = get_user_collection()
+        user = user_model.UserModel(
+            name=f"{agent.first_name} {agent.last_name}",
+            email=agent.email,
+            phone=agent.phone,
+            region="America/New_York",
+            agent_id=agent.id,
+            password="password",
+            permissions=["agent"],
+            email_verified=True,
+            otp_code="123456",
+            balance=[],
+            otp_expiration=datetime.datetime.utcnow() + datetime.timedelta(seconds=OTP_EXPIRATION),
+            campaigns=agent.campaigns,
+            stripe_customer_ids={},
+            subscription_details=user_model.SubscriptionModel()
+        )
+        for campaign in user.campaigns:
+            user_campaign = await campaign_controller.get_one_campaign(campaign)
+            stripe_customer = await stripe_controller.search_customer(customer=user, stripe_account_id=user_campaign.stripe_account_id)
+            if stripe_customer:
+                user.stripe_customer_ids[str(user_campaign.id)] = stripe_customer.id
+        user.password = jwt_helper.encrypt("password")
+        new_user = await user_collection.insert_one(user.model_dump(by_alias=True, exclude=["id"], mode="python"))
+        user.id = str(new_user.inserted_id)
+        return user
