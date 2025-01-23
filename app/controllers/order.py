@@ -261,11 +261,11 @@ def calculate_lead_amounts_by_distribution(
 def calculate_lead_amounts(order: OrderModel, order_campaign: CampaignModel, agent: AgentModel, products: list = None):
     if products:
         for product in products:
-            if product.product_name not in ["Fresh Lead", "Aged Lead"]:
+            if product.product_name not in ["Fresh Lead", "Aged Lead", "Second Chance Lead"]:
                 raise ValueError("Invalid product type")
             if product.product_name == "Fresh Lead":
                 order.fresh_lead_amount = product.quantity
-            if product.product_name == "Aged Lead":
+            if product.product_name == "Aged Lead" or product.product_name == "Second Chance Lead":
                 order.second_chance_lead_amount = product.quantity
     else:
         lead_price = agent.lead_price_override or order_campaign.price_per_lead

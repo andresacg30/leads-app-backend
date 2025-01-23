@@ -263,6 +263,7 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
                 products.append(PurchasedProduct(product_id=prod.id, product_name=prod.name, quantity=quantity))
         order_type = "one_time"
     campaign_id = await campaign_controller.get_campaign_id_by_stripe_account_id(stripe_account_id)
+    await _check_user_stripe_id_and_update(user=user, campaign_id=campaign_id, user_stripe_account_id=customer.id)
     current_user_balance = await user_controller.get_user_balance_by_agent_id(user.agent_id)
     campaign_balance = 0
     for campaign in current_user_balance:
@@ -292,8 +293,14 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
         products=products or None,
         leftover_balance=campaign_balance
     )
-
     return created_transaction.inserted_id, created_order.inserted_id
+
+
+async def _check_user_stripe_id_and_update(user: UserModel, campaign_id: str, user_stripe_account_id: str):
+    if not user.stripe_customer_ids.get(campaign_id):
+        user.stripe_customer_ids[str(campaign_id)] = user_stripe_account_id
+        await user_controller.update_user(user)
+    return user
 
 
 async def construct_event(payload, sig_header, endpoint_secret):
@@ -326,3 +333,13 @@ async def delete_customer(user: UserModel, campaign: CampaignModel):
         stripe_account=campaign.stripe_account_id
     )
     return True
+
+
+async def search_customer(customer: UserModel, stripe_account_id: str) -> dict:
+    customer_result = stripe.Customer.search(query=f"email:'{customer.email}'", stripe_account=stripe_account_id).data
+    if not customer_result:
+        customer_result = None
+        return customer_result
+        # customer_result = await create_customer(customer, stripe_account_id)
+    customer_result = stripe.Customer(customer_result[0].id, stripe_account=stripe_account_id)
+    return customer_result
