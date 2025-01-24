@@ -32,6 +32,8 @@ async def refund_credit_to_agent(
     """
     Refund credit to agent
     """
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="Agent id must be provided")
     if user.is_agent():
         raise HTTPException(status_code=404, detail="User does not have permission to refund credit to agent")
     try:
