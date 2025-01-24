@@ -32,7 +32,7 @@ class OrderIdInvalidError(Exception):
     pass
 
 
-async def create_order(order: OrderModel, user: UserModel, products: list = None, leftover_balance: float = None):
+async def create_order(order: OrderModel, user: UserModel, products: list = None, leftover_balance: float = 0):
     from app.controllers.campaign import get_one_campaign
     from app.controllers.agent import get_agent_by_field
     agent_in_db = await get_agent_by_field(_id=user.agent_id)
