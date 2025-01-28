@@ -17,6 +17,7 @@ from app.models.transaction import TransactionModel
 from app.models.user import UserModel
 from app.tools import formatters as formatter
 from app.tools import constants
+from app.tools import validators as validator
 
 
 logger = logging.getLogger(__name__)
@@ -192,6 +193,8 @@ async def create_lead(lead: lead_model.LeadModel):
     new_lead = await lead_collection.insert_one(
         lead.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
+    if lead.custom_fields.get("invalid") == "yes":
+        return new_lead
     if str(lead.campaign_id) not in constants.OG_CAMPAIGNS:
         if not lead.second_chance_buyer_id:
             lead_background_jobs.process_lead(lead, lead_id=new_lead.inserted_id)
@@ -778,3 +781,20 @@ async def get_unsold_leads(campaigns):
         "second_chance_unsold": second_chance_unsold,
         "second_chance_unsold_total": second_chance_unsold_total
     }
+
+
+def validate_lead(lead: lead_model.LeadModel) -> tuple:
+    rejection_reasons = []
+    if not lead.phone or not lead.email:
+        rejection_reasons.append("Missing phone or email")
+        return False, rejection_reasons
+    format_number = formatter.format_phone_number(lead.phone)
+    is_valid_phone = validator.validate_phone_number(format_number)
+    if not is_valid_phone:
+        rejection_reasons.append("Invalid phone number")
+        return False, rejection_reasons
+    is_duplicate = validator.validate_duplicate(lead, lead.campaign_id)
+    if is_duplicate:
+        rejection_reasons.append("Duplicate lead")
+        return False, rejection_reasons
+    return True, rejection_reasons

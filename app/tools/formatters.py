@@ -35,3 +35,8 @@ def format_string_to_utc_datetime(date: datetime.datetime):
 def format_state_to_abbreviation(state):
     state_abbr = us.states.lookup(state).abbr
     return state_abbr
+
+
+def format_phone_number(phone_number):
+    digits_only = ''.join(filter(str.isdigit, phone_number))
+    return digits_only

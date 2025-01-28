@@ -1,6 +1,6 @@
-import app.scripts.add_subscription_details_field_to_user as add_subscription_details_field_to_user
+import app.scripts.add_duplication_cutoff_days_to_campaign as duplication_script
 import asyncio
 
 
 if __name__ == "__main__":
-    asyncio.run(add_subscription_details_field_to_user.main())
+    asyncio.run(duplication_script.duplication_update())
