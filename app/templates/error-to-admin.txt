@@ -1,0 +1,11 @@
+LEADCONEX
+----------------------------------------
+
+There was an error on the backend. Error:
+
+{{ error_message }}
+
+Check logs on cloud and fix.
+
+----------------------------------------
+© LeadConex. All rights reserved.

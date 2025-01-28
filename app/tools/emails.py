@@ -1,6 +1,6 @@
 from jinja2 import Template
 
-from app.integrations.mailgun import send_single_email
+from app.integrations.mailgun import send_single_email, send_batch_email
 
 
 def send_verify_code_email(first_name, email, otp_code):
@@ -69,6 +69,27 @@ def send_stripe_onboarding_email(email, user_name, onboarding_url, campaign):
     send_single_email(
         to_address=email,
         subject="Complete your LeadConex Stripe Account Setup",
+        template=rendered_html,
+        text=rendered_text
+    )
+
+
+def send_error_to_admin(error_message):
+    with open("app/templates/error-to-admin.html") as error_html:
+        error_template = Template(error_html.read())
+        rendered_html = error_template.render(
+            error_message=error_message
+        )
+
+    with open("app/templates/error-to-admin.txt") as error_text:
+        error_text = error_text.read()
+        rendered_text = error_template.render(
+            error_message=error_message
+        )
+
+    send_batch_email(
+        to_addresses=["andres@johnwetmore.com", "angelo@johnwetmore.com", "leadconex@gmail.com"],
+        subject="LeadConex Error",
         template=rendered_html,
         text=rendered_text
     )

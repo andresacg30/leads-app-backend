@@ -40,3 +40,13 @@ def send_single_email(to_address: str, subject: str, template: str, text: str):
         template,
         text
     )
+
+
+def send_batch_email(to_addresses: list, subject: str, template: str, text: str):
+    addresses = {address: {"unique_id": "%recipient.unique_id%"} for address in to_addresses}
+    send_single_email(
+        to_address=addresses,
+        subject=subject,
+        template=template,
+        text=text
+    )
