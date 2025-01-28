@@ -44,7 +44,7 @@ class UserModel(BaseModel):
     otp_code: Optional[str] = Field(default=None)
     otp_expiration: Optional[datetime.datetime] = Field(default=None)
     has_subscription: Optional[bool] = None
-    subscription_details: Optional[SubscriptionModel] = None
+    subscription_details: Optional[SubscriptionModel] = Field(default_factory=SubscriptionModel)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
