@@ -212,10 +212,6 @@ async def create_lead(lead: LeadModel = Body(...), user: UserModel = Depends(get
     else:
         raise HTTPException(status_code=400, detail=f"Invalid state {lead.state}")
     lead.email = lead.email.lower()
-    is_invalid, rejection_reasons = lead_controller.validate_lead(lead)
-    if is_invalid:
-        lead.custom_fields["rejection_reasons"] = rejection_reasons
-        lead.custom_fields["invalid"] = "yes"
     new_lead = await lead_controller.create_lead(lead)
     return {"id": str(new_lead.inserted_id)}
 

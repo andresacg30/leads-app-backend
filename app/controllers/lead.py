@@ -190,6 +190,11 @@ async def get_lead_by_field(**kwargs):
 
 async def create_lead(lead: lead_model.LeadModel):
     lead_collection = get_lead_collection()
+    is_valid, rejection_reasons = await validate_lead(lead)
+    if not is_valid:
+        lead.custom_fields["rejection_reasons"] = rejection_reasons
+        lead.custom_fields["invalid"] = "yes"
+    lead.custom_fields["invalid"] = "no"
     new_lead = await lead_collection.insert_one(
         lead.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
@@ -197,7 +202,8 @@ async def create_lead(lead: lead_model.LeadModel):
         return new_lead
     if str(lead.campaign_id) not in constants.OG_CAMPAIGNS:
         if not lead.second_chance_buyer_id:
-            lead_background_jobs.process_lead(lead, lead_id=new_lead.inserted_id)
+            if not lead.custom_fields.get("invalid") or lead.custom_fields.get("invalid") == "no":
+                lead_background_jobs.process_lead(lead, lead_id=new_lead.inserted_id)
     return new_lead
 
 
@@ -783,7 +789,7 @@ async def get_unsold_leads(campaigns):
     }
 
 
-def validate_lead(lead: lead_model.LeadModel) -> tuple:
+async def validate_lead(lead: lead_model.LeadModel) -> tuple:
     rejection_reasons = []
     if not lead.phone or not lead.email:
         rejection_reasons.append("Missing phone or email")
@@ -793,7 +799,7 @@ def validate_lead(lead: lead_model.LeadModel) -> tuple:
     if not is_valid_phone:
         rejection_reasons.append("Invalid phone number")
         return False, rejection_reasons
-    is_duplicate = validator.validate_duplicate(lead, lead.campaign_id)
+    is_duplicate = await validator.validate_duplicate(lead, lead.campaign_id)
     if is_duplicate:
         rejection_reasons.append("Duplicate lead")
         return False, rejection_reasons
