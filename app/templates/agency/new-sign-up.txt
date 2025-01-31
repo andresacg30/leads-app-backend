@@ -1,0 +1,13 @@
+Hello Admin,
+
+A new agent has signed up for the {{ campaign_name }} team.
+
+Agent Details:
+-------------
+Name: {{ agent_name }}
+Phone: {{ agent_phone }}
+Email: {{ agent_email }}
+Licensed States: {{ agent_states_with_license }}
+
+Best regards,
+LeadConex Team

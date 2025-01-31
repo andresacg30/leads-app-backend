@@ -1,0 +1,18 @@
+LEADCONEX
+==========
+
+New Order Placed
+---------------
+
+A new order has been placed by {{ agent_name }}.
+
+ORDER DETAILS:
+-------------
+Campaign: {{ campaign }}
+Order Type: {{ type }}
+Total Amount: ${{ amount }}
+Lead Amount: {{ lead_amount }}
+Second Chance Lead Amount: {{ second_chance_lead_amount }}
+
+-------------------
+© LeadConex. All rights reserved.

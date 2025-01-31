@@ -93,3 +93,78 @@ def send_error_to_admin(error_message):
         template=rendered_html,
         text=rendered_text
     )
+
+
+def send_welcome_email(email):
+    with open("app/templates/agent/welcome-email.html") as welcome_html:
+        welcome_template = Template(welcome_html.read())
+        rendered_html = welcome_template.render()
+
+    with open("app/templates/agent/welcome-email.txt") as welcome_text:
+        welcome_text = welcome_text.read()
+        rendered_text = welcome_template.render()
+
+    send_single_email(
+        to_address=email,
+        subject="Welcome to your Lead Dashboard!",
+        template=rendered_html,
+        text=rendered_text
+    )
+
+
+def send_new_sign_up_email(emails, campaign_name, agent_name, agent_email, agent_phone, agent_states_with_license):
+    with open("app/templates/agency/new-sign-up.html") as new_sign_up_html:
+        new_sign_up_template = Template(new_sign_up_html.read())
+        rendered_html = new_sign_up_template.render(
+            campaign_name=campaign_name,
+            agent_name=agent_name,
+            agent_email=agent_email,
+            agent_phone=agent_phone,
+            agent_states_with_license=agent_states_with_license
+        )
+
+    with open("app/templates/agency/new-sign-up.txt") as new_sign_up_text:
+        new_sign_up_text = new_sign_up_text.read()
+        rendered_text = new_sign_up_template.render(
+            campaign_name=campaign_name,
+            agent_name=agent_name,
+            agent_email=agent_email,
+            agent_phone=agent_phone,
+            agent_states_with_license=agent_states_with_license
+        )
+
+    send_batch_email(
+        to_addresses=emails,
+        subject="New Agent Sign Up",
+        template=rendered_html,
+        text=rendered_text
+    )
+
+
+def send_new_order_email(emails, campaign, type, amount, lead_amount, second_chance_lead_amount):
+    with open("app/templates/agency/new-order.html") as new_order_html:
+        new_order_template = Template(new_order_html.read())
+        rendered_html = new_order_template.render(
+            campaign=campaign,
+            type=type,
+            amount=amount,
+            lead_amount=lead_amount,
+            second_chance_lead_amount=second_chance_lead_amount
+        )
+
+    with open("app/templates/agency/new-order.txt") as new_order_text:
+        new_order_text = new_order_text.read()
+        rendered_text = new_order_template.render(
+            campaign=campaign,
+            type=type,
+            amount=amount,
+            lead_amount=lead_amount,
+            second_chance_lead_amount=second_chance_lead_amount
+        )
+
+    send_batch_email(
+        to_addresses=emails,
+        subject="New Order",
+        template=rendered_html,
+        text=rendered_text
+    )

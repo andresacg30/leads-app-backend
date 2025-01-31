@@ -485,3 +485,13 @@ async def create_user_from_agent(agent: AgentModel):
         new_user = await user_collection.insert_one(user.model_dump(by_alias=True, exclude=["id"], mode="python"))
         user.id = str(new_user.inserted_id)
         return user
+
+
+async def get_users_by_field(**kwargs):
+    try:
+        user_collection = get_user_collection()
+        users_in_db = await user_collection.find(kwargs).to_list(None)
+        users = [user_model.UserModel(**user) for user in users_in_db]
+        return users
+    except UserNotFoundError:
+        raise HTTPException(status_code=404, detail="Users not found")
