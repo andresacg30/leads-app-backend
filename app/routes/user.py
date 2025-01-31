@@ -6,6 +6,7 @@ import string
 import logging
 from fastapi import Body, APIRouter, HTTPException, Request, Depends
 from passlib.context import CryptContext
+import rq
 
 import app.controllers.campaign as campaign_controller
 import app.controllers.user as user_controller
@@ -162,8 +163,13 @@ async def verify_otp(request: Request, email: str = Body(...), otp: str = Body(.
     if user.otp_code == otp:
         await user_controller.activate_user(email)
         if user.account_creation_task_id:
-            task_id = cancel_job(user.account_creation_task_id) 
-            logger.info(f"User {user.id} has been activated and task {task_id} has been canceled")
+            try:
+                task_id = cancel_job(user.account_creation_task_id) 
+                logger.info(f"User {user.id} has been activated and task {task_id} has been canceled")
+            except Exception as e:
+                task_id = None
+                logger.warning(f"User {user.id} has been activated but task {task_id} could not be canceled because {e}")
+        emails.send_welcome_email(email=email)
         return {"message": "OTP confirmed"}
     raise HTTPException(status_code=403, detail="Invalid OTP code")
 
@@ -300,6 +306,17 @@ async def user_signup(request: Request, user=Body(...)):
         first_name=user["first_name"],
         email=user["email"],
         otp_code=user["otp_code"]
+    )
+    campaign_admin_addresses = [user.email for user in await campaign_controller.get_campaign_agency_users(user_campaigns)]
+    campaign_name = user_campaigns[0].name if len(user_campaigns) == 1 else ", ".join(campaign.name for campaign in user_campaigns)
+    formatted_states = ", ".join(user["states_with_license"])
+    emails.send_new_sign_up_email(
+        emails=campaign_admin_addresses,
+        agent_name=f"{user['first_name']} {user['last_name']}",
+        agent_email=user["email"],
+        agent_phone=user["phone"],
+        agent_states_with_license=formatted_states,
+        campaign_name=campaign_name
     )
     return {"id": str(created_user.id)}
 

@@ -1,3 +1,4 @@
+from typing import List
 import uuid
 from bson import ObjectId
 from pymongo import ReturnDocument
@@ -144,6 +145,8 @@ async def delete_campaigns(ids):
 async def get_campaign_by_sign_up_code(sign_up_code):
     campaign_collection = get_campaign_collection()
     campaign_in_db = await campaign_collection.find_one({"sign_up_code": sign_up_code})
+    if not campaign_in_db:
+        return None
     campaign_result = campaign_models.CampaignModel(**campaign_in_db)
     return campaign_result
 
@@ -181,3 +184,10 @@ async def get_campaign_id_by_stripe_account_id(stripe_account_id: str):
     campaign_collection = get_campaign_collection()
     campaign = await campaign_collection.find_one({"stripe_account_id": stripe_account_id})
     return campaign["_id"]
+
+
+async def get_campaign_agency_users(campaigns: List[campaign_models.CampaignModel]):
+    import app.controllers.user as user_controller
+    campaign_ids = [campaign.id for campaign in campaigns]
+    users = await user_controller.get_users_by_field(campaigns={'$in': campaign_ids}, permissions={"$in": ["agency_admin", "agency", "admin"]})
+    return users

@@ -1,0 +1,16 @@
+LEADCONEX
+
+Welcome to your Lead Dashboard!
+
+Your account is created and ready to be used. Once you sign in, you can select the plan you want to buy and get started with payment.
+
+Tips:
+• In the Leads tab, you can view and download all your lead information in a CSV file.
+• In the Integrations tab, you can link your Ringy account to receive leads. Watch the instructional video to learn how to link it.
+• This is the first release of the app, so if you notice any anomalies, please use the bug button in the bottom-right corner to report it.
+
+If you want to make a one-time purchase, go to the "Lead Marketplace" tab and select the campaign you want to join. Then click "Billing Portal" to manage your payments and subscriptions.
+
+Thank you!
+
+© LeadConex. All rights reserved.

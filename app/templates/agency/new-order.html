@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>New Order Notification</title>
+</head>
+<body style="background-color: #282828; color: #FFFFFF; font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif; margin: 0; padding: 0;">
+    <div style="background-color: #383838; margin: 0 auto; padding: 20px; max-width: 600px; border-radius: 8px;">
+        <div style="text-align: center; padding: 10px 0;">
+            <h1 style="color: #D4AF37; margin: 0;">LEADCONEX</h1>
+        </div>
+        <div style="padding: 20px 0; color: #FFFFFF;">
+            <h2 style="color: #FFFFFF;">New Order Placed</h2>
+            <p style="color: #FFFFFF;">A new order has been placed by {{ agent_name }}.</p>
+            
+            <div style="background-color: #424242; padding: 15px; border-radius: 4px; margin: 10px 0;">
+                <p style="margin: 5px 0; color: #FFFFFF;"><strong style="color: #FFFFFF;">Campaign:</strong> {{ campaign }}</p>
+                <p style="margin: 5px 0; color: #FFFFFF;"><strong style="color: #FFFFFF;">Order Type:</strong> {{ type }}</p>
+                <p style="margin: 5px 0; color: #FFFFFF;"><strong style="color: #FFFFFF;">Total Amount:</strong> ${{ amount }}</p>
+                <p style="margin: 5px 0; color: #FFFFFF;"><strong style="color: #FFFFFF;">Lead Amount:</strong> {{ lead_amount }}</p>
+                <p style="margin: 5px 0; color: #FFFFFF;"><strong style="color: #FFFFFF;">Second Chance Lead Amount:</strong> {{ second_chance_lead_amount }}</p>
+            </div>
+        </div>
+        <div style="text-align: center; padding: 10px 0; font-size: 12px; color: #B0B0B0;">
+            <p>&copy; LeadConex. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

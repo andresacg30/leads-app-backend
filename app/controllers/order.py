@@ -14,6 +14,7 @@ from app.models.agent import AgentModel
 from app.models.campaign import CampaignModel
 from app.models.order import OrderModel, UpdateOrderModel
 from app.models.user import UserModel
+from app.tools import emails
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ class OrderIdInvalidError(Exception):
 
 
 async def create_order(order: OrderModel, user: UserModel, products: list = None, leftover_balance: float = 0):
-    from app.controllers.campaign import get_one_campaign
+    from app.controllers.campaign import get_one_campaign, get_campaign_agency_users
     from app.controllers.agent import get_agent_by_field, recalculate_daily_limit
     agent_in_db = await get_agent_by_field(_id=user.agent_id)
     agent = AgentModel(**agent_in_db)
@@ -56,6 +57,16 @@ async def create_order(order: OrderModel, user: UserModel, products: list = None
         order.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
     await recalculate_daily_limit(agent=agent, order=order)
+    campaign_admin_addresses = [user.email for user in await get_campaign_agency_users([order_campaign])]
+    order_type = order.type.capitalize().replace("_", " ")
+    emails.send_new_order_email(
+        emails=campaign_admin_addresses,
+        campaign=order_campaign.name,
+        type=order_type,
+        amount=order.order_total,
+        lead_amount=order.fresh_lead_amount,
+        second_chance_lead_amount=order.second_chance_lead_amount
+    )
     return created_order
 
 
