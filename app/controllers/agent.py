@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import bson
 import difflib
+import logging
 
 from bson import ObjectId
 import bson.errors
@@ -9,7 +10,6 @@ from typing import List, Dict
 from motor.core import AgnosticCollection
 
 from app.db import Database
-from app.controllers.campaign import get_campaign_collection
 from app.controllers.order import get_order_collection
 from app.models.agent import AgentModel, UpdateAgentModel
 from app.models.campaign import CampaignModel
@@ -17,6 +17,10 @@ from app.models.lead import LeadModel
 from app.models.order import OrderModel
 from app.models.transaction import TransactionModel
 from app.models.user import UserModel
+from app.tools import constants
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_agent_collection() -> AgnosticCollection:
@@ -150,7 +154,8 @@ async def get_all_agents(page, limit, sort, filter, user):
             "custom_fields": 1,
             "lead_price_override": 1,
             "second_chance_lead_price_override": 1,
-            "distribution_type": 1
+            "distribution_type": 1,
+            "daily_lead_limit": 1
         }},
         {"$sort": {sort[0]: sort[1]}},
         {"$skip": (page - 1) * limit},
@@ -302,7 +307,8 @@ async def get_agents_with_balance(campaign: ObjectId):
             "custom_fields": 1,
             "lead_price_override": 1,
             "second_chance_lead_price_override": 1,
-            "distribution_type": 1
+            "distribution_type": 1,
+            "daily_lead_limit": 1
         }}
     ]
     agents = await agent_collection.aggregate(pipeline).to_list(None)
@@ -330,7 +336,6 @@ async def get_agents_with_open_orders(campaign_id: ObjectId, lead: LeadModel):
                 {"$match": {
                     "$and": [
                         {"$expr": {"$eq": ["$lead_order_id", "$$order_id"]}},
-                        {"is_second_chance": False}
                     ]
                 }},
                 {"$count": "fresh_lead_completed"}
@@ -343,8 +348,7 @@ async def get_agents_with_open_orders(campaign_id: ObjectId, lead: LeadModel):
             "pipeline": [
                 {"$match": {
                     "$and": [
-                        {"$expr": {"$eq": ["$second_chance_order_id", "$$order_id"]}},
-                        {"is_second_chance": True}
+                        {"$expr": {"$eq": ["$second_chance_lead_order_id", "$$order_id"]}}
                     ]
                 }},
                 {"$count": "second_chance_completed"}
@@ -373,10 +377,14 @@ async def get_agents_with_open_orders(campaign_id: ObjectId, lead: LeadModel):
             "states_with_license": 1,
             "CRM": 1,
             "fresh_completed": 1,
-            "second_completed": 1
+            "second_completed": 1,
+            "daily_lead_limit": 1,
+            "lead_price_override": 1,
+            "second_chance_lead_price_override": 1,
         }}
     ]
-    agents = await agent_collection.aggregate(pipeline).to_list(None)
+    agents_in_db = await agent_collection.aggregate(pipeline).to_list(None)
+    agents = [AgentModel(**agent) for agent in agents_in_db]
     return agents
 
 
@@ -385,8 +393,10 @@ async def get_eligible_agents_for_lead_processing(
     lead_count,
     second_chance_lead_count,
     campaign_id,
-    is_second_chance=False
+    is_second_chance=False,
+    both_types=False
 ):
+    from app.controllers.campaign import get_campaign_collection
     campaign_collection = get_campaign_collection()
     campaign_in_db = await campaign_collection.find_one({"_id": campaign_id})
     campaign = CampaignModel(**campaign_in_db)
@@ -476,10 +486,27 @@ async def get_eligible_agents_for_lead_processing(
                     {
                         "$match": {
                             "$expr": {
-                                "$cond": {
-                                    "if": {"$eq": [is_second_chance, True]},
-                                    "then": {"$lt": ["$second_completed", "$second_chance_lead_amount"]},
-                                    "else": {"$lt": ["$fresh_completed", "$fresh_lead_amount"]}
+                                "$switch": {
+                                    "branches": [
+                                        {
+                                            "case": {"$eq": [both_types, True]},
+                                            "then": {
+                                                "$and": [
+                                                    {"$lt": ["$fresh_completed", "$fresh_lead_amount"]},
+                                                    {"$lt": ["$second_completed", "$second_chance_lead_amount"]}
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "case": {"$eq": [is_second_chance, True]},
+                                            "then": {
+                                                "$lt": ["$second_completed", "$second_chance_lead_amount"]
+                                            }
+                                        }
+                                    ],
+                                    "default": {
+                                        "$lt": ["$fresh_completed", "$fresh_lead_amount"]
+                                    }
                                 }
                             }
                         }
@@ -509,7 +536,8 @@ async def get_eligible_agents_for_lead_processing(
                 "credentials": 1,
                 "custom_fields": 1,
                 "lead_price_override": 1,
-                "second_chance_lead_price_override": 1
+                "second_chance_lead_price_override": 1,
+                "daily_lead_limit": 1
             }
         },
         {
@@ -572,3 +600,30 @@ async def get_agent_metrics(campaigns: List[bson.ObjectId]) -> Dict[str, int]:
         "active_agents": active_agents,
         "active_agents_total": active_agents_total,
     }
+
+
+async def recalculate_daily_limit(agent: AgentModel, order: OrderModel):
+    try:
+        daily_lead_limit = order.fresh_lead_amount // constants.DAILY_LEAD_LIMIT
+        for campaign in agent.daily_lead_limit:
+            if campaign.campaign_id == order.campaign_id:
+                campaign.limit = daily_lead_limit
+                break
+        updated_agent = await update_agent(agent.id, agent)
+        return updated_agent
+    except Exception as e:
+        logger.error(f"Error recalculating daily limit for agent {agent.id}: {e}")
+        raise e
+
+
+async def update_daily_lead_limit(agent: AgentModel, campaign_id: bson.ObjectId, daily_lead_limit: int):
+    try:
+        for campaign in agent.daily_lead_limit:
+            if campaign["campaign_id"] == campaign_id:
+                campaign["daily_lead_limit"] = daily_lead_limit
+                break
+        updated_agent = await update_agent(agent.id, agent)
+        return updated_agent
+    except Exception as e:
+        logger.error(f"Error updating daily lead limit for agent {agent.id}: {e}")
+        raise e

@@ -18,6 +18,33 @@ from app.tools import mappings, formatters
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 
+@router.put(
+    "/update-daily-limit/{id}",
+    response_description="Update daily lead limit for agent",
+    response_model_by_alias=False
+)
+async def update_daily_lead_limit_for_agent(
+    id: str,
+    daily_lead_limit: int = Body(...),
+    campaign_id: str = Body(...),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Update daily lead limit for agent
+    """
+    if not user.is_admin():
+        raise HTTPException(status_code=404, detail="User does not have permission to update daily lead limit for agent")
+    try:
+        updated_agent = await agent_controller.update_daily_lead_limit(
+            agent_id=bson.ObjectId(id),
+            daily_lead_limit=daily_lead_limit,
+            campaign_id=bson.ObjectId(campaign_id)
+        )
+        return {"id": str(updated_agent["_id"])}
+    except agent_controller.AgentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.post(
     "/refund-credit",
     response_description="Refund credit to agent",
@@ -75,11 +102,17 @@ async def get_eligible_agents_for_lead_processing(
     if not lead_count and not second_chance_lead_count:
         raise HTTPException(status_code=400, detail="Lead count or second chance lead count must be provided")
     formatted_states = [formatters.format_state_to_abbreviation(state) for state in states]
+    both_types = False
+    if second_chance_lead_count > 0 and lead_count > 0:
+        both_types = True
+    is_second_chance = second_chance_lead_count > 0
     agents = await agent_controller.get_eligible_agents_for_lead_processing(
         formatted_states,
         lead_count,
         second_chance_lead_count,
-        campaign_id=bson.ObjectId(campaign_id)
+        campaign_id=bson.ObjectId(campaign_id),
+        is_second_chance=is_second_chance,
+        both_types=both_types
     )
     if agents:
         agent_data = list(agent.to_json() for agent in AgentCollection(data=agents).data)

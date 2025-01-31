@@ -420,8 +420,12 @@ async def refund_credit(
         )
         campaign = await campaign_controller.get_one_campaign(campaign_id)
         created_transaction = await create_transaction(transaction)
+        agent = await agent_controller.get_agent(user.agent_id)
 
-        fresh_lead_total = math.floor(amount / campaign.price_per_lead)
+        if agent.lead_price_override:
+            fresh_lead_total = math.floor(amount / agent.lead_price_override)
+        else:
+            fresh_lead_total = math.floor(amount / campaign.price_per_lead)
 
         order = OrderModel(
             agent_id=user.agent_id,
@@ -432,10 +436,16 @@ async def refund_credit(
             fresh_lead_total=fresh_lead_total
         )
 
-        if amount >= campaign.price_per_lead:
-            created_order = await create_order(order, user)
+        if agent.lead_price_override:
+            if amount >= agent.lead_price_override:
+                created_order = await create_order(order, user)
+            else:
+                created_order = None
         else:
-            created_order = None
+            if amount >= campaign.price_per_lead:
+                created_order = await create_order(order, user)
+            else:
+                created_order = None
         return created_transaction, created_order
     except Exception as e:
         logger.error(f"Error refunding credit: {e}")

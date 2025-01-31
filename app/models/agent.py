@@ -136,6 +136,11 @@ class AgentCredentials(BaseModel):
     password: Optional[str] = Field(default=None)
 
 
+class DailyLeadLimit(BaseModel):
+    campaign_id: Optional[PyObjectId] = Field(alias="campaign_id", default=None)
+    limit: Optional[int] = Field(default=0)
+
+
 class AgentModel(BaseModel):
     """
     Container for a single Agent record.
@@ -155,7 +160,8 @@ class AgentModel(BaseModel):
     created_time: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     campaigns: List[PyObjectId] = Field(default_factory=list)
     credentials: AgentCredentials = Field(default_factory=AgentCredentials)
-    custom_fields: Optional[dict] = Field(default=None)
+    daily_lead_limit: Optional[List[DailyLeadLimit]] = Field(default_factory=list)
+    custom_fields: Optional[dict] = Field(default=dict)
 
     @validator('phone', pre=True, always=True)
     def ensure_phone_is_str(cls, v):
@@ -219,7 +225,19 @@ class AgentModel(BaseModel):
                 data[key] = [str(v) if isinstance(v, ObjectId) else v for v in value]
                 if key == 'balance':
                     data[key] = [{"campaign_id": str(v['campaign_id']), "balance": v['balance']} for v in value]
+                elif key == "daily_lead_limit":
+                    data[key] = [{"campaign_id": str(v['campaign_id']), "limit": v['limit']} for v in value]
         return data
+
+    async def todays_lead_count(self, campaign_id: str):
+        from app.controllers.lead import todays_lead_count_by_agent
+
+        return await todays_lead_count_by_agent(self.id, campaign_id=campaign_id)
+
+    async def campaign_daily_limit(self, campaign_id: ObjectId):
+        for campaign in self.daily_lead_limit:
+            if campaign.campaign_id == campaign_id:
+                return campaign.limit
 
 
 class UpdateAgentModel(BaseModel):
@@ -239,6 +257,7 @@ class UpdateAgentModel(BaseModel):
     distribution_type: Optional[str] = Field(default=None)
     credentials: Optional[AgentCredentials] = None
     custom_fields: Optional[dict] = None
+    daily_lead_limit: Optional[List[DailyLeadLimit]] = None
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,

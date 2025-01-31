@@ -26,6 +26,8 @@ class LeadModel(BaseModel):
     second_chance_lead_sold_time: Optional[datetime.datetime] = Field(default=None)
     lead_sold_by_agent_time: Optional[datetime.datetime] = Field(default=None)
     lead_sold_by_integrity: Optional[datetime.datetime] = Field(default=None)
+    became_second_chance_time: Optional[datetime.datetime] = Field(default=None)
+    second_chance_task_id: Optional[str] = Field(default=None)
     lead_order_id: Optional[PyObjectId] = None
     second_chance_lead_order_id: Optional[PyObjectId] = None
     lead_received_date: Optional[datetime.datetime] = None
