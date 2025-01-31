@@ -161,7 +161,7 @@ class AgentModel(BaseModel):
     campaigns: List[PyObjectId] = Field(default_factory=list)
     credentials: AgentCredentials = Field(default_factory=AgentCredentials)
     daily_lead_limit: Optional[List[DailyLeadLimit]] = Field(default_factory=list)
-    custom_fields: Optional[dict] = Field(default=dict)
+    custom_fields: Optional[dict] = Field(default=None)
 
     @validator('phone', pre=True, always=True)
     def ensure_phone_is_str(cls, v):
