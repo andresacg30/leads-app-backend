@@ -20,7 +20,7 @@ class CampaignModel(BaseModel):
     admin_id: PyObjectId = Field(default=None)
     price_per_lead: Optional[float] = Field(default=None)
     price_per_second_chance_lead: Optional[float] = Field(default=None)
-    duplicate_cutoff_days: Optional[int] = Field(default=None)
+    duplication_cutoff_days: Optional[int] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,

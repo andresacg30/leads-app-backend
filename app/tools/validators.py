@@ -19,7 +19,7 @@ async def validate_duplicate(lead: LeadModel, campaign_id: str):
         existing_lead: dict = await get_lead_by_field(phone=lead.phone, campaign_id=campaign_id)
         existing_lead = LeadModel(**existing_lead)
         if existing_lead:
-            duplication_max_date = datetime.datetime.utcnow() - datetime.timedelta(days=campaign.duplicate_cutoff_days)
+            duplication_max_date = datetime.datetime.utcnow() - datetime.timedelta(days=campaign.duplication_cutoff_days)
             if existing_lead.created_time >= duplication_max_date:
                 return True
             return False
