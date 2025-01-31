@@ -34,7 +34,7 @@ class OrderIdInvalidError(Exception):
 
 async def create_order(order: OrderModel, user: UserModel, products: list = None, leftover_balance: float = 0):
     from app.controllers.campaign import get_one_campaign
-    from app.controllers.agent import get_agent_by_field
+    from app.controllers.agent import get_agent_by_field, recalculate_daily_limit
     agent_in_db = await get_agent_by_field(_id=user.agent_id)
     agent = AgentModel(**agent_in_db)
     order_campaign = await get_one_campaign(str(order.campaign_id))
@@ -55,6 +55,7 @@ async def create_order(order: OrderModel, user: UserModel, products: list = None
     created_order = await order_collection.insert_one(
         order.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
+    await recalculate_daily_limit(agent=agent, order=order)
     return created_order
 
 

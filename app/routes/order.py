@@ -73,7 +73,10 @@ async def list_orders(page: int = 1, limit: int = 10, sort: str = "date=DESC" , 
                 raise HTTPException(status_code=404, detail="User does not have access to this order")
             filter["campaign_id"] = {"$in": [bson.ObjectId(campaign) for campaign in user.campaigns]}
             if "agent_id" in filter:
-                filter["agent_id"] = {"$in": [bson.ObjectId(agent) for agent in filter["agent_id"]]}
+                if isinstance(filter["agent_id"], str):
+                    filter["agent_id"] = {"$in": [bson.ObjectId(filter["agent_id"])]}
+                elif isinstance(filter["agent_id"], list):
+                    filter["agent_id"] = {"$in": [bson.ObjectId(agent) for agent in filter["agent_id"]]}
             if user.is_agent() or user.is_new_user():
                 filter["agent_id"] = bson.ObjectId(user.agent_id)
         else:

@@ -2,6 +2,9 @@ FROM_EMAIL_ADDRESS = "info@leadconex.org"
 
 OTP_EXPIRATION = 15 * 60
 
+TIME_FOR_SECOND_CHANCE = 30
+
+DAILY_LEAD_LIMIT = 3
 
 # Campaigns that are currently using GHL and LB for distribution
 OG_CAMPAIGNS = [
