@@ -189,5 +189,7 @@ async def get_campaign_id_by_stripe_account_id(stripe_account_id: str):
 async def get_campaign_agency_users(campaigns: List[campaign_models.CampaignModel]):
     import app.controllers.user as user_controller
     campaign_ids = [campaign.id for campaign in campaigns]
-    users = await user_controller.get_users_by_field(campaigns={'$in': campaign_ids}, permissions={"$in": ["agency_admin", "agency", "admin"]})
+    users = await user_controller.get_users_by_field(campaigns={'$in': campaign_ids}, permissions={"$in": ["agency_admin", "agency"]})
+    admin_users = await user_controller.get_users_by_field(permissions={"$in": ["admin"]})
+    users += admin_users
     return users

@@ -65,7 +65,8 @@ async def create_order(order: OrderModel, user: UserModel, products: list = None
         type=order_type,
         amount=order.order_total,
         lead_amount=order.fresh_lead_amount,
-        second_chance_lead_amount=order.second_chance_lead_amount
+        second_chance_lead_amount=order.second_chance_lead_amount,
+        agent_name=user.name
     )
     return created_order
 

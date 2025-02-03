@@ -141,7 +141,7 @@ def send_new_sign_up_email(emails, campaign_name, agent_name, agent_email, agent
     )
 
 
-def send_new_order_email(emails, campaign, type, amount, lead_amount, second_chance_lead_amount):
+def send_new_order_email(emails, campaign, type, amount, lead_amount, second_chance_lead_amount, agent_name):
     with open("app/templates/agency/new-order.html") as new_order_html:
         new_order_template = Template(new_order_html.read())
         rendered_html = new_order_template.render(
@@ -149,7 +149,8 @@ def send_new_order_email(emails, campaign, type, amount, lead_amount, second_cha
             type=type,
             amount=amount,
             lead_amount=lead_amount,
-            second_chance_lead_amount=second_chance_lead_amount
+            second_chance_lead_amount=second_chance_lead_amount,
+            agent_name=agent_name
         )
 
     with open("app/templates/agency/new-order.txt") as new_order_text:
@@ -159,7 +160,8 @@ def send_new_order_email(emails, campaign, type, amount, lead_amount, second_cha
             type=type,
             amount=amount,
             lead_amount=lead_amount,
-            second_chance_lead_amount=second_chance_lead_amount
+            second_chance_lead_amount=second_chance_lead_amount,
+            agent_name=agent_name
         )
 
     send_batch_email(
