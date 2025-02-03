@@ -134,7 +134,7 @@ async def show_lead(id: str, user: UserModel = Depends(get_current_user)):
             if lead.campaign_id not in user.campaigns:
                 raise HTTPException(status_code=404, detail="User does not have access to this campaign")
             if user.is_agent():
-                if id != user.agent_id:
+                if lead.buyer_id != user.agent_id:
                     raise HTTPException(status_code=404, detail="User does not have access to this lead")
         return lead.to_json()
 
