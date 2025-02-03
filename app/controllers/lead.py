@@ -140,7 +140,7 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
     except bson.errors.InvalidId:
         raise LeadIdInvalidError(f"Invalid id {id} on update lead route")
     except Exception as e:
-        logger.error(f"Error updating lead {id}: {str(e)}")
+        logger.error(f"Error updating lead {id}: {str(e)} . Lead info: {lead}")
         raise Exception("Error")
 
 
