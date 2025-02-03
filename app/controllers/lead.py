@@ -139,6 +139,9 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
             return existing_lead
     except bson.errors.InvalidId:
         raise LeadIdInvalidError(f"Invalid id {id} on update lead route")
+    except Exception as e:
+        logger.error(f"Error updating lead {id}: {str(e)}")
+        raise Exception("Error")
 
 
 async def update_lead_from_ghl(id, lead: lead_model.UpdateLeadModel):
