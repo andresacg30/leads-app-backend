@@ -5,9 +5,12 @@ from app.models.campaign import CampaignModel
 
 
 def validate_phone_number(phone_number):
-    if len(phone_number) != 10:
-        return False
-    return True
+    digits_only = ''.join(filter(str.isdigit, phone_number))
+
+    if len(digits_only) == 11 and digits_only.startswith('1'):
+        digits_only = digits_only[1:]
+
+    return len(digits_only) == 10
 
 
 async def validate_duplicate(lead: LeadModel, campaign_id: str):
