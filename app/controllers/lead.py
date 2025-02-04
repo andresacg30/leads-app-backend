@@ -570,7 +570,7 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
             agent_crm = crm_chooser(agent_to_distribute.CRM.name)
             if agent_crm and agent_to_distribute.CRM.integration_details:
                 agent_integration_details = agent_to_distribute.CRM.integration_details[str(campaign.id)]
-                fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')
+                fresh_creds = next(cred for cred in agent_integration_details if cred.type == 'fresh')
                 if fresh_creds:
                     fresh_creds.pop('type')
                     agent_crm = agent_crm(
