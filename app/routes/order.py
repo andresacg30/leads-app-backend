@@ -83,7 +83,10 @@ async def list_orders(page: int = 1, limit: int = 10, sort: str = "date=DESC" , 
             if "campaign_id" in filter:
                 filter["campaign_id"] = {"$in": [bson.ObjectId(campaign) for campaign in filter["campaign_id"]]}
             if "agent_id" in filter:
-                filter["agent_id"] = {"$in": [bson.ObjectId(agent) for agent in filter["agent_id"]]}
+                if isinstance(filter["agent_id"], str):
+                    filter["agent_id"] = {"$in": [bson.ObjectId(filter["agent_id"])]}
+                elif isinstance(filter["agent_id"], list):
+                    filter["agent_id"] = {"$in": [bson.ObjectId(agent) for agent in filter["agent_id"]]}
         sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
         orders, total = await order_controller.get_all_orders(page=page, limit=limit, sort=sort, filter=filter)
         data = await asyncio.gather(*(order.to_json() for order in OrderCollection(data=orders).data))
