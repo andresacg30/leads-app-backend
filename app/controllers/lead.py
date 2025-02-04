@@ -572,6 +572,7 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
                 agent_integration_details = agent_to_distribute.CRM.integration_details[str(campaign.id)]
                 fresh_creds = next(cred for cred in agent_integration_details if cred.type == 'fresh')
                 if fresh_creds:
+                    fresh_creds = fresh_creds.to_json()
                     fresh_creds.pop('type')
                     agent_crm = agent_crm(
                         integration_details=fresh_creds
@@ -671,7 +672,7 @@ async def send_fresh_leads_to_agent(lead_ids: list, agent: dict, campaign: Campa
     if agent["CRM"]["name"]:
         agent_crm = crm_chooser(agent["CRM"]["name"])
         if agent_crm and agent["CRM"]["integration_details"]:
-            agent_integration_details = agent["CRM"]["integration_details"][campaign_id]
+            agent_integration_details = agent["CRM"]["integration_details"][str(campaign_id)]
             fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')
             fresh_creds.pop('type')
             agent_crm = agent_crm(
@@ -681,10 +682,14 @@ async def send_fresh_leads_to_agent(lead_ids: list, agent: dict, campaign: Campa
                 lead = await get_one_lead(lead_id)
                 agent_crm.push_lead(lead.crm_json())
                 logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_id}")
+    else:
+        logger.warning(f"No CRM found for agent {agent_id}")
     if agent["lead_price_override"]:
         lead_price = agent["lead_price_override"]
+        logger.info(f"Lead price override found for agent {agent_id}")
     else:
         lead_price = campaign.price_per_lead
+        logger.info(f"No lead price override found for agent {agent_id}")
     await transaction_controller.create_transaction(
         TransactionModel(
             user_id=user.id,

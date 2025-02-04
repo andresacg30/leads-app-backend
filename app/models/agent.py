@@ -14,9 +14,21 @@ class IntegrationDetail(BaseModel):
     sid: str
     type: str
 
+    def to_json(self):
+        return {
+            "auth_token": self.auth_token,
+            "sid": self.sid,
+            "type": self.type
+        }
+
 
 class IntegrationDetailsUpdate(BaseModel):
     integration_details: List
+    
+    def to_json(self):
+        return {
+            "integration_details": [detail.to_json() for detail in self.integration_details]
+        }
 
 
 class CRMModel(BaseModel):
