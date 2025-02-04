@@ -549,10 +549,12 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
     if not agents_with_open_orders:
         logger.warning(f"No agents with balance found for lead {lead_id}")
         return
+    logger.info(f"Agents with open orders: {agents_with_open_orders}")
     eligible_agents = await get_eligible_agents_for_lead(agents_with_open_orders, lead)
     if not eligible_agents:
         logger.warning(f"No agents licensed in {lead.state} with balance found for lead {lead_id}")
         return
+    logger.info(f"Eligible agents: {eligible_agents}")
     agent_to_distribute: AgentModel = choose_agent(agents=eligible_agents, distribution_type="round_robin")
     if agent_to_distribute:
         if agent_to_distribute.lead_price_override:
@@ -600,6 +602,8 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
                     campaign_id=lead.campaign_id
                 )
             )
+            logger.info(f"Lead {lead_id} assigned to agent {agent_to_distribute.id}")
+    logger.info(f"Lead {lead_id} not assigned to any agent")
 
 
 def choose_agent(agents, distribution_type):
