@@ -11,7 +11,6 @@ OG_CAMPAIGNS = [
     "6668b634a88f8e5a8dde197e",  # Capital
     "6668b634a88f8e5a8dde197f",  # Freedom
     "6668b634a88f8e5a8dde197c",  # LJL
-    "6668b634a88f8e5a8dde197d",  # Legacy
     "6668b634a88f8e5a8dde1980",  # Secure
     "667c4fe1664290677c6dc24d",  # Independant
     "668d8c02e990ca1088f7a3e0",  # Legacy LT
