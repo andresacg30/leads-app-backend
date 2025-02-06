@@ -361,6 +361,7 @@ async def get_agents_with_open_orders(campaign_id: ObjectId, lead: LeadModel):
         }},
         {"$match": {
             "orders.status": "open",
+            "campaign_id": campaign_id,
             "$expr": {
                 "$cond": {
                     "if": {"$eq": [lead.is_second_chance, True]},
