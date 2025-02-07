@@ -1,0 +1,17 @@
+LEADCONEX
+
+Subscription Cancellation Confirmed
+
+Dear {{ user_name }},
+
+We confirm that your subscription has been successfully cancelled. Here are the details of your cancellation:
+
+Campaign: {{ campaign }}
+Amount: ${{ amount }}
+Cancellation Date: {{ cancellation_date }}
+
+If you have any questions or wish to reactivate your subscription in the future, please sign in with your email to app.leadconex.com and visit the Lead Marketplace.
+
+Thank you for having been a {{ campaign }} customer.
+
+© LeadConex. All rights reserved.

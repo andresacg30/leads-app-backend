@@ -1,0 +1,11 @@
+LEADCONEX
+
+Subscription Cancellation
+
+user_name has cancelled his subscription.
+
+Campaign: {{ campaign }}
+Amount: ${{ amount }}
+Cancellation Date: {{ cancellation_date }}
+
+© LeadConex. All rights reserved.

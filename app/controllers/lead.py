@@ -567,7 +567,11 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
         if current_lead_order:
             lead.lead_order_id = current_lead_order.id
         if agent_to_distribute.CRM.name:
-            agent_crm = crm_chooser(agent_to_distribute.CRM.name)
+            try:
+                agent_crm = crm_chooser(agent_to_distribute.CRM.name)
+            except ValueError as e:
+                logger.error(f"Error choosing CRM for agent {agent_to_distribute.id}: {str(e)}")
+                agent_crm = None
             if agent_crm and agent_to_distribute.CRM.integration_details:
                 agent_integration_details = agent_to_distribute.CRM.integration_details[str(campaign.id)]
                 fresh_creds = next(cred for cred in agent_integration_details if cred.type == 'fresh')

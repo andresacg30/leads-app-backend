@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Subscription Canceled</title>
+    <style>
+        body {
+            background-color: #282828;
+            color: #FFFFFF;
+            font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            background-color: #383838;
+            margin: 0 auto;
+            padding: 20px;
+            max-width: 600px;
+            border-radius: 8px;
+        }
+        .header {
+            text-align: center;
+            padding: 10px 0;
+        }
+        .header h1 {
+            color: #D4AF37;
+            margin: 0;
+        }
+        .content {
+            padding: 20px 0;
+            color: #FFFFFF;
+        }
+        .subscription-info {
+            background-color: #424242;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .subscription-info p {
+            margin: 5px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 10px 0;
+            font-size: 12px;
+            color: #B0B0B0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>LEADCONEX</h1>
+        </div>
+        <div class="content">
+            <h2>Subscription Cancellation</h2>
+            <p>{{ user_name }} has cancelled his subscription.</p>
+            
+            <div class="subscription-info">
+                <p><strong>Campaign:</strong> {{ campaign_name }}</p>
+                <p><strong>Amount:</strong> ${{ amount }}</p>
+                <p><strong>Cancellation Date:</strong> {{ cancellation_date }}</p>
+            </div>
+            
+        </div>
+        <div class="footer">
+            <p>&copy; LeadConex. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html></div>

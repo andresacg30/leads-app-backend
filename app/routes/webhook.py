@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, HTTPException, Response
 from app.models.user import SubscriptionDetailsModel
 from app.controllers import user as user_controller
 from settings import get_settings
-from app.tools.emails import send_error_to_admin
+from app.tools.emails import send_error_to_admin, send_cancellation_email_to_agent, send_cancellation_email_to_agency
 
 router = APIRouter(prefix="/api/webhook", tags=["order"])
 settings = get_settings()
@@ -34,6 +34,25 @@ async def create_order_from_stripe_subscription_payment_self_account(
     """
     response = await create_order_from_stripe_subscription_payment(request=request, endpoint_secret=settings.stripe_self_account_payment_endpoint_secret)
     return response
+
+
+@router.post("/cancel-subscription")
+async def cancel_subscription(request: Request):
+    """
+    Cancel a user's subscription.
+    """
+    response = await cancel_subscription_from_stripe(request=request, endpoint_secret=settings.stripe_cancel_subscription_endpoint_secret)
+    return response
+
+
+@router.post("/cancel-subscription-self-account")
+async def cancel_subscription_self_account(request: Request):
+    """
+    Cancel a user's subscription.
+    """
+    response = await cancel_subscription_from_stripe(request=request, endpoint_secret=settings.stripe_cancel_subscription_endpoint_secret_self_account)
+    return response
+
 
 
 async def create_order_from_stripe_subscription_payment(
@@ -113,17 +132,17 @@ async def create_order_from_stripe_subscription_payment(
         return Response(content=f"Error: {e}", media_type="application/json", status_code=200)
 
 
-@router.post("/cancel-subscription")
-async def cancel_subscription(request: Request):
+async def cancel_subscription_from_stripe(request: Request, endpoint_secret):
     """
     Cancel a user's subscription.
     """
+    from app.controllers import campaign as campaign_controller
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
     event = await stripe_controller.construct_event(
         payload=payload,
         sig_header=sig_header,
-        endpoint_secret=settings.stripe_cancel_subscription_endpoint_secret
+        endpoint_secret=endpoint_secret
     )
     if not event:
         raise HTTPException(status_code=400, detail="Invalid signature")
@@ -144,6 +163,23 @@ async def cancel_subscription(request: Request):
             canceled_subscription.end_date = datetime.datetime.utcnow()
             user.subscription_details.past_subscriptions.append(canceled_subscription)
             await user_controller.update_user(user)
+            stripe_account = event.account if hasattr(event, "account") else settings.stripe_self_account
+            campaign = await campaign_controller.get_campaign_by_stripe_account_id(stripe_account)
+            send_cancellation_email_to_agent(
+                email=user.email,
+                user_name=user.name,
+                campaign_name=campaign.name,
+                amount=canceled_subscription.amount_per_week,
+                cancellation_date=canceled_subscription.end_date
+            )
+            campaign_email_addresses = [user.email for user in await campaign_controller.get_campaign_agency_users(campaigns=[campaign])]
+            send_cancellation_email_to_agency(
+                emails=campaign_email_addresses,
+                user_name=user.name,
+                campaign_name=campaign.name,
+                amount=canceled_subscription.amount_per_week,
+                cancellation_date=canceled_subscription.end_date
+            )
             logger.info(f"Webhook received, subscription cancelled for user {user.id}")
             return Response(content="Webhook received, subscription cancelled", media_type="application/json", status_code=200)
         except user_controller.UserNotFoundError:

@@ -170,3 +170,57 @@ def send_new_order_email(emails, campaign, type, amount, lead_amount, second_cha
         template=rendered_html,
         text=rendered_text
     )
+
+
+def send_cancellation_email_to_agent(email, user_name, campaign_name, amount, cancellation_date):
+    with open("app/templates/agent/subscription-cancelled.html") as cancelation_html:
+        cancelation_template = Template(cancelation_html.read())
+        rendered_html = cancelation_template.render(
+            user_name=user_name,
+            campaign_name=campaign_name,
+            amount=amount,
+            cancellation_date=cancellation_date
+        )
+
+    with open("app/templates/agent/subscription-cancelled.txt") as cancelation_text:
+        cancelation_text = cancelation_text.read()
+        rendered_text = cancelation_template.render(
+            user_name=user_name,
+            campaign_name=campaign_name,
+            amount=amount,
+            cancellation_date=cancellation_date
+        )
+
+    send_single_email(
+        to_address=email,
+        subject=f"Your {campaign_name} Subscription has been Canceled",
+        template=rendered_html,
+        text=rendered_text
+    )
+
+
+def send_cancellation_email_to_agency(emails, user_name, campaign_name, amount, cancellation_date):
+    with open("app/templates/agency/subscription-cancelled.html") as cancelation_html:
+        cancelation_template = Template(cancelation_html.read())
+        rendered_html = cancelation_template.render(
+            user_name=user_name,
+            campaign_name=campaign_name,
+            amount=amount,
+            cancellation_date=cancellation_date
+        )
+
+    with open("app/templates/agency/subscription-cancelled.txt") as cancelation_text:
+        cancelation_text = cancelation_text.read()
+        rendered_text = cancelation_template.render(
+            user_name=user_name,
+            campaign_name=campaign_name,
+            amount=amount,
+            cancellation_date=cancellation_date
+        )
+
+    send_batch_email(
+        to_addresses=emails,
+        subject=f"Agent {user_name} has Canceled their Subscription",
+        template=rendered_html,
+        text=rendered_text
+    )

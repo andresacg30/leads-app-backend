@@ -186,6 +186,15 @@ async def get_campaign_id_by_stripe_account_id(stripe_account_id: str):
     return campaign["_id"]
 
 
+async def get_campaign_by_stripe_account_id(stripe_account_id: str):
+    campaign_collection = get_campaign_collection()
+    campaign_in_db = await campaign_collection.find_one({"stripe_account_id": stripe_account_id})
+    if not campaign_in_db:
+        return
+    campaign = campaign_models.CampaignModel(**campaign_in_db)
+    return campaign
+
+
 async def get_campaign_agency_users(campaigns: List[campaign_models.CampaignModel]):
     import app.controllers.user as user_controller
     campaign_ids = [campaign.id for campaign in campaigns]
