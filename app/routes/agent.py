@@ -18,6 +18,28 @@ from app.tools import mappings, formatters
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 
+@router.post("/enroll-new-campaign", response_description="Enroll agent in new campaign", response_model_by_alias=False)
+async def enroll_agent_in_new_campaign(
+    agency_code: str = Body(...),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Enroll agent in new campaign
+    """
+    from app.controllers.campaign import get_campaign_by_sign_up_code
+    if not user.is_admin():
+        raise HTTPException(status_code=404, detail="User does not have permission to enroll agent in new campaign")
+    try:
+        campaign = await get_campaign_by_sign_up_code(agency_code)
+        campaign_update_for_user = await user_controller.enroll_user_in_campaign(user=user, campaign=campaign)
+        campaign_update_for_agent = await agent_controller.enroll_agent_in_campaign(
+            agent=user.agent_id,
+            campaign=campaign.id
+        )
+        
+    except agent_controller.AgentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 @router.put(
     "/update-daily-limit/{id}",
     response_description="Update daily lead limit for agent",
