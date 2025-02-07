@@ -120,10 +120,13 @@ async def update_user(user: user_model.UserModel):
 
 async def store_refresh_token(username: str, refresh_token: str):
     user_collection = get_user_collection()
-    await user_collection.update_one(
+    update = await user_collection.update_one(
         {"email": username},
         {"$set": {"refresh_token": refresh_token}}
     )
+    if update.modified_count == 0:
+        logger.debug(f"User {username} not found")
+    return update
 
 
 async def get_users(ids):

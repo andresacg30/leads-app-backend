@@ -208,7 +208,7 @@ async def user_login(user_credentials: UserSignIn = Body(...)):
         password = hash_helper.verify(user_credentials.password, user_exists.password)
         if password:
             tokens = sign_jwt(user_credentials.username, user_exists.permissions)
-            await user_controller.store_refresh_token(user_credentials.username, tokens["refresh_token"])
+            user_exists.refresh_token = tokens["refresh_token"]
             user_exists.last_login = datetime.datetime.utcnow()
             await user_controller.update_user(user_exists)
             return tokens
