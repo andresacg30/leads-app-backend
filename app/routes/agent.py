@@ -65,11 +65,8 @@ async def refund_credit_to_agent(
         raise HTTPException(status_code=404, detail="User does not have permission to refund credit to agent")
     try:
         agent_user = await user_controller.get_user_by_field(agent_id=bson.ObjectId(agent_id))
-        if not agent_user.is_agent():
-            if agent_user.is_new_user():
-                await user_controller.change_user_permissions(agent_user.id, ["agent"])
-            else:
-                raise HTTPException(status_code=404, detail="User is not an agent")
+        if agent_user.is_new_user():
+            await user_controller.change_user_permissions(agent_user.id, ["agent"])
         created_transaccion, created_order = await user_controller.refund_credit(
             campaign_id=campaign_id,
             user=agent_user,
