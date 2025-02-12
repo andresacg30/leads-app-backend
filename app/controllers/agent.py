@@ -636,4 +636,6 @@ async def enroll_agent_in_campaign(agent_id: bson.ObjectId, campaign_id: bson.Ob
         {"_id": agent_id},
         {"$addToSet": {"campaigns": campaign_id}}
     )
+    if updated_agent.modified_count == 0:
+        raise AgentNotFoundError(f"Agent with id {agent_id} not found.")
     return updated_agent
