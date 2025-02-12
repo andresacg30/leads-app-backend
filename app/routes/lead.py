@@ -136,7 +136,9 @@ async def show_lead(id: str, user: UserModel = Depends(get_current_user)):
             if user.is_agent():
                 if lead.buyer_id != user.agent_id:
                     raise HTTPException(status_code=404, detail="User does not have access to this lead")
-                lead.custom_fields["trustedform_url"] = None
+                del lead.custom_fields["invalid"]
+                del lead.custom_fields["invalid_reason"]
+                del lead.custom_fields["trustedform_url"]
         return lead.to_json()
 
     except lead_controller.LeadNotFoundError as e:
