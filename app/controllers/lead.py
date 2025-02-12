@@ -674,7 +674,7 @@ async def send_fresh_leads_to_agent(lead_ids: list, agent: dict, campaign: Campa
             "lead_order_id": oldest_open_order.id
         }}
     )
-    if agent["CRM"]["name"]:
+    if agent.get("CRM").get("name"):
         agent_crm = crm_chooser(agent["CRM"]["name"])
         if agent_crm and agent["CRM"]["integration_details"]:
             agent_integration_details = agent["CRM"]["integration_details"][str(campaign_id)]
@@ -736,10 +736,10 @@ async def send_second_chance_leads_to_agent(lead_ids: list, agent: AgentModel, c
             "second_chance_lead_order_id": oldest_open_order.id
         }}
     )
-    if agent["CRM"]["name"]:
+    if agent.get("CRM").get("name"):
         agent_crm = crm_chooser(agent["CRM"]["name"])
         if agent_crm and agent["CRM"]["integration_details"]:
-            agent_integration_details = agent["CRM"]["integration_details"][campaign_id]
+            agent_integration_details = agent["CRM"]["integration_details"][str(campaign_id)]
             second_chance_creds = next(cred for cred in agent_integration_details if cred['type'] == 'second_chance')
             second_chance_creds.pop('type')
             agent_crm = agent_crm(
