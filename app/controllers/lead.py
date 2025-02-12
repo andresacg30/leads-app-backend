@@ -435,6 +435,7 @@ def _build_aggregation_pipeline(filter, sort, page, limit, agent_id, date_gte, d
                 }
             }
         },
+        {"$unset": "custom_fields.trustedform_url"},
         {
             "$project": {
                 "first_name": 1,
