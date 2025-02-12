@@ -628,3 +628,14 @@ async def update_daily_lead_limit(agent: AgentModel, campaign_id: bson.ObjectId,
     except Exception as e:
         logger.error(f"Error updating daily lead limit for agent {agent.id}: {e}")
         raise e
+
+
+async def enroll_agent_in_campaign(agent_id: bson.ObjectId, campaign_id: bson.ObjectId):
+    agent_collection = get_agent_collection()
+    updated_agent = await agent_collection.update_one(
+        {"_id": agent_id},
+        {"$addToSet": {"campaigns": campaign_id}}
+    )
+    if updated_agent.modified_count == 0:
+        raise AgentNotFoundError(f"Agent with id {agent_id} not found.")
+    return updated_agent

@@ -18,6 +18,32 @@ from app.tools import mappings, formatters
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 
+@router.post("/enroll-new-campaign", response_description="Enroll agent in new campaign", response_model_by_alias=False)
+async def enroll_agent_in_new_campaign(
+    agency_code: str = Body(..., embed=True),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Enroll agent in new campaign
+    """
+    from app.controllers.campaign import get_campaign_by_sign_up_code
+    try:
+        campaign = await get_campaign_by_sign_up_code(agency_code)
+        if campaign.id in user.campaigns:
+            raise HTTPException(status_code=400, detail="Agent is already enrolled in this campaign")
+        campaign_update_for_user = await user_controller.enroll_user_in_campaign(
+            user=user,
+            campaign=campaign
+        )
+        campaign_update_for_agent = await agent_controller.enroll_agent_in_campaign(
+            agent_id=user.agent_id,
+            campaign_id=campaign.id
+        )
+        if campaign_update_for_user and campaign_update_for_agent:
+            return {"message": "Agent enrolled in new campaign"}
+    except agent_controller.AgentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 @router.put(
     "/update-daily-limit/{id}",
     response_description="Update daily lead limit for agent",

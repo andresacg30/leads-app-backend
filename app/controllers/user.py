@@ -498,3 +498,18 @@ async def get_users_by_field(**kwargs):
         return users
     except UserNotFoundError:
         raise HTTPException(status_code=404, detail="Users not found")
+
+
+async def enroll_user_in_campaign(user: user_model.UserModel, campaign: CampaignModel):
+    user_collection = get_user_collection()
+    stripe_customer = await stripe_controller.create_customer(user, campaign.stripe_account_id)
+    updated_user = await user_collection.update_one(
+        {"_id": user.id},
+        {
+            "$addToSet": {"campaigns": campaign.id},
+            "$set": {f"stripe_customer_ids.{campaign.id}": stripe_customer.id}
+        }
+    )
+    if updated_user.modified_count == 0:
+        raise Exception("Failed to enroll user in campaign")
+    return updated_user
