@@ -18,6 +18,26 @@ router = APIRouter(prefix="/api/lead", tags=["lead"])
 
 
 @router.post(
+    "/mark-as-sold-by-agent",
+    response_description="Mark leads as sold by agent",
+    response_model_by_alias=False
+)
+async def mark_leads_as_sold_by_agent(
+    lead_ids: List[str] = Body(..., embed=True),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Mark leads as sold by agent
+    """
+    if not user.is_agent():
+        raise HTTPException(status_code=404, detail="User does not have required permissions")
+    if not lead_ids:
+        raise HTTPException(status_code=400, detail="Lead ids are required")
+    await lead_controller.mark_leads_as_sold(lead_ids)
+    return {"message": "Leads marked as sold"}
+
+
+@router.post(
     "/send-leads-to-agent",
     response_description="Send leads to agent",
     response_model_by_alias=False
