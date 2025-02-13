@@ -34,7 +34,6 @@ async def mark_leads_as_sold_by_agent(
     if not lead_ids:
         raise HTTPException(status_code=400, detail="Lead ids are required")
     await lead_controller.mark_leads_as_sold(lead_ids)
-    await lead_background_jobs.delete_background_task_by_lead_ids(lead_ids)
     return {"message": "Leads marked as sold"}
 
 

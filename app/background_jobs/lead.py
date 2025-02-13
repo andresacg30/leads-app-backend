@@ -1,8 +1,11 @@
 from datetime import datetime, timedelta
 import logging
 
+import bson
+
 import app.controllers.lead as lead_controller
 
+from app.background_jobs.job import enqueue_background_job
 from app.models.lead import LeadModel
 from app.tools.async_tools import run_async
 from app.resources import rq
@@ -76,10 +79,16 @@ async def delete_background_task_by_lead_ids(lead_ids: list):
     for lead_id in lead_ids:
         lead = await lead_controller.get_one_lead(lead_id)
         if lead.second_chance_task_id:
-            rq.remove(lead.second_chance_task_id)
+            try:
+                enqueue_background_job(
+                    'app.background_jobs.job.cancel_job',
+                    lead.second_chance_task_id
+                )
+            except Exception as e:
+                logger.error(f"Error deleting task {lead.second_chance_task_id}: {e}")
             lead.second_chance_task_id = None
             await lead_collection.update_one(
-                {"_id": lead_id},
+                {"_id": bson.ObjectId(lead_id)},
                 {"$set": {"second_chance_task_id": None}}
             )
     return "Success"
