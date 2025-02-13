@@ -2,7 +2,7 @@ LEADCONEX
 
 Subscription Cancellation
 
-user_name has cancelled his subscription.
+user_name has cancelled their subscription.
 
 Campaign: {{ campaign }}
 Amount: ${{ amount }}
