@@ -26,6 +26,9 @@ def process_lead(lead: LeadModel, lead_id: str):
 async def process_second_chance_lead(lead_id: str):
     logger.info(f"Lead {lead_id} is being processed for second chance")
     lead = await lead_controller.get_one_lead(lead_id)
+    if lead.lead_sold_by_agent_time:
+        logger.info(f"Lead {lead_id} has already been sold by an agent")
+        return "Lead already sold"
     lead.is_second_chance = True
     lead.became_second_chance_time = datetime.utcnow()
     await lead_controller.update_lead(lead_id, lead)
@@ -64,4 +67,19 @@ async def schedule_for_second_chance(lead: LeadModel, lead_id: str, time: int):
     lead.second_chance_task_id = task_id.id
     await lead_controller.update_lead(lead_id, lead)
     logger.info(f"Task ID for lead {lead.full_name}: {task_id}")
+    return "Success"
+
+
+async def delete_background_task_by_lead_ids(lead_ids: list):
+    logger.info(f"Deleting background tasks for {len(lead_ids)} leads")
+    lead_collection = lead_controller.get_lead_collection()
+    for lead_id in lead_ids:
+        lead = await lead_controller.get_one_lead(lead_id)
+        if lead.second_chance_task_id:
+            rq.remove(lead.second_chance_task_id)
+            lead.second_chance_task_id = None
+            await lead_collection.update_one(
+                {"_id": lead_id},
+                {"$set": {"second_chance_task_id": None}}
+            )
     return "Success"

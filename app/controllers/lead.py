@@ -1004,3 +1004,11 @@ async def todays_lead_count_by_agent(agent_id: str, campaign_id: str) -> int:
         "campaign_id": ObjectId(campaign_id)
     }
     return await lead_collection.count_documents(query)
+
+
+async def mark_leads_as_sold(lead_ids):
+    lead_collection = get_lead_collection()
+    await lead_collection.update_many(
+        {"_id": {"$in": [ObjectId(lead_id) for lead_id in lead_ids]}},
+        {"$set": {"lead_sold_by_agent_time": datetime.utcnow()}}
+    )
