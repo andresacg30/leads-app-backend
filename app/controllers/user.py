@@ -267,10 +267,7 @@ async def get_all_users(page, limit, sort, filter, user):
         {"$limit": limit}
     ])
     users = await user_collection.aggregate(pipeline).to_list(None)
-    if filter:
-        total = len(users)
-    else:
-        total = await user_collection.count_documents({})
+    total = await user_collection.count_documents(filter)
     return users, total
 
 
