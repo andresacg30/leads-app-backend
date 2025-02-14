@@ -13,7 +13,7 @@ import app.controllers.user as user_controller
 import app.background_jobs.user as user_background_jobs
 import app.integrations.stripe as stripe_integration
 
-from app.auth.jwt_handler import sign_jwt, decode_jwt
+from app.auth.jwt_handler import sign_jwt, decode_jwt, sign_impersonate_jwt
 from app.auth.jwt_bearer import get_current_user
 from app.background_jobs.job import cancel_job
 from app.models.agent import IntegrationDetailsUpdate
@@ -192,6 +192,24 @@ async def resend_otp(request: Request, email: str = Body(..., embed=True)):
     return {"message": "OTP code resent successfully"}
 
 
+@router.post("/impersonate")
+async def impersonate_user(request: Request, data: dict = Body(...), current_user: UserModel = Depends(get_current_user)):
+    if not (current_user.is_admin() or current_user.is_agency()):
+        raise HTTPException(status_code=403, detail="You do not have permission to impersonate another user")
+
+    user_id = data.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required")
+
+    try:
+        impersonated_user = await user_controller.get_user(bson.ObjectId(user_id))
+    except Exception:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    tokens = sign_impersonate_jwt(impersonated_user.email, impersonated_user.permissions)
+    return {"token": tokens["access_token"]}
+
+
 @router.post("/login")
 async def user_login(user_credentials: UserSignIn = Body(...)):
     if user_credentials.otp:
@@ -265,6 +283,21 @@ async def refresh_token(refresh_request: RefreshTokenRequest = Body(...)):
         raise HTTPException(status_code=403, detail="Invalid refresh token")
     except Exception:
         raise HTTPException(status_code=403, detail="Invalid refresh token")
+
+
+@router.get("/{id}")
+async def show_user(id: str, request_user: UserModel = Depends(get_current_user)):
+    try:
+        if not request_user.is_admin():
+            if not request_user.campaigns:
+                raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+        user = await user_controller.get_user(bson.ObjectId(id))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        user.campaigns = list(filter(lambda campaign: campaign in request_user.campaigns, user.campaigns))
+        return user.to_json()
+    except user_controller.UserNotFoundError:
+        raise HTTPException(status_code=404, detail="User not found")
 
 
 @router.post("/get-many")
@@ -358,7 +391,7 @@ async def list_users(page: int = 1, limit: int = 10, sort: str = "name=ASC", fil
                 raise HTTPException(status_code=404, detail="User does not have access to this campaign")
             filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in user.campaigns]}
         sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
-        users, total = await user_controller.get_all_users(page=page, limit=limit, sort=sort, filter=filter)
+        users, total = await user_controller.get_all_users(page=page, limit=limit, sort=sort, filter=filter, user=user)
         return {
             "data": list(user.to_json() for user in UserCollection(data=users).data),
             "total": total

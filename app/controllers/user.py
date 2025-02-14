@@ -234,12 +234,14 @@ async def get_user_balance_by_agent_id(id: str):
     return user.get("balance") or []
 
 
-async def get_all_users(page, limit, sort, filter):
+async def get_all_users(page, limit, sort, filter, user):
     user_collection = get_user_collection()
     pipeline = []
 
     if filter:
         pipeline.append({"$match": filter})
+    if not user.is_admin():
+        campaigns = filter["campaigns"]["$in"]
 
     pipeline.extend([
         {"$project": {
@@ -251,7 +253,13 @@ async def get_all_users(page, limit, sort, filter):
             "agent_id": 1,
             "balance": 1,
             "permissions": 1,
-            "campaigns": 1,
+            "campaigns": {
+                "$filter": {
+                    "input": "$campaigns",
+                    "as": "campaign",
+                    "cond": {"$in": ["$$campaign", campaigns]}
+                }
+            } if not user.is_admin() else 1,
             "email_verified": 1,
         }},
         {"$sort": {sort[0]: sort[1]}},
@@ -513,3 +521,12 @@ async def enroll_user_in_campaign(user: user_model.UserModel, campaign: Campaign
     if updated_user.modified_count == 0:
         raise Exception("Failed to enroll user in campaign")
     return updated_user
+
+
+async def get_user(id: bson.ObjectId):
+    user_collection = get_user_collection()
+    user_in_db = await user_collection.find_one({"_id": id})
+    if not user_in_db:
+        raise UserNotFoundError(f"User with id {id} not found")
+    user = user_model.UserModel(**user_in_db)
+    return user
