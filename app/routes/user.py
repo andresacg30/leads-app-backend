@@ -194,7 +194,7 @@ async def resend_otp(request: Request, email: str = Body(..., embed=True)):
 
 @router.post("/impersonate")
 async def impersonate_user(request: Request, data: dict = Body(...), current_user: UserModel = Depends(get_current_user)):
-    if not (current_user.is_admin() or current_user.is_agency()):
+    if not (current_user.is_admin() or current_user.is_agency() or current_user.is_agency_admin()):
         raise HTTPException(status_code=403, detail="You do not have permission to impersonate another user")
 
     user_id = data.get("user_id")

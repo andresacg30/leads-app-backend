@@ -79,6 +79,10 @@ class UserModel(BaseModel):
     @property
     def ROLE_ADMIN(self) -> str:
         return "admin"
+    
+    @property
+    def ROLE_AGENCY_ADMIN(self) -> str:
+        return "agency_admin"
 
     @property
     def ROLE_NEW_USER(self) -> str:
@@ -95,6 +99,9 @@ class UserModel(BaseModel):
 
     def is_new_user(self) -> bool:
         return self.ROLE_NEW_USER in self.permissions
+
+    def is_agency_admin(self) -> bool:
+        return self.ROLE_AGENCY_ADMIN in self.permissions
 
     def is_email_verified(self) -> bool:
         return self.email_verified
