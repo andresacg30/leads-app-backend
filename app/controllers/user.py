@@ -243,6 +243,19 @@ async def get_all_users(page, limit, sort, filter, user):
     if not user.is_admin():
         campaigns = filter["campaigns"]["$in"]
 
+    if "q" in filter:
+        query_value = filter["q"]
+        pipeline.append(
+            {"$match": {
+                "$or": [
+                    {"name": {"$regex": query_value, "$options": "i"}},
+                    {"email": {"$regex": query_value, "$options": "i"}},
+                    {"phone": {"$regex": query_value, "$options": "i"}},
+                ]
+            }}
+        )
+        filter.pop("q")
+
     pipeline.extend([
         {"$project": {
             "_id": 1,
