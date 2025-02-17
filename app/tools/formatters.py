@@ -40,3 +40,8 @@ def format_state_to_abbreviation(state):
 def format_phone_number(phone_number):
     digits_only = ''.join(filter(str.isdigit, phone_number))
     return digits_only
+
+
+def get_full_state_name(state):
+    state_name = us.states.lookup(state).name
+    return state_name

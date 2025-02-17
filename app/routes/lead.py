@@ -11,7 +11,7 @@ from app.auth.jwt_bearer import get_current_user
 from app.background_jobs import lead as lead_background_jobs
 from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
 from app.models.user import UserModel
-from app.tools import mappings
+from app.tools import mappings, formatters
 
 
 router = APIRouter(prefix="/api/lead", tags=["lead"])
@@ -255,6 +255,8 @@ async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=D
         filter = _parse_filter(filter)
         if filter:
             filter = _handle_buyer_filters(filter)
+            if "state" in filter:
+                filter = _handle_state_filters(filter)
         sort = _build_sort_tuple(sort)
         filter = _handle_user_filters(filter, user)
 
@@ -271,6 +273,14 @@ def _parse_filter(filter_str: Optional[str]) -> Optional[Dict]:
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid filter string: {e}")
     return None
+
+
+def _handle_state_filters(filter: Dict) -> Dict:
+    if "state" in filter:
+        states = filter["state"]
+        state_abbr_list = [formatters.get_full_state_name(state) for state in states]
+        filter["state"] = {"$in": state_abbr_list}
+    return filter
 
 
 def _build_sort_tuple(sort_str: str) -> tuple:
