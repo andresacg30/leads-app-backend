@@ -556,7 +556,7 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
         logger.warning(f"No agents licensed in {lead.state} with balance found for lead {lead_id}")
         return
     logger.info(f"Eligible agents: {eligible_agents}")
-    agent_to_distribute: AgentModel = choose_agent(agents=eligible_agents, distribution_type="round_robin")
+    agent_to_distribute: AgentModel = choose_agent(agents=eligible_agents, distribution_type="random")
     if agent_to_distribute:
         if agent_to_distribute.lead_price_override:
             lead_price = agent_to_distribute.lead_price_override
