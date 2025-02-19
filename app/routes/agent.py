@@ -83,6 +83,7 @@ async def refund_credit_to_agent(
     campaign_id: str = Body(...),
     agent_id: str = Body(...),
     amount: float = Body(...),
+    distribution_type: str = Body(...),
     user: UserModel = Depends(get_current_user)
 ):
     """
@@ -99,7 +100,8 @@ async def refund_credit_to_agent(
         created_transaccion, created_order = await user_controller.refund_credit(
             campaign_id=campaign_id,
             user=agent_user,
-            amount=amount
+            amount=amount,
+            distribution_type=distribution_type
         )
         return {"transaction_id": str(created_transaccion.inserted_id), "order_id": str(created_order.inserted_id) if created_order else None}
     except user_controller.UserNotFoundError:
