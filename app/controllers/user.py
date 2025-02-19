@@ -427,10 +427,11 @@ async def update_user_integration_details(user_id, campaign_id, integration_deta
 async def refund_credit(
     user: user_model.UserModel,
     campaign_id: str,
-    amount: int
+    amount: int,
+    distribution_type: str
 ):
     from app.controllers.transaction import create_transaction
-    from app.controllers.order import create_order
+    from app.controllers.order import create_order, calculate_lead_amounts_by_distribution
     try:
         transaction = TransactionModel(
             date=datetime.datetime.utcnow(),
@@ -443,11 +444,15 @@ async def refund_credit(
         campaign = await campaign_controller.get_one_campaign(campaign_id)
         created_transaction = await create_transaction(transaction)
         agent = await agent_controller.get_agent(user.agent_id)
+        lead_price = agent.lead_price_override if agent.lead_price_override else campaign.price_per_lead
+        second_chance_lead_price = agent.second_chance_lead_price_override if agent.second_chance_lead_price_override else campaign.price_per_second_chance_lead
 
-        if agent.lead_price_override:
-            fresh_lead_total = math.floor(amount / agent.lead_price_override)
-        else:
-            fresh_lead_total = math.floor(amount / campaign.price_per_lead)
+        fresh_lead_total, second_chance_lead_total = calculate_lead_amounts_by_distribution(
+            order_total=amount,
+            distribution_type=distribution_type,
+            lead_price=lead_price,
+            second_chance_lead_price=second_chance_lead_price
+        )
 
         order = OrderModel(
             agent_id=user.agent_id,
@@ -455,7 +460,8 @@ async def refund_credit(
             order_total=amount,
             status="open",
             type="refund",
-            fresh_lead_total=fresh_lead_total
+            fresh_lead_amount=fresh_lead_total,
+            second_chance_lead_amount=second_chance_lead_total
         )
 
         if agent.lead_price_override:

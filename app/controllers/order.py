@@ -43,7 +43,8 @@ async def create_order(order: OrderModel, user: UserModel, products: list = None
     campaign_last_closed_order = await get_most_recent_closed_order_by_agent_and_campaign(str(user.agent_id), str(order.campaign_id))
     campaign_last_open_order_fresh = await get_oldest_open_order_by_agent_and_campaign(str(user.agent_id), str(order.campaign_id), is_second_chance=False)
     campaign_last_open_order_second_chance = await get_oldest_open_order_by_agent_and_campaign(str(user.agent_id), str(order.campaign_id), is_second_chance=True)
-    order = calculate_lead_amounts(order, order_campaign, agent, products)
+    if order.fresh_lead_amount == 0 and order.second_chance_lead_amount == 0:
+        order = calculate_lead_amounts(order, order_campaign, agent, products)
     if campaign_last_closed_order and not (campaign_last_open_order_fresh or campaign_last_open_order_second_chance):
         added_fresh_leads, added_second_chance_leads = calculate_extra_leads_for_leftover_balance(
             agent=agent,
@@ -262,8 +263,6 @@ def determine_distribution_type(order: OrderModel, agent: AgentModel) -> str:
         elif order.fresh_lead_amount == 0 and order.second_chance_lead_amount > 0:
             return "second_chance_only"
         return "mixed"
-    elif order.type == "refund":
-        return "fresh_only"
     return agent.distribution_type
 
 
