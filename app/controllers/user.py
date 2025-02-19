@@ -73,6 +73,7 @@ async def create_user(user) -> user_model.UserModel:
         phone=user["phone"],
         states_with_license=user["states_with_license"],
         campaigns=user["campaigns"],
+        distribution_type=user["distribution_type"]
     )
     created_agent = await agent_controller.create_agent(agent_model)
 
