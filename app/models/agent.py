@@ -150,7 +150,7 @@ class AgentCredentials(BaseModel):
 
 class DailyLeadLimit(BaseModel):
     campaign_id: Optional[PyObjectId] = Field(alias="campaign_id", default=None)
-    limit: Optional[int] = Field(default=0)
+    limit: Optional[int] = Field(default=10)
 
 
 class AgentModel(BaseModel):

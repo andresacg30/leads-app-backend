@@ -93,6 +93,7 @@ async def update_campaigns_for_agent(agent_id, campaigns):
 
 async def create_agent(agent: AgentModel):
     agent_collection = get_agent_collection()
+    agent.daily_lead_limit = [{"campaign_id": campaign, "daily_lead_limit": constants.DEFAULT_LEAD_LIMIT} for campaign in agent.campaigns]
     created_agent = await agent_collection.insert_one(
         agent.model_dump(by_alias=True, exclude=["id", "full_name"], mode="python")
     )
@@ -607,12 +608,7 @@ async def get_agent_metrics(campaigns: List[bson.ObjectId]) -> Dict[str, int]:
 async def recalculate_daily_limit(agent: AgentModel, order: OrderModel):
     try:
         daily_lead_limit = order.fresh_lead_amount // constants.DAILY_LEAD_LIMIT
-        for campaign in agent.daily_lead_limit:
-            if campaign.campaign_id == order.campaign_id:
-                campaign.limit = daily_lead_limit
-                break
-        updated_agent = await update_agent(agent.id, agent)
-        return updated_agent
+        return daily_lead_limit
     except Exception as e:
         logger.error(f"Error recalculating daily limit for agent {agent.id}: {e}")
         raise e
@@ -621,8 +617,8 @@ async def recalculate_daily_limit(agent: AgentModel, order: OrderModel):
 async def update_daily_lead_limit(agent: AgentModel, campaign_id: bson.ObjectId, daily_lead_limit: int):
     try:
         for campaign in agent.daily_lead_limit:
-            if campaign["campaign_id"] == campaign_id:
-                campaign["daily_lead_limit"] = daily_lead_limit
+            if campaign.campaign_id == campaign_id:
+                campaign.limit = daily_lead_limit
                 break
         updated_agent = await update_agent(agent.id, agent)
         return updated_agent

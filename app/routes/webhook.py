@@ -127,7 +127,7 @@ async def create_order_from_stripe_subscription_payment(
                 logger.error(f"error: {e}")
                 return Response(content=f"error: {e}", media_type="application/json", status_code=200)
     except Exception as e:
-        send_error_to_admin(f"Error: {e}")
+        send_error_to_admin(f"Error: {e}. User: {payment_intent.customer}")
         logger.error(f"Error: {e}")
         return Response(content=f"Error: {e}", media_type="application/json", status_code=200)
 
@@ -153,16 +153,17 @@ async def cancel_subscription_from_stripe(request: Request, endpoint_secret):
             if not user:
                 return Response(content="Webhook received, subscription cancel but no user found", media_type="application/json", status_code=200)
             user.has_subscription = False
-            canceled_subscription = user.subscription_details.current_subscriptions.pop(
-                next(
-                    (i for i, sub in enumerate(user.subscription_details.current_subscriptions)
-                     if sub.amount_per_week == subscription.plan.amount / 100),
-                    -1
+            if user.subscription_details.current_subscriptions:
+                canceled_subscription = user.subscription_details.current_subscriptions.pop(
+                    next(
+                        (i for i, sub in enumerate(user.subscription_details.current_subscriptions)
+                            if sub.amount_per_week == subscription.plan.amount / 100),
+                        -1
+                    )
                 )
-            )
-            canceled_subscription.end_date = datetime.datetime.utcnow()
-            user.subscription_details.past_subscriptions.append(canceled_subscription)
-            await user_controller.update_user(user)
+                canceled_subscription.end_date = datetime.datetime.utcnow()
+                user.subscription_details.past_subscriptions.append(canceled_subscription)
+                await user_controller.update_user(user)
             stripe_account = event.account if hasattr(event, "account") else settings.stripe_self_account
             campaign = await campaign_controller.get_campaign_by_stripe_account_id(stripe_account)
             send_cancellation_email_to_agent(

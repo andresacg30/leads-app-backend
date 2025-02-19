@@ -61,8 +61,11 @@ async def update_daily_lead_limit_for_agent(
     if not user.is_admin():
         raise HTTPException(status_code=404, detail="User does not have permission to update daily lead limit for agent")
     try:
+        agent = await agent_controller.get_agent(id=id)
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
         updated_agent = await agent_controller.update_daily_lead_limit(
-            agent_id=bson.ObjectId(id),
+            agent=agent,
             daily_lead_limit=daily_lead_limit,
             campaign_id=bson.ObjectId(campaign_id)
         )
