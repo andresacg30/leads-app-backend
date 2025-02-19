@@ -286,7 +286,7 @@ def calculate_lead_amounts_by_distribution(
 def calculate_lead_amounts(order: OrderModel, order_campaign: CampaignModel, agent: AgentModel, products: list = None):
     if products:
         for product in products:
-            if product.product_name not in ["Fresh Lead", "Aged Lead", "Second Chance Lead"]:
+            if product.product_name not in ["Fresh Lead", "Aged Lead", "Second Chance Lead", "2nd Chance Lead"]:
                 raise ValueError("Invalid product type")
             if product.product_name == "Fresh Lead":
                 order.fresh_lead_amount = product.quantity
