@@ -14,7 +14,7 @@ from app.models.agent import AgentModel
 from app.models.campaign import CampaignModel
 from app.models.order import OrderModel, UpdateOrderModel
 from app.models.user import UserModel
-from app.tools import emails
+from app.tools import emails, constants
 
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class OrderIdInvalidError(Exception):
 
 async def create_order(order: OrderModel, user: UserModel, products: list = None, leftover_balance: float = 0):
     from app.controllers.campaign import get_one_campaign, get_campaign_agency_users
-    from app.controllers.agent import get_agent_by_field, recalculate_daily_limit
+    from app.controllers.agent import get_agent_by_field, recalculate_daily_limit, update_daily_lead_limit
     agent_in_db = await get_agent_by_field(_id=user.agent_id)
     agent = AgentModel(**agent_in_db)
     order_campaign = await get_one_campaign(str(order.campaign_id))
@@ -56,7 +56,19 @@ async def create_order(order: OrderModel, user: UserModel, products: list = None
     created_order = await order_collection.insert_one(
         order.model_dump(by_alias=True, exclude=["id"], mode="python")
     )
-    await recalculate_daily_limit(agent=agent, order=order)
+    if campaign_last_open_order_fresh or campaign_last_open_order_second_chance:
+        new_limit = await recalculate_daily_limit(agent=agent, order=order)
+        campaign_limit = next(
+            (campaign for campaign in agent.daily_lead_limit if campaign.campaign_id == order.campaign_id),
+            None
+        )
+        highest_limit = max(new_limit, campaign_limit.limit)
+        agent.daily_lead_limit[agent.daily_lead_limit.index(campaign_limit)].limit = highest_limit
+        await update_daily_lead_limit(agent=agent, campaign_id=order.campaign_id, daily_lead_limit=highest_limit)
+    else:
+        new_limit = await recalculate_daily_limit(agent=agent, order=order)
+        higuest_limit = max(new_limit, constants.DEFAULT_LEAD_LIMIT)
+        await update_daily_lead_limit(agent=agent, campaign_id=order.campaign_id, daily_lead_limit=higuest_limit)
     campaign_admin_addresses = [user.email for user in await get_campaign_agency_users([order_campaign])]
     order_type = order.type.capitalize().replace("_", " ")
     emails.send_new_order_email(

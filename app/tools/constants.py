@@ -6,6 +6,8 @@ TIME_FOR_SECOND_CHANCE = 30
 
 DAILY_LEAD_LIMIT = 3
 
+DEFAULT_LEAD_LIMIT = 7
+
 # Campaigns that are currently using GHL and LB for distribution
 OG_CAMPAIGNS = [
     "6668b634a88f8e5a8dde197e",  # Capital
