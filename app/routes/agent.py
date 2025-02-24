@@ -232,7 +232,7 @@ async def create_agent(agent: AgentModel = Body(...), user: UserModel = Depends(
             agent = AgentModel(**agent_in_db_found)
             await user_controller.create_user_from_agent(agent=agent)
             return {"id": str(agent_in_db_found["_id"])}
-    if agent.CRM.name or not agent.CRM.name == "null":
+    if agent.CRM.name or agent.CRM.name != "null":
         agent.CRM.url = mappings.crm_url_mappings[agent.CRM.name]
     if len(agent.states_with_license) == 1:
         agent.states_with_license = formatters.format_state_list(agent.states_with_license)
