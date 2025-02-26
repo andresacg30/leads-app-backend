@@ -112,7 +112,7 @@ def send_welcome_email(email):
     )
 
 
-def send_new_sign_up_email(emails, campaign_name, agent_name, agent_email, agent_phone, agent_states_with_license):
+def send_new_sign_up_email(emails, campaign_name, agent_name, agent_email, agent_phone, agent_states_with_license, agent_answers):
     with open("app/templates/agency/new-sign-up.html") as new_sign_up_html:
         new_sign_up_template = Template(new_sign_up_html.read())
         rendered_html = new_sign_up_template.render(
@@ -120,7 +120,8 @@ def send_new_sign_up_email(emails, campaign_name, agent_name, agent_email, agent
             agent_name=agent_name,
             agent_email=agent_email,
             agent_phone=agent_phone,
-            agent_states_with_license=agent_states_with_license
+            agent_states_with_license=agent_states_with_license,
+            agent_answers=agent_answers
         )
 
     with open("app/templates/agency/new-sign-up.txt") as new_sign_up_text:

@@ -173,6 +173,7 @@ class AgentModel(BaseModel):
     campaigns: List[PyObjectId] = Field(default_factory=list)
     credentials: AgentCredentials = Field(default_factory=AgentCredentials)
     daily_lead_limit: Optional[List[DailyLeadLimit]] = Field(default_factory=list)
+    custom_campaign_responses: dict = Field(default_factory=dict)
     custom_fields: Optional[dict] = Field(default=None)
 
     @validator('phone', pre=True, always=True)
@@ -270,6 +271,7 @@ class UpdateAgentModel(BaseModel):
     credentials: Optional[AgentCredentials] = None
     custom_fields: Optional[dict] = None
     daily_lead_limit: Optional[List[DailyLeadLimit]] = None
+    custom_campaign_responses: dict = Field(default_factory=dict)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,

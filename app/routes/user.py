@@ -1,4 +1,5 @@
 import ast
+from typing import List
 import bson
 import datetime
 import random
@@ -349,7 +350,8 @@ async def user_signup(request: Request, user=Body(...)):
         agent_email=user["email"],
         agent_phone=user["phone"],
         agent_states_with_license=formatted_states,
-        campaign_name=campaign_name
+        campaign_name=campaign_name,
+        agent_answers=user["custom_campaign_responses"]
     )
     return {"id": str(created_user.id)}
 
@@ -401,3 +403,16 @@ async def list_users(page: int = 1, limit: int = 10, sort: str = "name=ASC", fil
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post(
+    "/get-campaign-questions"
+)
+async def get_questions(request: Request, agency_codes: List[str] = Body(..., embed=True)):
+    """
+    Get the custom sign up questions for a campaign.
+    """
+    agency_code = agency_codes[0]
+    campaign: CampaignModel = await campaign_controller.get_campaign_by_sign_up_code(agency_code)
+    questions = [question for question in campaign.custom_sign_up_questions if question]
+    return {"questions": questions}
