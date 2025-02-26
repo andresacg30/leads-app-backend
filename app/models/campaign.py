@@ -21,6 +21,7 @@ class CampaignModel(BaseModel):
     price_per_lead: Optional[float] = Field(default=None)
     price_per_second_chance_lead: Optional[float] = Field(default=None)
     duplication_cutoff_days: Optional[int] = Field(default=None)
+    custom_sign_up_questions: List = Field(default_factory=list)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
@@ -61,6 +62,7 @@ class UpdateCampaignModel(BaseModel):
     price_per_lead: Optional[float] = None
     price_per_second_chance_lead: Optional[float] = None
     duplicate_cutoff_days: Optional[int] = None
+    custom_sign_up_questions: List = Field(default_factory=list)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,

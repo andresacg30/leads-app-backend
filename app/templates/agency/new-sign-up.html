@@ -62,6 +62,14 @@
                 <p><strong>Email:</strong> {{ agent_email }}</p>
                 <p><strong>Licensed States:</strong> {{ agent_states_with_license }}</p>
             </div>
+            {% if agent_answers %}
+            <div class="campaign-questions">
+                <h3>Campaign Questions</h3>
+                {% for question, answer in agent_answers.items() %}
+                <p><strong>{{ question }}:</strong> {{ answer }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
         <div class="footer">
             <p>&copy; LeadConex. All rights reserved.</p>

@@ -104,6 +104,18 @@ async def update_campaign(id, campaign: campaign_models.UpdateCampaignModel):
             campaign_model.id = id
             await onboard_agency_admin(campaign_model)
 
+    if "custom_sign_up_questions" in campaign:
+        agency_admin_campaigns = await get_campaigns_by_admin_id(campaign_model.admin_id)
+        if agency_admin_campaigns:
+            for agency_admin_campaign in agency_admin_campaigns:
+                if agency_admin_campaign.id != ObjectId(id):
+                    agency_admin_campaign.custom_sign_up_questions = campaign_model.custom_sign_up_questions
+                    await campaign_collection.find_one_and_update(
+                        {"_id": agency_admin_campaign.id},
+                        {"$set": agency_admin_campaign.model_dump(by_alias=True, exclude=["id"], mode="python")},
+                        return_document=ReturnDocument.AFTER
+                    )
+
     if len(campaign) >= 1:
         update_result = await campaign_collection.find_one_and_update(
             {"_id": ObjectId(id)},
@@ -164,6 +176,15 @@ async def get_campaign_by_admin_id(admin_id: ObjectId):
         return None
     campaign_result = campaign_models.CampaignModel(**campaign_in_db)
     return campaign_result
+
+
+async def get_campaigns_by_admin_id(admin_id: ObjectId):
+    campaign_collection = get_campaign_collection()
+    campaigns_in_db = await campaign_collection.find({"admin_id": admin_id}).to_list(None)
+    if not campaigns_in_db:
+        return None
+    campaigns_result = [campaign_models.CampaignModel(**campaign) for campaign in campaigns_in_db]
+    return campaigns_result
 
 
 async def get_stripe_onboarding_url(campaign_id: ObjectId):

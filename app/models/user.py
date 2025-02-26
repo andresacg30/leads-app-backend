@@ -79,7 +79,7 @@ class UserModel(BaseModel):
     @property
     def ROLE_ADMIN(self) -> str:
         return "admin"
-    
+
     @property
     def ROLE_AGENCY_ADMIN(self) -> str:
         return "agency_admin"
