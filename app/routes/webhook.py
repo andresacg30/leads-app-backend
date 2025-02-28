@@ -1,6 +1,7 @@
 import datetime
 import logging
 import app.integrations.stripe as stripe_controller
+from bson import ObjectId
 
 from fastapi import APIRouter, Request, HTTPException, Response
 
@@ -137,6 +138,7 @@ async def cancel_subscription_from_stripe(request: Request, endpoint_secret):
     Cancel a user's subscription.
     """
     from app.controllers import campaign as campaign_controller
+    from app.integrations.stripe import stripe
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
     event = await stripe_controller.construct_event(
@@ -165,7 +167,11 @@ async def cancel_subscription_from_stripe(request: Request, endpoint_secret):
                 user.subscription_details.past_subscriptions.append(canceled_subscription)
                 await user_controller.update_user(user)
             stripe_account = event.account if hasattr(event, "account") else settings.stripe_self_account
-            campaign = await campaign_controller.get_campaign_by_stripe_account_id(stripe_account)
+            product = stripe.Product.retrieve(subscription.get("items").get("data")[0].price.product, stripe_account=stripe_account)
+            campaign_id = product.metadata["campaign_id"]
+            if not campaign_id:
+                return Response(content="Webhook received, subscription cancelled but no campaign found", media_type="application/json", status_code=200)
+            campaign = await campaign_controller.get_one_campaign(ObjectId(campaign_id))
             send_cancellation_email_to_agent(
                 email=user.email,
                 user_name=user.name,

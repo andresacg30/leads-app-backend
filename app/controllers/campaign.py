@@ -163,6 +163,15 @@ async def get_campaign_by_sign_up_code(sign_up_code):
     return campaign_result
 
 
+async def get_campaigns_by_sign_up_code(sign_up_code: str):
+    campaign_collection = get_campaign_collection()
+    campaigns_in_db = await campaign_collection.find({"sign_up_code": sign_up_code}).to_list(None)
+    if not campaigns_in_db:
+        return None
+    campaigns_result = [campaign_models.CampaignModel(**campaign) for campaign in campaigns_in_db]
+    return campaigns_result
+
+
 def generate_unique_sign_up_code():
     uid = uuid.uuid4()
     code = uid.int % 1_000_000

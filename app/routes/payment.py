@@ -29,7 +29,8 @@ async def get_products(request: PaymentTypeRequest, user: UserModel = Depends(ge
         stripe_account_id = await campaign_controller.get_stripe_account_id(campaign_id)
         product_list = await stripe_controller.get_products(
             payment_type=request.payment_type,
-            stripe_account_id=stripe_account_id
+            stripe_account_id=stripe_account_id,
+            campaign_id=str(campaign_id)
         )
         return product_list
     except Exception as e:
