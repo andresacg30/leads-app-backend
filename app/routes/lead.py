@@ -155,7 +155,8 @@ async def show_lead(id: str, user: UserModel = Depends(get_current_user)):
                 raise HTTPException(status_code=404, detail="User does not have access to this campaign")
             if user.is_agent():
                 if lead.buyer_id != user.agent_id:
-                    raise HTTPException(status_code=404, detail="User does not have access to this lead")
+                    if lead.second_chance_buyer_id != user.agent_id:
+                        raise HTTPException(status_code=404, detail="User does not have access to this lead")
                 if lead.custom_fields.get("invalid"):
                     del lead.custom_fields["invalid"]
                 if lead.custom_fields.get("invalid_reason"):
