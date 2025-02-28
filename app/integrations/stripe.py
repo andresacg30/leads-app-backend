@@ -128,13 +128,14 @@ async def verify_checkout_session(session_id: str, stripe_account_id: str):
     return session
 
 
-async def get_products(payment_type: str, stripe_account_id: str):
+async def get_products(payment_type: str, stripe_account_id: str, campaign_id: str):
     stripe_products = stripe.Product.list(active=True, limit=100, stripe_account=stripe_account_id)
     filtered_products = []
 
     for product in stripe_products['data']:
         if 'metadata' in product and product['metadata'].get('payment_type') == payment_type:
-            filtered_products.append(product)
+            if product["metadata"].get("campaign_id") == campaign_id:
+                filtered_products.append(product)
 
     filtered_products.sort(key=lambda product: _extract_amount(product['name']))
 
@@ -254,6 +255,13 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
         return None, None
     if payment_intent.invoice:
         order_type = "recurring"
+        invoice = stripe.Invoice.retrieve(payment_intent.invoice, stripe_account=stripe_account_id)
+        product = invoice.lines.data[0].price.product
+        prod = stripe.Product.retrieve(product, stripe_account=stripe_account_id)
+        campaign_id_str = prod.metadata.get("campaign_id")
+        if not campaign_id_str:
+            raise Exception("No campaign ID found in product metadata")
+        campaign_id = ObjectId(campaign_id_str)
     else:
         products_metadata = payment_intent.metadata.get("products")
         if products_metadata:
@@ -262,7 +270,10 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
                 prod = stripe.Product.retrieve(product_id, stripe_account=stripe_account_id)
                 products.append(PurchasedProduct(product_id=prod.id, product_name=prod.name, quantity=quantity))
         order_type = "one_time"
-    campaign_id = await campaign_controller.get_campaign_id_by_stripe_account_id(stripe_account_id)
+        campaign_id_str = payment_intent.metadata.get("campaign_id")
+        if not campaign_id_str:
+            raise Exception("No campaign ID found in payment intent metadata")
+        campaign_id = ObjectId(campaign_id_str)
     await _check_user_stripe_id_and_update(user=user, campaign_id=campaign_id, user_stripe_account_id=customer.id)
     current_user_balance = await user_controller.get_user_balance_by_agent_id(user.agent_id)
     campaign_balance = 0

@@ -631,7 +631,10 @@ async def enroll_agent_in_campaign(agent_id: bson.ObjectId, campaign_id: bson.Ob
     agent_collection = get_agent_collection()
     updated_agent = await agent_collection.update_one(
         {"_id": agent_id},
-        {"$addToSet": {"campaigns": campaign_id}}
+        {
+            "$addToSet": {"campaigns": campaign_id},
+            "$push": {"daily_lead_limit": {"campaign_id": campaign_id, "daily_lead_limit": constants.DEFAULT_LEAD_LIMIT}}
+        }
     )
     if updated_agent.modified_count == 0:
         raise AgentNotFoundError(f"Agent with id {agent_id} not found.")

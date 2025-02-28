@@ -1,5 +1,6 @@
 import asyncio
 import math
+from typing import List
 import bson
 import datetime
 import logging
@@ -93,9 +94,15 @@ async def create_user(user) -> user_model.UserModel:
         campaigns=user["campaigns"],
         otp_expiration=datetime.datetime.utcnow() + datetime.timedelta(seconds=OTP_EXPIRATION),
     )
+    stripe_customers = {}
     for campaign in user.campaigns:
         user_campaign = await campaign_controller.get_one_campaign(campaign)
-        stripe_customer = await create_customer(user=user, stripe_account_id=user_campaign.stripe_account_id)
+        stripe_account_id = user_campaign.stripe_account_id
+        if stripe_account_id not in stripe_customers:
+            stripe_customer = await create_customer(user=user, stripe_account_id=stripe_account_id)
+            stripe_customers[stripe_account_id] = stripe_customer
+        else:
+            stripe_customer = stripe_customers[stripe_account_id]
         user.stripe_customer_ids[str(user_campaign.id)] = stripe_customer.id
     user_collection = get_user_collection()
     user.password = jwt_helper.encrypt(user.password)
@@ -526,19 +533,35 @@ async def get_users_by_field(**kwargs):
         raise HTTPException(status_code=404, detail="Users not found")
 
 
-async def enroll_user_in_campaign(user: user_model.UserModel, campaign: CampaignModel):
+async def enroll_user_in_campaigns(user: user_model.UserModel, campaigns: List[CampaignModel]):
     user_collection = get_user_collection()
-    stripe_customer = await stripe_controller.create_customer(user, campaign.stripe_account_id)
-    updated_user = await user_collection.update_one(
-        {"_id": user.id},
-        {
-            "$addToSet": {"campaigns": campaign.id},
-            "$set": {f"stripe_customer_ids.{campaign.id}": stripe_customer.id}
-        }
-    )
-    if updated_user.modified_count == 0:
-        raise Exception("Failed to enroll user in campaign")
-    return updated_user
+    stripe_account_to_customer = {}
+    for existing_campaign_id in user.campaigns:
+        try:
+            existing_campaign = await campaign_controller.get_one_campaign(existing_campaign_id)
+            existing_customer_id = user.stripe_customer_ids.get(str(existing_campaign_id))
+            if existing_customer_id:
+                stripe_account_to_customer[existing_campaign.stripe_account_id] = existing_customer_id
+        except Exception:
+            continue
+    for campaign in campaigns:
+        if campaign.id in user.campaigns:
+            continue
+        if campaign.stripe_account_id in stripe_account_to_customer:
+            customer_id = stripe_account_to_customer[campaign.stripe_account_id]
+        else:
+            stripe_customer = await stripe_controller.create_customer(user, campaign.stripe_account_id)
+            customer_id = stripe_customer.id
+            stripe_account_to_customer[campaign.stripe_account_id] = customer_id
+        await user_collection.update_one(
+            {"_id": user.id},
+            {
+                "$addToSet": {"campaigns": campaign.id},
+                "$set": {f"stripe_customer_ids.{str(campaign.id)}": customer_id}
+            }
+        )
+
+    return await get_user(user.id)
 
 
 async def get_user(id: bson.ObjectId):
