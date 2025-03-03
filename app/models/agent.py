@@ -24,6 +24,7 @@ class IntegrationDetail(BaseModel):
 
 class IntegrationDetailsUpdate(BaseModel):
     integration_details: List
+    crm_name: str
     
     def to_json(self):
         return {

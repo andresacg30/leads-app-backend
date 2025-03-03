@@ -420,11 +420,12 @@ async def get_user_integration_details(user_id, campaign_id):
     return agent.CRM.get_campaign_integration_details(campaign_id)
 
 
-async def update_user_integration_details(user_id, campaign_id, integration_details):
+async def update_user_integration_details(user_id, campaign_id, integration_details, crm_name):
     user_collection = get_user_collection()
     user_in_db = await user_collection.find_one({"_id": bson.ObjectId(user_id)})
     user = user_model.UserModel(**user_in_db)
     agent = await agent_controller.get_agent(user.agent_id)
+    agent.CRM.name = crm_name
     agent.CRM.update_integration_details(campaign_id, integration_details)
     updated_agent = await agent_controller.update_agent(id=user.agent_id, agent=agent)
     if not updated_agent:

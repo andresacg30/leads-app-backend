@@ -55,7 +55,8 @@ async def update_user_integration_details(campaign_id: str, request: Integration
     await user_controller.update_user_integration_details(
         user_id=user.id,
         campaign_id=campaign_id,
-        integration_details=request.integration_details)
+        integration_details=request.integration_details,
+        crm_name=request.crm_name)
     return {"message": "Integration details updated successfully"}
 
 
