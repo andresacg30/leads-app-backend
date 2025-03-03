@@ -249,6 +249,7 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
     payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id, stripe_account=stripe_account_id)
     customer = stripe.Customer.retrieve(payment_intent.customer, stripe_account=stripe_account_id)
     products = []
+    order_total = payment_intent.amount / 100
     try:
         user = await user_controller.get_user_by_email(customer.email)
     except user_controller.UserNotFoundError:
@@ -262,6 +263,7 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
         if not campaign_id_str:
             raise Exception("No campaign ID found in product metadata")
         campaign_id = ObjectId(campaign_id_str)
+        order_total = invoice.subtotal / 100
     else:
         products_metadata = payment_intent.metadata.get("products")
         if products_metadata:
@@ -274,6 +276,11 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
         if not campaign_id_str:
             raise Exception("No campaign ID found in payment intent metadata")
         campaign_id = ObjectId(campaign_id_str)
+        checkout_sessions = stripe.checkout.Session.list(payment_intent=payment_intent_id, stripe_account=stripe_account_id)
+        if checkout_sessions.data:
+            session = checkout_sessions.data[0]
+            if hasattr(session, "total_details") and session.total_details.amount_discount > 0:
+                order_total = session.total_details.amount_subtotal / 100
     await _check_user_stripe_id_and_update(user=user, campaign_id=campaign_id, user_stripe_account_id=customer.id)
     current_user_balance = await user_controller.get_user_balance_by_agent_id(user.agent_id)
     campaign_balance = 0
@@ -283,7 +290,7 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
             break
     created_transaction = await transaction_controller.create_transaction(
         TransactionModel(
-            amount=payment_intent.amount / 100,
+            amount=order_total,
             campaign_id=campaign_id,
             user_id=user.id,
             payment_intent_id=payment_intent_id,
@@ -296,7 +303,7 @@ async def add_transaction_from_new_payment_intent(payment_intent_id: str, stripe
         OrderModel(
             agent_id=user.agent_id,
             campaign_id=campaign_id,
-            order_total=payment_intent.amount / 100,
+            order_total=order_total,
             status="open",
             type=order_type,
         ),
