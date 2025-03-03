@@ -414,5 +414,8 @@ async def get_questions(request: Request, agency_codes: List[str] = Body(..., em
     """
     agency_code = agency_codes[0]
     campaign: CampaignModel = await campaign_controller.get_campaign_by_sign_up_code(agency_code)
+    if not campaign:
+        logger.warning(f"Campaign with sign up code {agency_code} not found", extra={'function': 'get_questions'})
+        raise HTTPException(status_code=404, detail="Campaign not found")
     questions = [question for question in campaign.custom_sign_up_questions if question]
     return {"questions": questions}
