@@ -565,7 +565,7 @@ async def get_eligible_agents_for_lead_processing(
         },
         {
             "$match": {
-                "$expr": {"$gt": ["$balance", "$total_cost"]}
+                "$expr": {"$gte": ["$balance", "$total_cost"]}
             }
         },
         {
