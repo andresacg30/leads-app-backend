@@ -677,16 +677,17 @@ async def send_fresh_leads_to_agent(lead_ids: list, agent: dict, campaign: Campa
     if agent.get("CRM").get("name"):
         agent_crm = crm_chooser(agent["CRM"]["name"])
         if agent_crm and agent["CRM"]["integration_details"]:
-            agent_integration_details = agent["CRM"]["integration_details"][str(campaign_id)]
-            fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')
-            fresh_creds.pop('type')
-            agent_crm = agent_crm(
-                integration_details=fresh_creds
-            )
-            for lead_id in lead_ids:
-                lead = await get_one_lead(lead_id)
-                agent_crm.push_lead(lead.crm_json())
-                logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_id}")
+            agent_integration_details = agent["CRM"]["integration_details"].get(str(campaign_id))
+            if agent_integration_details:
+                fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')
+                fresh_creds.pop('type')
+                agent_crm = agent_crm(
+                    integration_details=fresh_creds
+                )
+                for lead_id in lead_ids:
+                    lead = await get_one_lead(lead_id)
+                    agent_crm.push_lead(lead.crm_json())
+                    logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_id}")
     else:
         logger.warning(f"No CRM found for agent {agent_id}")
     if agent["lead_price_override"]:

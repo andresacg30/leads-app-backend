@@ -1,6 +1,6 @@
-import app.scripts.add_states_from_csv_to_agents as change_state_full_for_abbr_script
+import app.scripts.add_2nd_chance_from_csv as add_2nd_chance_from_csv_script
 import asyncio
 
 
-if __name__ == "__main__":
-    asyncio.run(change_state_full_for_abbr_script.main())
+# if __name__ == "__main__":
+#     asyncio.run(add_2nd_chance_from_csv_script.main())
