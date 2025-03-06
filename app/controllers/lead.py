@@ -571,7 +571,7 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
             try:
                 agent_crm = crm_chooser(agent_to_distribute.CRM.name)
             except ValueError as e:
-                logger.error(f"Error choosing CRM for agent {agent_to_distribute.id}: {str(e)}")
+                logger.error(f"Error choosing CRM for agent {agent_to_distribute.id}: {str(e)}. Sending lead to LC")
                 agent_crm = None
             if agent_crm and agent_to_distribute.CRM.integration_details:
                 agent_integration_details = agent_to_distribute.CRM.integration_details[str(campaign.id)]
@@ -675,7 +675,11 @@ async def send_fresh_leads_to_agent(lead_ids: list, agent: dict, campaign: Campa
         }}
     )
     if agent.get("CRM").get("name"):
-        agent_crm = crm_chooser(agent["CRM"]["name"])
+        try:
+            agent_crm = crm_chooser(agent["CRM"]["name"])
+        except ValueError as e:
+            logger.error(f"Error choosing CRM for agent {agent_id}: {str(e)}. Sending lead to LC")
+            agent_crm = None
         if agent_crm and agent["CRM"]["integration_details"]:
             agent_integration_details = agent["CRM"]["integration_details"].get(str(campaign_id))
             if agent_integration_details:
@@ -738,18 +742,23 @@ async def send_second_chance_leads_to_agent(lead_ids: list, agent: AgentModel, c
         }}
     )
     if agent.get("CRM").get("name"):
-        agent_crm = crm_chooser(agent["CRM"]["name"])
+        try:
+            agent_crm = crm_chooser(agent["CRM"]["name"])
+        except ValueError as e:
+            logger.error(f"Error choosing CRM for agent {agent_id}: {str(e)}. Sending lead to LC")
+            agent_crm = None
         if agent_crm and agent["CRM"]["integration_details"]:
-            agent_integration_details = agent["CRM"]["integration_details"][str(campaign_id)]
-            second_chance_creds = next(cred for cred in agent_integration_details if cred['type'] == 'second_chance')
-            second_chance_creds.pop('type')
-            agent_crm = agent_crm(
-                integration_details=second_chance_creds
-            )
-            for lead_id in lead_ids:
-                lead = await get_one_lead(lead_id)
-                agent_crm.push_lead(lead.crm_json())
-                logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_id}")
+            agent_integration_details = agent["CRM"]["integration_details"].get([str(campaign_id)])
+            if agent_integration_details:
+                second_chance_creds = next(cred for cred in agent_integration_details if cred['type'] == 'second_chance')
+                second_chance_creds.pop('type')
+                agent_crm = agent_crm(
+                    integration_details=second_chance_creds
+                )
+                for lead_id in lead_ids:
+                    lead = await get_one_lead(lead_id)
+                    agent_crm.push_lead(lead.crm_json())
+                    logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_id}")
     if agent["second_chance_lead_price_override"]:
         lead_price = agent["second_chance_lead_price_override"]
     else:
@@ -958,7 +967,11 @@ async def assign_second_chance_lead_to_agent(lead: lead_model.LeadModel, lead_id
         if current_lead_order:
             lead.second_chance_lead_order_id = current_lead_order.id
         if agent_to_distribute.CRM.name:
-            agent_crm = crm_chooser(agent_to_distribute.CRM.name)
+            try:
+                agent_crm = crm_chooser(agent_to_distribute.CRM.name)
+            except ValueError as e:
+                logger.error(f"Error choosing CRM for agent {agent_to_distribute.id}: {str(e)}. Sending lead to LC")
+                agent_crm = None
             if agent_crm and agent_to_distribute.CRM.integration_details:
                 agent_integration_details = agent_to_distribute.CRM.integration_details[str(campaign.id)]
                 second_chance_creds = next(cred for cred in agent_integration_details if cred['type'] == 'second_chance')
