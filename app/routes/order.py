@@ -14,6 +14,38 @@ from app.models.order import OrderModel, UpdateOrderModel, OrderCollection
 router = APIRouter(prefix="/api/order", tags=["order"])
 
 
+@router.put(
+    "/{id}",
+    response_description="Update an order",
+    response_model_by_alias=False
+)
+async def update_order(
+    id: str,
+    order_update: UpdateOrderModel,
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Update an order record with validated data.
+    """
+    try:
+        if not user.is_admin():
+            if not user.campaigns or order_update.campaign_id not in user.campaigns:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You don't have permission to update this order"
+                )
+            if user.is_agent() and str(order_update.agent_id) != str(user.agent_id):
+                raise HTTPException(
+                    status_code=403, 
+                    detail="You can only update your own orders"
+                )
+        updated_order = await order_controller.update_order(id, order_update)
+        return {"_id": str(updated_order["_id"])}
+    except order_controller.OrderNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Order {id} not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.get(
     "/{id}",
     response_description="Get a single order",

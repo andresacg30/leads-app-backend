@@ -58,7 +58,7 @@ class UpdateOrderModel(BaseModel):
     second_chance_lead_completed: Optional[int]
     second_chance_lead_amount: Optional[int]
     order_total: int = Optional[int]
-    rules: Optional[List[dict]]
+    rules: dict = Optional[dict]
     completed_date: Optional[datetime.datetime]
 
 
