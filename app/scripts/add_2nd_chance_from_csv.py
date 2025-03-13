@@ -13,7 +13,7 @@ def process_csv_to_leads(file_path: str) -> List[Dict]:
     df = pd.read_csv(file_path)
     
     # Get standard field names and custom field names
-    standard_fields = ['Email', 'State', 'Full Name', 'Phone number']
+    standard_fields = ['Email', 'State', 'Full Name', 'Phone']
     custom_fields = [col for col in df.columns if col not in standard_fields]
     
     operations = []
@@ -43,7 +43,7 @@ def process_csv_to_leads(file_path: str) -> List[Dict]:
             "is_second_chance": True,
             "custom_fields": {},
             "origin": "csv",
-            "campaign_id": "67bf5ec640df211069c97a7b"
+            "campaign_id": "67bf5e5e40df211069c97a7a"
         }
         # Add custom fields
         for field in custom_fields:
@@ -63,7 +63,7 @@ def process_csv_to_leads(file_path: str) -> List[Dict]:
 
 
 async def main():
-    file_path = "CSV/TyVetLeads_Cleaned.csv"
+    file_path = "
     operations = process_csv_to_leads(file_path)
     
     lead_collection = get_lead_collection()
