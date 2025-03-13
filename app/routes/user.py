@@ -102,10 +102,15 @@ async def get_active_agents(user: UserModel = Depends(get_current_user)):
 
 @router.get("/get-profile")
 async def get_user_profile(user: UserModel = Depends(get_current_user)):
+    from app.controllers.agent import get_agent
+    if user.permissions == ["agent"]:
+        agent = await get_agent(user.agent_id)
+        states = agent.states_with_license
     user_data = {
         "first_name": user.name.split(" ")[0],
-        "last_name": user.name.split(" ")[1],
-        "email": user.email
+        "last_name": states if user.permissions == ["agent"] else None,
+        "email": user.email,
+        "id": str(user.agent_id),
     }
     return user_data
 
