@@ -329,7 +329,12 @@ async def update_agent(id: str, agent: UpdateAgentModel = Body(...), user: UserM
     try:
         if agent.email:
             agent.email = agent.email.lower()
-        updated_agent = await agent_controller.update_agent(id, agent)
+        if agent.states_with_license and agent.campaigns[0] is None:
+            agent_in_db: AgentModel = await agent_controller.get_agent(id=bson.ObjectId(id))
+            agent_in_db.states_with_license = agent.states_with_license
+            updated_agent = await agent_controller.update_agent(id, agent_in_db)
+        else:
+            updated_agent = await agent_controller.update_agent(id, agent)
         return {"id": str(updated_agent["_id"])}
 
     except agent_controller.AgentNotFoundError as e:
