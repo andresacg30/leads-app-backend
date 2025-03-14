@@ -575,16 +575,18 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
                 agent_crm = None
             if agent_crm and agent_to_distribute.CRM.integration_details:
                 agent_integration_details = agent_to_distribute.CRM.integration_details.get(str(lead.campaign_id))
-                if agent_integration_details
-                    fresh_creds = next(cred for cred in agent_integration_details if cred.type == 'fresh')
-                    if fresh_creds:
-                        fresh_creds = fresh_creds.to_json()
+                if agent_integration_details:
+                    try:
+                        fresh_creds = next(cred for cred in agent_integration_details if cred["type"] == 'fresh')
                         fresh_creds.pop('type')
-                        agent_crm = agent_crm(
-                            integration_details=fresh_creds
-                        )
-                        agent_crm.push_lead(lead.crm_json())
-                        logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_to_distribute.id}")
+                    except Exception:
+                        fresh_creds = next(cred for cred in agent_integration_details if cred.type == 'fresh')
+                        fresh_creds = fresh_creds.to_json()
+                    agent_crm = agent_crm(
+                        integration_details=fresh_creds
+                    )
+                    agent_crm.push_lead(lead.crm_json())
+                    logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_to_distribute.id}")
         result = await lead_collection.update_one(
             {"_id": ObjectId(lead_id)},
             {"$set": {
@@ -684,8 +686,12 @@ async def send_fresh_leads_to_agent(lead_ids: list, agent: dict, campaign: Campa
         if agent_crm and agent["CRM"]["integration_details"]:
             agent_integration_details = agent["CRM"]["integration_details"].get(str(campaign_id))
             if agent_integration_details:
-                fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')
-                fresh_creds.pop('type')
+                try:
+                    fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')
+                    fresh_creds.pop('type')
+                except Exception:
+                    fresh_creds = next(cred for cred in agent_integration_details if cred.type == 'fresh')
+                    fresh_creds = fresh_creds.to_json()
                 agent_crm = agent_crm(
                     integration_details=fresh_creds
                 )
@@ -751,15 +757,20 @@ async def send_second_chance_leads_to_agent(lead_ids: list, agent: AgentModel, c
         if agent_crm and agent["CRM"]["integration_details"]:
             agent_integration_details = agent["CRM"]["integration_details"].get([str(campaign_id)])
             if agent_integration_details:
-                second_chance_creds = next(cred for cred in agent_integration_details if cred['type'] == 'second_chance')
-                second_chance_creds.pop('type')
-                agent_crm = agent_crm(
-                    integration_details=second_chance_creds
-                )
-                for lead_id in lead_ids:
-                    lead = await get_one_lead(lead_id)
-                    agent_crm.push_lead(lead.crm_json())
-                    logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_id}")
+                try:
+                    second_chance_creds = next(cred for cred in agent_integration_details if cred['type'] == 'second_chance')
+                    second_chance_creds.pop('type')
+                except Exception:
+                    second_chance_creds = next(cred for cred in agent_integration_details if cred.type == 'second_chance')
+                    second_chance_creds = second_chance_creds.to_json()
+                if second_chance_creds:
+                    agent_crm = agent_crm(
+                        integration_details=second_chance_creds
+                    )
+                    for lead_id in lead_ids:
+                        lead = await get_one_lead(lead_id)
+                        agent_crm.push_lead(lead.crm_json())
+                        logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_id}")
     if agent["second_chance_lead_price_override"]:
         lead_price = agent["second_chance_lead_price_override"]
     else:
@@ -976,9 +987,13 @@ async def assign_second_chance_lead_to_agent(lead: lead_model.LeadModel, lead_id
             if agent_crm and agent_to_distribute.CRM.integration_details:
                 agent_integration_details = agent_to_distribute.CRM.integration_details.get(str(lead.campaign_id))
                 if agent_integration_details:
-                    second_chance_creds = next(cred for cred in agent_integration_details if cred['type'] == 'second_chance')
-                    if second_chance_creds:
+                    try:
+                        second_chance_creds = next(cred for cred in agent_integration_details if cred['type'] == 'second_chance')
                         second_chance_creds.pop('type')
+                    except Exception:
+                        second_chance_creds = next(cred for cred in agent_integration_details if cred.type == 'second_chance')
+                        second_chance_creds = second_chance_creds.to_json()
+                    if second_chance_creds:
                         agent_crm = agent_crm(
                             integration_details=second_chance_creds
                         )
