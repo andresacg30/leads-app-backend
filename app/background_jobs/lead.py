@@ -59,6 +59,8 @@ def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
 
 
 async def schedule_for_second_chance(lead: LeadModel, lead_id: str, time: int):
+    # Bug: processing leads as second chance
+    return
     logger.info(f"Scheduling lead {lead_id} for second chance")
     delay = timedelta(days=time)
     task_id = rq.enqueue_in(
