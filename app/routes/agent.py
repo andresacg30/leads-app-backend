@@ -18,6 +18,29 @@ from app.tools import mappings, formatters
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 
+@router.post(
+    "/get-sign-ups-in-time-frame",
+    response_description="Get sign ups in time frame",
+    response_model_by_alias=False
+)
+async def get_sign_ups_in_time_frame(
+    campaign_id: str = Body(..., embed=True),
+    created_time_gte: str = Body(..., embed=True),
+    created_time_lte: str = Body(..., embed=True),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Get sign ups in time frame
+    """
+    if not user.is_admin():
+        raise HTTPException(status_code=404, detail="User does not have permission to get sign ups in time frame")
+    sign_ups = await agent_controller.get_sign_ups_in_time_frame(
+        campaign_id=bson.ObjectId(campaign_id),
+        created_time_gte=created_time_gte,
+        created_time_lte=created_time_lte
+    )
+    return {"total": len(sign_ups)}
+
 @router.post("/enroll-new-campaign", response_description="Enroll agent in new campaign", response_model_by_alias=False)
 async def enroll_agent_in_new_campaign(
     agency_code: str = Body(..., embed=True),

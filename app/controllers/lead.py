@@ -1044,3 +1044,28 @@ async def mark_leads_as_sold(lead_ids):
         {"_id": {"$in": [ObjectId(lead_id) for lead_id in lead_ids]}},
         {"$set": {"lead_sold_by_agent_time": datetime.utcnow()}}
     )
+
+
+async def get_active_agents_in_time_range(campaign_id, lead_sold_time_gte, lead_sold_time_lte):
+    lead_collection = get_lead_collection()
+
+    lead_sold_time_gte_dt = datetime.strptime(lead_sold_time_gte, "%Y-%m-%dT%H:%M:%S.%fZ")
+    lead_sold_time_lte_dt = datetime.strptime(lead_sold_time_lte, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+    query_fresh = {
+        "campaign_id": ObjectId(campaign_id),
+        "lead_sold_time": {"$gte": lead_sold_time_gte_dt, "$lte": lead_sold_time_lte_dt},
+        "buyer_id": {"$exists": True, "$ne": None}
+    }
+    fresh_agents = await lead_collection.distinct("buyer_id", query_fresh)
+
+    query_second_chance = {
+        "campaign_id": ObjectId(campaign_id),
+        "second_chance_lead_sold_time": {"$gte": lead_sold_time_gte_dt, "$lte": lead_sold_time_lte_dt},
+        "second_chance_buyer_id": {"$exists": True, "$ne": None}
+    }
+    second_chance_agents = await lead_collection.distinct("second_chance_buyer_id", query_second_chance)
+
+    all_agents = set(fresh_agents + second_chance_agents)
+
+    return all_agents

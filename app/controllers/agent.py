@@ -639,3 +639,19 @@ async def enroll_agent_in_campaign(agent_id: bson.ObjectId, campaign_id: bson.Ob
     if updated_agent.modified_count == 0:
         raise AgentNotFoundError(f"Agent with id {agent_id} not found.")
     return updated_agent
+
+
+async def get_sign_ups_in_time_frame(campaign_id, created_time_gte, created_time_lte):
+    agent_collection = get_agent_collection()
+    created_time_gte_dt = datetime.strptime(created_time_gte, "%Y-%m-%dT%H:%M:%S.%fZ")
+    created_time_lte_dt = datetime.strptime(created_time_lte, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+    query = {
+        "campaigns": campaign_id,
+        "created_time": {
+            "$gte": created_time_gte_dt,
+            "$lte": created_time_lte_dt
+        }
+    }
+    sign_ups = await agent_collection.find(query).to_list(None)
+    return sign_ups
