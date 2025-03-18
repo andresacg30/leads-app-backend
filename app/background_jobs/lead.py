@@ -35,6 +35,8 @@ async def process_second_chance_lead(lead_id: str):
     lead.is_second_chance = True
     lead.became_second_chance_time = datetime.utcnow()
     await lead_controller.update_lead(lead_id, lead)
+    # Bug: processing leads as second chance
+    return
     task_id = rq.enqueue(
         run_async,
         lead_controller.assign_second_chance_lead_to_agent,
@@ -59,8 +61,6 @@ def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
 
 
 async def schedule_for_second_chance(lead: LeadModel, lead_id: str, time: int):
-    # Bug: processing leads as second chance
-    return
     logger.info(f"Scheduling lead {lead_id} for second chance")
     delay = timedelta(days=time)
     task_id = rq.enqueue_in(
