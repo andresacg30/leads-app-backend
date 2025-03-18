@@ -18,6 +18,26 @@ router = APIRouter(prefix="/api/lead", tags=["lead"])
 
 
 @router.post(
+    "/get-active-agents-in-time-range",
+    response_description="Get active agents in time range",
+    response_model_by_alias=False
+)
+async def get_active_agents_in_time_range(
+    lead_sold_time_gte: str = Body(..., embed=True),
+    lead_sold_time_lte: str = Body(..., embed=True),
+    campaign_id: str = Body(..., embed=True),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Get active agents in time range
+    """
+    if not user.is_admin():
+        raise HTTPException(status_code=404, detail="User does not have required permissions")
+    active_agents = await lead_controller.get_active_agents_in_time_range(campaign_id, lead_sold_time_gte, lead_sold_time_lte)
+    return {"total": len(active_agents)}
+
+
+@router.post(
     "/mark-as-sold-by-agent",
     response_description="Mark leads as sold by agent",
     response_model_by_alias=False
