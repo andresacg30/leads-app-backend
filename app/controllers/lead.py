@@ -49,39 +49,12 @@ class LeadEmptyError(Exception):
 
 
 async def update_lead(id, lead: lead_model.UpdateLeadModel):
-    from app.controllers.order import get_oldest_open_order_by_agent_and_campaign, check_order_amounts_and_close
-    from app.controllers.campaign import get_one_campaign
-    from app.controllers.user import get_user_by_field, UserNotFoundError
-    from app.controllers.transaction import create_transaction
     if all(v is None for v in lead.model_dump(mode="python").values()):
         raise LeadEmptyError("No values to update")
     lead_collection = get_lead_collection()
     try:
         lead = {k: v for k, v in lead.model_dump(by_alias=True, mode="python").items() if v is not None}
-        if lead["campaign_id"] in constants.OG_CAMPAIGNS:
-            datetime_fields = ["created_time", "lead_sold_time", "second_chance_lead_sold_time", "lead_sold_by_agent_time"]
-            if any(field in lead for field in datetime_fields):
-                for field in datetime_fields:
-                    if field in lead:
-                        lead[field] = formatter.format_string_to_utc_datetime(lead[field])
-        ### TEMPORAL FOR OG CAMPAIGNS ###
-        if lead.get("buyer_id"):
-            agent_oldest_open_order = await get_oldest_open_order_by_agent_and_campaign(
-                agent_id=lead["buyer_id"],
-                campaign_id=lead["campaign_id"],
-                is_second_chance=False
-            )
-            if agent_oldest_open_order:
-                lead["lead_order_id"] = agent_oldest_open_order.id
-        if lead.get("second_chance_buyer_id"):
-            agent_oldest_open_order = await get_oldest_open_order_by_agent_and_campaign(
-                agent_id=lead["second_chance_buyer_id"],
-                campaign_id=lead["campaign_id"],
-                is_second_chance=True
-            )
-            if agent_oldest_open_order:
-                lead["second_chance_lead_order_id"] = agent_oldest_open_order.id
-        ### END TEMPORAL FOR OG CAMPAIGNS ###
+
         if len(lead) >= 1:
             update_result = await lead_collection.find_one_and_update(
                 {"_id": ObjectId(id)},
@@ -90,46 +63,6 @@ async def update_lead(id, lead: lead_model.UpdateLeadModel):
             )
 
             if update_result is not None:
-                ### TEMPORAL FOR OG CAMPAIGNS ###
-                if "buyer_id" in lead or "second_chance_buyer_id" in lead:
-                    if str(update_result["campaign_id"]) in constants.OG_CAMPAIGNS:
-                        if agent_oldest_open_order:
-                            await check_order_amounts_and_close(agent_oldest_open_order)
-                        campaign = await get_one_campaign(str(update_result["campaign_id"]))
-                        if "buyer_id" in lead and lead["buyer_id"]:
-                            try:
-                                user = await get_user_by_field(agent_id=lead["buyer_id"])
-                                if user:
-                                    await create_transaction(
-                                        TransactionModel(
-                                            user_id=user.id,
-                                            amount=-campaign.price_per_lead,
-                                            description="Fresh Lead sent",
-                                            type="debit",
-                                            date=datetime.utcnow(),
-                                            lead_id=ObjectId(id),
-                                            campaign_id=lead.get("campaign_id"))
-                                        )
-                            except UserNotFoundError:
-                                pass
-                        if "second_chance_buyer_id" in lead and lead["second_chance_buyer_id"]:
-                            try:
-                                user = await get_user_by_field(agent_id=lead["second_chance_buyer_id"])
-                                if user:
-                                    await create_transaction(
-                                        TransactionModel(
-                                            user_id=user.id,
-                                            amount=-campaign.price_per_second_chance_lead,
-                                            description="Second Chance Lead purchase",
-                                            type="debit",
-                                            date=datetime.utcnow(),
-                                            lead_id=ObjectId(id),
-                                            campaign_id=lead.get("campaign_id")
-                                        )
-                                    )
-                            except UserNotFoundError:
-                                pass
-                ### END TEMPORAL FOR OG CAMPAIGNS ###
                 return update_result
 
             else:
@@ -417,7 +350,6 @@ def _build_aggregation_pipeline(filter, sort, page, limit, agent_id, date_gte, d
     else:
         match_stage = {"$match": {}}
 
-    # Add filter after addFields for Fresh and 2nd Chance leads
     pipeline = [
         match_stage,
         {
@@ -550,12 +482,12 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
     if not agents_with_open_orders:
         logger.warning(f"No agents with balance found for lead {lead_id}")
         return
-    logger.info(f"Agents with open orders: {agents_with_open_orders}")
+    logger.info(f"Agents with open orders: {[agent.first_name + ' ' + agent.last_name for agent in agents_with_open_orders]}")
     eligible_agents = await get_eligible_agents_for_lead(agents_with_open_orders, lead)
     if not eligible_agents:
         logger.warning(f"No agents licensed in {lead.state} with balance found for lead {lead_id}")
         return
-    logger.info(f"Eligible agents: {eligible_agents}")
+    logger.info(f"Eligible agents: {[agent.first_name + ' ' + agent.last_name for agent in eligible_agents]}")
     agent_to_distribute: AgentModel = choose_agent(agents=eligible_agents, distribution_type="random")
     if agent_to_distribute:
         if agent_to_distribute.lead_price_override:
@@ -568,25 +500,7 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
         if current_lead_order:
             lead.lead_order_id = current_lead_order.id
         if agent_to_distribute.CRM.name:
-            try:
-                agent_crm = crm_chooser(agent_to_distribute.CRM.name)
-            except ValueError as e:
-                logger.error(f"Error choosing CRM for agent {agent_to_distribute.id}: {str(e)}. Sending lead to LC")
-                agent_crm = None
-            if agent_crm and agent_to_distribute.CRM.integration_details:
-                agent_integration_details = agent_to_distribute.CRM.integration_details.get(str(lead.campaign_id))
-                if agent_integration_details:
-                    try:
-                        fresh_creds = next(cred for cred in agent_integration_details if cred["type"] == 'fresh')
-                        fresh_creds.pop('type')
-                    except Exception:
-                        fresh_creds = next(cred for cred in agent_integration_details if cred.type == 'fresh')
-                        fresh_creds = fresh_creds.to_json()
-                    agent_crm = agent_crm(
-                        integration_details=fresh_creds
-                    )
-                    agent_crm.push_lead(lead.crm_json())
-                    logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_to_distribute.id}")
+            await push_lead_to_crm(agent_to_distribute, lead)
         result = await lead_collection.update_one(
             {"_id": ObjectId(lead_id)},
             {"$set": {
@@ -612,7 +526,54 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
                 )
             )
             logger.info(f"Lead {lead_id} assigned to agent {agent_to_distribute.id}")
+
     logger.info(f"Lead {lead_id} not assigned to any agent")
+
+
+async def push_lead_to_crm(agent_to_distribute: AgentModel, lead: lead_model.LeadModel):
+    try:
+        agent_crm = crm_chooser(agent_to_distribute.CRM.name)
+    except ValueError as e:
+        logger.error(f"Error choosing CRM for agent {agent_to_distribute.id}: {str(e)}. Sending lead to LC")
+        agent_crm = None
+    if agent_crm and agent_to_distribute.CRM.integration_details:
+        agent_integration_details = agent_to_distribute.CRM.integration_details.get(str(lead.campaign_id))
+        if agent_integration_details:
+            logger.info(f"CRM integration details found for agent {agent_to_distribute.id}: {agent_to_distribute.CRM.name} for campaign {lead.campaign_id}")
+            try:
+                fresh_creds = next(cred for cred in agent_integration_details if cred["type"] == 'fresh')
+                fresh_creds.pop('type')
+            except Exception:
+                fresh_creds = next(cred for cred in agent_integration_details if cred.type == 'fresh')
+                fresh_creds = fresh_creds.to_json()
+            agent_crm = agent_crm(
+                integration_details=fresh_creds
+            )
+            agent_crm.push_lead(lead.crm_json())
+            logger.info(f"Lead {lead.id} pushed to CRM for agent {agent_to_distribute.id}")
+
+
+async def push_second_chance_lead_to_crm(agent_to_distribute: AgentModel, lead: lead_model.LeadModel):
+    try:
+        agent_crm = crm_chooser(agent_to_distribute.CRM.name)
+    except ValueError as e:
+        logger.error(f"Error choosing CRM for agent {agent_to_distribute.id}: {str(e)}. Sending lead to LC")
+        agent_crm = None
+    if agent_crm and agent_to_distribute.CRM.integration_details:
+        agent_integration_details = agent_to_distribute.CRM.integration_details.get(str(lead.campaign_id))
+        if agent_integration_details:
+            logger.info(f"CRM integration details found for agent {agent_to_distribute.id}: {agent_to_distribute.CRM.name} for campaign {lead.campaign_id}")
+            try:
+                second_chance_creds = next(cred for cred in agent_integration_details if cred["type"] == 'second_chance')
+                second_chance_creds.pop('type')
+            except Exception:
+                second_chance_creds = next(cred for cred in agent_integration_details if cred.type == 'second_chance')
+                second_chance_creds = second_chance_creds.to_json()
+            agent_crm = agent_crm(
+                integration_details=second_chance_creds
+            )
+            agent_crm.push_lead(lead.crm_json())
+            logger.info(f"Second chance lead {lead.id} pushed to CRM for agent {agent_to_distribute.id}")
 
 
 def choose_agent(agents, distribution_type):
@@ -637,7 +598,8 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
     user = await get_user_by_field(agent_id=ObjectId(agent_id))
     campaign = await get_one_campaign(campaign_id)
     agent_id_obj = ObjectId(agent_id)
-    agent = await agent_controller.get_agent_by_field(_id=agent_id_obj)
+    agent_in_db = await agent_controller.get_agent_by_field(_id=agent_id_obj)
+    agent = AgentModel(**agent_in_db)
 
     if not agent:
         logger.warning(f"Agent {agent_id} not found")
@@ -655,58 +617,37 @@ async def send_leads_to_agent(lead_ids: list, agent_id: str, campaign_id: str):
         return False
 
 
-async def send_fresh_leads_to_agent(lead_ids: list, agent: dict, campaign: CampaignModel, user: UserModel):
+async def send_fresh_leads_to_agent(lead_ids: list, agent: AgentModel, campaign: CampaignModel, user: UserModel):
     from app.controllers import order as order_controller
     from app.controllers import transaction as transaction_controller
 
     lead_collection = get_lead_collection()
 
-    agent_id = agent["_id"]
-    campaign_id = campaign.id
-
     oldest_open_order = await order_controller.get_oldest_open_order_by_agent_and_campaign(
-            agent_id=str(agent_id),
-            campaign_id=str(campaign_id),
+            agent_id=str(agent.id),
+            campaign_id=str(campaign.id),
             is_second_chance=False
         )
     result = await lead_collection.update_many(
         {"_id": {"$in": [ObjectId(id) for id in lead_ids]}},
         {"$set": {
-            "buyer_id": agent_id,
+            "buyer_id": agent.id,
             "lead_sold_time": datetime.utcnow(),
             "lead_order_id": oldest_open_order.id
         }}
     )
-    if agent.get("CRM").get("name"):
-        try:
-            agent_crm = crm_chooser(agent["CRM"]["name"])
-        except ValueError as e:
-            logger.error(f"Error choosing CRM for agent {agent_id}: {str(e)}. Sending lead to LC")
-            agent_crm = None
-        if agent_crm and agent["CRM"]["integration_details"]:
-            agent_integration_details = agent["CRM"]["integration_details"].get(str(campaign_id))
-            if agent_integration_details:
-                try:
-                    fresh_creds = next(cred for cred in agent_integration_details if cred['type'] == 'fresh')
-                    fresh_creds.pop('type')
-                except Exception:
-                    fresh_creds = next(cred for cred in agent_integration_details if cred.type == 'fresh')
-                    fresh_creds = fresh_creds.to_json()
-                agent_crm = agent_crm(
-                    integration_details=fresh_creds
-                )
-                for lead_id in lead_ids:
-                    lead = await get_one_lead(lead_id)
-                    agent_crm.push_lead(lead.crm_json())
-                    logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_id}")
+    if agent.CRM.name:
+        for lead_id in lead_ids:
+            lead = await get_one_lead(lead_id)
+            await lead_background_jobs.push_lead_to_crm(agent, lead)
     else:
-        logger.warning(f"No CRM found for agent {agent_id}")
-    if agent["lead_price_override"]:
-        lead_price = agent["lead_price_override"]
-        logger.info(f"Lead price override found for agent {agent_id}")
+        logger.warning(f"No CRM found for agent {agent.id}")
+    if agent.lead_price_override:
+        lead_price = agent.lead_price_override
+        logger.info(f"Lead price override found for agent {agent.id}")
     else:
         lead_price = campaign.price_per_lead
-        logger.info(f"No lead price override found for agent {agent_id}")
+        logger.info(f"No lead price override found for agent {agent.id}")
     await transaction_controller.create_transaction(
         TransactionModel(
             user_id=user.id,
@@ -715,7 +656,7 @@ async def send_fresh_leads_to_agent(lead_ids: list, agent: dict, campaign: Campa
             type="debit",
             date=datetime.utcnow(),
             lead_id=[ObjectId(id) for id in lead_ids],
-            campaign_id=campaign_id
+            campaign_id=campaign.id
         )
     )
 
@@ -732,47 +673,27 @@ async def send_second_chance_leads_to_agent(lead_ids: list, agent: AgentModel, c
 
     lead_collection = get_lead_collection()
 
-    agent_id = agent["_id"]
-    campaign_id = campaign.id
-
     oldest_open_order = await order_controller.get_oldest_open_order_by_agent_and_campaign(
-            agent_id=str(agent_id),
-            campaign_id=str(campaign_id),
+            agent_id=str(agent.id),
+            campaign_id=str(campaign.id),
             is_second_chance=True
         )
     result = await lead_collection.update_many(
         {"_id": {"$in": [ObjectId(id) for id in lead_ids]}},
         {"$set": {
-            "second_chance_buyer_id": agent_id,
+            "second_chance_buyer_id": agent.id,
             "second_chance_lead_sold_time": datetime.utcnow(),
             "second_chance_lead_order_id": oldest_open_order.id
         }}
     )
-    if agent.get("CRM").get("name"):
-        try:
-            agent_crm = crm_chooser(agent["CRM"]["name"])
-        except ValueError as e:
-            logger.error(f"Error choosing CRM for agent {agent_id}: {str(e)}. Sending lead to LC")
-            agent_crm = None
-        if agent_crm and agent["CRM"]["integration_details"]:
-            agent_integration_details = agent["CRM"]["integration_details"].get([str(campaign_id)])
-            if agent_integration_details:
-                try:
-                    second_chance_creds = next(cred for cred in agent_integration_details if cred['type'] == 'second_chance')
-                    second_chance_creds.pop('type')
-                except Exception:
-                    second_chance_creds = next(cred for cred in agent_integration_details if cred.type == 'second_chance')
-                    second_chance_creds = second_chance_creds.to_json()
-                if second_chance_creds:
-                    agent_crm = agent_crm(
-                        integration_details=second_chance_creds
-                    )
-                    for lead_id in lead_ids:
-                        lead = await get_one_lead(lead_id)
-                        agent_crm.push_lead(lead.crm_json())
-                        logger.info(f"Lead {lead_id} pushed to CRM for agent {agent_id}")
-    if agent["second_chance_lead_price_override"]:
-        lead_price = agent["second_chance_lead_price_override"]
+    if agent.CRM.name:
+        for lead_id in lead_ids:
+            lead = await get_one_lead(lead_id)
+            await lead_background_jobs.push_lead_to_crm(agent, lead, is_second_chance=True)
+    else:
+        logger.warning(f"No CRM found for agent {agent.id}")
+    if agent.second_chance_lead_price_override:
+        lead_price = agent.second_chance_lead_price_override
     else:
         lead_price = campaign.price_per_second_chance_lead
     await transaction_controller.create_transaction(
@@ -783,7 +704,7 @@ async def send_second_chance_leads_to_agent(lead_ids: list, agent: AgentModel, c
             type="debit",
             date=datetime.utcnow(),
             lead_id=[ObjectId(id) for id in lead_ids],
-            campaign_id=campaign_id
+            campaign_id=campaign.id
         )
     )
 
@@ -794,7 +715,7 @@ async def send_second_chance_leads_to_agent(lead_ids: list, agent: AgentModel, c
     return False
 
 
-async def get_eligible_agents_for_lead(agents: List[AgentModel], lead: lead_model.LeadModel):
+async def get_eligible_agents_for_lead(agents: List[AgentModel], lead: lead_model.LeadModel) -> List[AgentModel]:
     formatted_lead_state = formatter.format_state_to_abbreviation(lead.state)
     eligible_agents = []
     for agent in agents:
