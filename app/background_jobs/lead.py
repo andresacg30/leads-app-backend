@@ -94,3 +94,23 @@ async def delete_background_task_by_lead_ids(lead_ids: list):
                 {"$set": {"second_chance_task_id": None}}
             )
     return "Success"
+
+
+async def push_lead_to_crm(agent, lead, is_second_chance=False):
+    logger.info(f"Pushing lead {lead.full_name} to CRM")
+    if is_second_chance:
+        task_id = rq.enqueue(
+            run_async,
+            lead_controller.push_second_chance_lead_to_crm,
+            agent,
+            lead
+        )
+    else:
+        task_id = rq.enqueue(
+            run_async,
+            lead_controller.push_lead_to_crm,
+            agent,
+            lead
+        )
+    logger.info(f"Task ID for lead {lead.full_name}: {task_id}")
+    return "Success"
