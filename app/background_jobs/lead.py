@@ -114,3 +114,16 @@ async def push_lead_to_crm(agent, lead, is_second_chance=False):
         )
     logger.info(f"Task ID for lead {lead.full_name}: {task_id}")
     return "Success"
+
+
+async def reprocess_second_chance_leads(order, agent, user):
+    logger.info(f"Reprocessing second chance leads for order {order.id}")
+    task_id = rq.enqueue(
+        run_async,
+        lead_controller.reprocess_second_chance_leads,
+        order,
+        agent,
+        user
+    )
+    logger.info(f"Task ID for order {order.id}: {task_id}")
+    return "Success"

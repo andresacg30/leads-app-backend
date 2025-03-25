@@ -15,6 +15,7 @@ from app.background_jobs import lead as lead_background_jobs
 from app.models import lead as lead_model
 from app.models.agent import AgentModel
 from app.models.campaign import CampaignModel
+from app.models.order import OrderModel
 from app.models.transaction import TransactionModel
 from app.models.user import UserModel
 from app.tools import formatters as formatter
@@ -671,6 +672,10 @@ async def send_second_chance_leads_to_agent(lead_ids: list, agent: AgentModel, c
     from app.controllers import order as order_controller
     from app.controllers import transaction as transaction_controller
 
+    if not lead_ids:
+        logger.info(f"No leads to process for agent {agent.id}")
+        return True
+
     lead_collection = get_lead_collection()
 
     oldest_open_order = await order_controller.get_oldest_open_order_by_agent_and_campaign(
@@ -678,39 +683,61 @@ async def send_second_chance_leads_to_agent(lead_ids: list, agent: AgentModel, c
             campaign_id=str(campaign.id),
             is_second_chance=True
         )
+
+    if not oldest_open_order:
+        logger.info(f"No open second chance orders found for agent {agent.id}")
+        return True
+
+    remaining_leads_needed = oldest_open_order.second_chance_lead_amount - await oldest_open_order.second_chance_lead_completed
+
+    current_batch = lead_ids
+    remaining_leads = []
+    if len(lead_ids) > remaining_leads_needed:
+        logger.info(f"Order {oldest_open_order.id} needs {remaining_leads_needed} leads but {len(lead_ids)} were provided. Splitting batch.")
+        current_batch = lead_ids[:remaining_leads_needed]
+        remaining_leads = lead_ids[remaining_leads_needed:]
+
     result = await lead_collection.update_many(
-        {"_id": {"$in": [ObjectId(id) for id in lead_ids]}},
+        {"_id": {"$in": [ObjectId(id) for id in current_batch]}},
         {"$set": {
             "second_chance_buyer_id": agent.id,
             "second_chance_lead_sold_time": datetime.utcnow(),
             "second_chance_lead_order_id": oldest_open_order.id
         }}
     )
+
     if agent.CRM.name:
-        for lead_id in lead_ids:
+        for lead_id in current_batch:
             lead = await get_one_lead(lead_id)
             await lead_background_jobs.push_lead_to_crm(agent, lead, is_second_chance=True)
     else:
         logger.warning(f"No CRM found for agent {agent.id}")
+
     if agent.second_chance_lead_price_override:
         lead_price = agent.second_chance_lead_price_override
     else:
         lead_price = campaign.price_per_second_chance_lead
+
     await transaction_controller.create_transaction(
         TransactionModel(
             user_id=user.id,
-            amount=-lead_price * len(lead_ids),
+            amount=-lead_price * len(current_batch),
             description="Second Chance Leads sent by agency",
             type="debit",
             date=datetime.utcnow(),
-            lead_id=[ObjectId(id) for id in lead_ids],
+            lead_id=[ObjectId(id) for id in current_batch],
             campaign_id=campaign.id
         )
     )
 
     await order_controller.check_order_amounts_and_close(oldest_open_order)
     await order_controller.update_order(oldest_open_order.id, oldest_open_order)
-    if result.modified_count == len(lead_ids):
+
+    if remaining_leads:
+        logger.info(f"Processed {len(current_batch)} leads for order {oldest_open_order.id}. Checking for more orders to fill with {len(remaining_leads)} remaining leads.")
+        return await send_second_chance_leads_to_agent(remaining_leads, agent, campaign, user)
+
+    if result.modified_count == len(current_batch):
         return True
     return False
 
@@ -990,3 +1017,45 @@ async def get_active_agents_in_time_range(campaign_id, lead_sold_time_gte, lead_
     all_agents = set(fresh_agents + second_chance_agents)
 
     return all_agents
+
+
+async def get_eligible_second_chance_to_reprocess(campaign_id, states, agent_id) -> List[lead_model.LeadModel]:
+    from app.controllers.order import get_total_second_chance_leads_needed
+    lead_collection = get_lead_collection()
+    agent_total_second_chance_leads_needed = await get_total_second_chance_leads_needed(agent_id, campaign_id)
+    limit = agent_total_second_chance_leads_needed
+
+    query = {
+        "campaign_id": campaign_id,
+        "second_chance_buyer_id": None,
+        "is_second_chance": True,
+        "state": {"$in": states},
+        "buyer_id": {"$ne": agent_id}
+    }
+
+    second_chance_unsold_in_db = await lead_collection.find(query).limit(limit).to_list(None)
+    second_chance_unsold = [lead_model.LeadModel(**lead) for lead in second_chance_unsold_in_db]
+
+    return second_chance_unsold
+
+
+async def reprocess_second_chance_leads(order: OrderModel, agent: AgentModel, user: UserModel):
+    from app.controllers.campaign import get_one_campaign
+    states = [formatter.get_full_state_name(state) for state in agent.states_with_license]
+    second_chance_leads_to_send = await get_eligible_second_chance_to_reprocess(
+        order.campaign_id,
+        states,
+        agent.id
+    )
+    logger.info(f"{len(second_chance_leads_to_send)} second chance leads found for reprocess for agent {agent.id}, order {order.id}")
+    if not second_chance_leads_to_send:
+        logger.info(f"No second chance leads to reprocess for agent {agent.id}, order {order.id}")
+        return
+    second_chance_leads_to_send_ids = [str(lead.id) for lead in second_chance_leads_to_send]
+    campaign = await get_one_campaign(str(order.campaign_id))
+    await send_second_chance_leads_to_agent(
+        second_chance_leads_to_send_ids,
+        agent,
+        campaign,
+        user
+    )
