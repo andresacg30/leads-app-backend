@@ -36,6 +36,7 @@ class OrderIdInvalidError(Exception):
 async def create_order(order: OrderModel, user: UserModel, products: list = None, leftover_balance: float = 0):
     from app.controllers.campaign import get_one_campaign, get_campaign_agency_users
     from app.controllers.agent import get_agent_by_field, recalculate_daily_limit, update_daily_lead_limit
+    from app.background_jobs.lead import reprocess_second_chance_leads
     agent_in_db = await get_agent_by_field(_id=user.agent_id)
     agent = AgentModel(**agent_in_db)
     order_campaign = await get_one_campaign(str(order.campaign_id))
@@ -81,6 +82,9 @@ async def create_order(order: OrderModel, user: UserModel, products: list = None
         second_chance_lead_amount=order.second_chance_lead_amount,
         agent_name=user.name
     )
+    order.id = str(created_order.inserted_id)
+    if order.second_chance_lead_amount > 0:
+        await reprocess_second_chance_leads(order, agent, user)
     return created_order
 
 
@@ -435,3 +439,19 @@ async def get_many_orders(ids: List[str], user: UserModel):
     orders_in_db = await order_collection.find({"_id": {"$in": [ObjectId(id) for id in ids]}}).to_list(None)
     orders = [OrderModel(**order) for order in orders_in_db]
     return orders
+
+
+async def get_total_second_chance_leads_needed(agent_id, campaign_id):
+    order_collection = get_order_collection()
+    orders_in_db = await order_collection.find(
+        {"agent_id": ObjectId(agent_id), "campaign_id": ObjectId(campaign_id), "status": "open"}
+    ).to_list(None)
+    orders = [OrderModel(**order) for order in orders_in_db]
+
+    needed_leads = []
+    for order in orders:
+        completed = await order.second_chance_lead_completed
+        needed_leads.append(order.second_chance_lead_amount - completed)
+
+    total_second_chance_leads_needed = sum(needed_leads)
+    return total_second_chance_leads_needed

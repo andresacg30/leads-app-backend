@@ -479,8 +479,15 @@ async def refund_credit(
             else:
                 created_order = None
         else:
-            if amount >= campaign.price_per_lead:
-                created_order = await create_order(order, user)
+            if distribution_type == "fresh_only":
+                if amount >= campaign.price_per_lead:
+                    created_order = await create_order(order, user)
+            if distribution_type == "second_chance_only":
+                if amount >= campaign.price_per_second_chance_lead:
+                    created_order = await create_order(order, user)
+            if distribution_type == "mixed":
+                if amount >= campaign.price_per_lead + campaign.price_per_second_chance_lead:
+                    created_order = await create_order(order, user)
             else:
                 created_order = None
         return created_transaction, created_order
