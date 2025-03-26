@@ -47,7 +47,11 @@ class Ringy:
             dict: The API response, possibly containing the new lead ID or an error.
         """
         custom_fields = lead_data.pop('custom_fields', {}) or {}
-        lead_data.update(custom_fields)
+        normalized_custom_fields = {}
+        for key, value in custom_fields.items():
+            normalized_key = self._normalize_field_name(key)
+            normalized_custom_fields[normalized_key] = value
+        lead_data.update(normalized_custom_fields)
         lead_data.update({
             "sid": self.sid,
             "authToken": self.auth_token
@@ -76,3 +80,15 @@ class Ringy:
         return {
             "Content-Type": "application/json"
         }
+
+    def _normalize_field_name(self, field_name: str) -> str:
+        """
+        Normalize field names to lowercase with underscores.
+
+        Args:
+            field_name (str): The original field name (e.g., "Current Coverage")
+
+        Returns:
+            str: The normalized field name (e.g., "current_coverage")
+        """
+        return field_name.replace(' ', '_').lower()
