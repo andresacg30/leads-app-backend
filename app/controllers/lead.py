@@ -1033,7 +1033,7 @@ async def get_eligible_second_chance_to_reprocess(campaign_id, states, agent_id)
         "buyer_id": {"$ne": agent_id}
     }
 
-    second_chance_unsold_in_db = await lead_collection.find(query).limit(limit).to_list(None)
+    second_chance_unsold_in_db = await lead_collection.find(query).sort([("created_time", -1)]).limit(limit).to_list(None)
     second_chance_unsold = [lead_model.LeadModel(**lead) for lead in second_chance_unsold_in_db]
 
     return second_chance_unsold

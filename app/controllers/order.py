@@ -13,6 +13,7 @@ from app.db import Database
 from app.models.agent import AgentModel
 from app.models.campaign import CampaignModel
 from app.models.order import OrderModel, UpdateOrderModel
+from app.models.transaction import TransactionModel
 from app.models.user import UserModel
 from app.tools import emails, constants
 
@@ -354,6 +355,8 @@ async def check_order_amounts_and_close(order: OrderModel):
         order.status = "closed"
         order.completed_date = datetime.datetime.utcnow()
         await update_order(str(order.id), order)
+    else:
+        await update_order(str(order.id), order)
 
 
 async def get_order_metrics(campaigns: List[bson.ObjectId]) -> Dict[str, int]:
@@ -455,3 +458,120 @@ async def get_total_second_chance_leads_needed(agent_id, campaign_id):
 
     total_second_chance_leads_needed = sum(needed_leads)
     return total_second_chance_leads_needed
+
+
+async def get_remaining_credit(order: OrderModel, campaign: CampaignModel):
+    order_total = order.order_total
+    lead_price = campaign.price_per_lead
+    second_chance_lead_price = campaign.price_per_second_chance_lead
+    fresh_lead_completed = await order.fresh_lead_completed
+    second_chance_lead_completed = await order.second_chance_lead_completed
+    remaining_credit = order_total - (fresh_lead_completed * lead_price) - (second_chance_lead_completed * second_chance_lead_price)
+    return remaining_credit
+
+
+async def get_credit_reallocation_info(order_id: str):
+    from app.controllers.campaign import get_campaigns_by_admin_id, get_one_campaign
+    order = await get_one_order(str(order_id))
+    order_campaign = await get_one_campaign(str(order.campaign_id))
+    order = await get_one_order(str(order_id))
+    remaining_credit = await get_remaining_credit(order, order_campaign)
+    sister_campaigns = await get_campaigns_by_admin_id(order_campaign.admin_id)
+    response = {
+        "campaign_ids": [
+            {
+                "id": str(campaign.id),
+                "name": campaign.name
+            } for campaign in sister_campaigns
+        ],
+        "remaining_credit": remaining_credit
+    }
+    return response
+
+
+async def reallocate_credit(
+    order_id: str,
+    new_campaign_id: str,
+    amount: float,
+    distribution_type: str
+):
+    from app.background_jobs.lead import reprocess_second_chance_leads
+    from app.controllers.campaign import get_one_campaign
+    from app.controllers.agent import get_agent_by_field
+    from app.controllers.transaction import create_transaction
+    from app.controllers.user import get_user_by_field
+
+    old_order = await get_one_order(str(order_id))
+    old_campaign = await get_one_campaign(str(old_order.campaign_id))
+    remaining_credit = await get_remaining_credit(old_order, old_campaign)
+    if amount > remaining_credit:
+        raise ValueError(f"Requested amount (${amount:.2f}) exceeds remaining credit (${remaining_credit:.2f})")
+
+    new_campaign = await get_one_campaign(new_campaign_id)
+    new_order = OrderModel(
+        campaign_id=ObjectId(new_campaign_id),
+        agent_id=old_order.agent_id,
+        order_total=amount,
+        type="reallocation",
+        fresh_lead_amount=0,
+        second_chance_lead_amount=0,
+        date=datetime.datetime.utcnow(),
+        status="open"
+    )
+
+    agent = await get_agent_by_field(_id=old_order.agent_id)
+    agent = AgentModel(**agent)
+    user = await get_user_by_field(agent_id=old_order.agent_id)
+    if distribution_type == "fresh_only":
+        new_order.fresh_lead_amount = math.floor(amount / new_campaign.price_per_lead)
+    elif distribution_type == "second_chance_only":
+        new_order.second_chance_lead_amount = math.floor(amount / new_campaign.price_per_second_chance_lead)
+    else:
+        new_order.fresh_lead_amount = math.floor((amount * 0.8) / new_campaign.price_per_lead)
+        new_order.second_chance_lead_amount = math.floor((amount * 0.2) / new_campaign.price_per_second_chance_lead)
+    fresh_leads_to_deduct = math.ceil(amount / old_campaign.price_per_lead)
+    second_chance_leads_to_deduct = math.ceil(amount / old_campaign.price_per_second_chance_lead)
+
+    old_order.order_total -= amount
+
+    if old_order.fresh_lead_amount > 0 and old_order.second_chance_lead_amount == 0:
+        old_order.fresh_lead_amount -= fresh_leads_to_deduct
+    elif old_order.fresh_lead_amount == 0 and old_order.second_chance_lead_amount > 0:
+        old_order.second_chance_lead_amount -= second_chance_leads_to_deduct
+    else:
+        fresh_amount = 0.8 * amount
+        second_chance_amount = 0.2 * amount
+        old_order.fresh_lead_amount -= math.floor(fresh_amount / old_campaign.price_per_lead)
+        old_order.second_chance_lead_amount -= math.floor(second_chance_amount / old_campaign.price_per_second_chance_lead)
+
+    old_order.fresh_lead_amount = max(0, old_order.fresh_lead_amount)
+    old_order.second_chance_lead_amount = max(0, old_order.second_chance_lead_amount)
+
+    order = await check_order_amounts_and_close(old_order)
+
+    order_collection = get_order_collection()
+    created_order = await order_collection.insert_one(
+        new_order.model_dump(by_alias=True, exclude=["id"], mode="python")
+    )
+    new_campaign_transaction = await create_transaction(
+        TransactionModel(
+            user_id=user.id,
+            amount=amount,
+            campaign_id=new_order.campaign_id,
+            type="credit_reallocation",
+            date=datetime.datetime.utcnow()
+        )
+    )
+    old_campaign_transaction = await create_transaction(
+        TransactionModel(
+            user_id=user.id,
+            amount=-amount,
+            campaign_id=old_order.campaign_id,
+            type="credit_reallocation",
+            date=datetime.datetime.utcnow()
+        )
+    )
+    if new_order.second_chance_lead_amount > 0:
+        await reprocess_second_chance_leads(new_order, agent, user)
+
+    return str(created_order.inserted_id)

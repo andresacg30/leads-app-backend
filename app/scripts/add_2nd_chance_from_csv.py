@@ -43,7 +43,7 @@ def process_csv_to_leads(file_path: str) -> List[Dict]:
             "is_second_chance": True,
             "custom_fields": {},
             "origin": "csv",
-            "campaign_id": "67bf5e5e40df211069c97a7a"
+            "campaign_id": "67bf5e3a40df211069c97a79"
         }
         # Add custom fields
         for field in custom_fields:
@@ -63,7 +63,7 @@ def process_csv_to_leads(file_path: str) -> List[Dict]:
 
 
 async def main():
-    file_path = "
+    file_path = "CSV/freedomMPCleaned.csv"
     operations = process_csv_to_leads(file_path)
     
     lead_collection = get_lead_collection()
