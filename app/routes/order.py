@@ -14,6 +14,53 @@ from app.models.order import OrderModel, UpdateOrderModel, OrderCollection
 router = APIRouter(prefix="/api/order", tags=["order"])
 
 
+@router.get(
+    "/credit-reallocation-info/{order_id}",
+    response_description="Get credit reallocation info",
+    response_model_by_alias=False
+)
+async def get_credit_reallocation_info(order_id: str, user: UserModel = Depends(get_current_user)):
+    """
+    Get the credit reallocation info for a specific order, looked up by `order_id`.
+    """
+    try:
+        if not user.is_admin():
+            if not user.campaigns:
+                raise HTTPException(status_code=404, detail="User does not have access to this order")
+        return await order_controller.get_credit_reallocation_info(order_id)
+    except order_controller.OrderNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
+
+
+@router.post(
+    "/reallocate-credit",
+    response_description="Reallocate credit",
+    response_model_by_alias=False
+)
+async def reallocate_credit(
+    order_id: str = Body(..., embed=True),
+    new_campaign_id: str = Body(..., embed=True),
+    amount: float = Body(..., embed=True),
+    distribution_type: str = Body(..., embed=True),
+    user: UserModel = Depends(get_current_user)
+):
+    """
+    Reallocate credit from one campaign to another.
+    """
+    try:
+        if not user.is_admin():
+            if not user.campaigns or bson.ObjectId(new_campaign_id) not in user.campaigns:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You don't have permission to reallocate credit to this campaign"
+                )
+        return await order_controller.reallocate_credit(order_id, new_campaign_id, amount, distribution_type)
+    except order_controller.OrderNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.put(
     "/{id}",
     response_description="Update an order",
