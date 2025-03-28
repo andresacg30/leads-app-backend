@@ -101,12 +101,30 @@ async def create_agent(agent: AgentModel):
 
 
 async def get_all_agents(page, limit, sort, filter, user):
-    pipeline = []
+    if filter is None:
+        filter = {}
+
+    user_campaigns = None
+    if not user.is_admin():
+        user_campaigns = [ObjectId(c) if isinstance(c, str) else c for c in user.campaigns]
+
+        if "campaigns" in filter:
+            if isinstance(filter["campaigns"], dict) and "$in" in filter["campaigns"]:
+                allowed_campaigns = [c for c in filter["campaigns"]["$in"] if str(c) in [str(uc) for uc in user_campaigns]]
+                if not allowed_campaigns:
+                    return [], 0
+                filter["campaigns"]["$in"] = allowed_campaigns
+            else:
+                filter["campaigns"] = {"$in": user_campaigns}
+        else:
+            filter["campaigns"] = {"$in": user_campaigns}
+    else:
+        if "campaigns" in filter and not isinstance(filter["campaigns"], dict):
+            filter["campaigns"] = {"$in": [ObjectId(c) if isinstance(c, str) else c for c in filter["campaigns"]]}
+
     if filter:
         filter = _filter_formatter_helper(filter)
-        if not user.is_admin():
-            campaigns = filter.pop("user_campaigns")
-            filter["campaigns"] = {"$in": campaigns}
+
     pipeline = [
         {"$match": filter},
         {"$lookup": {
@@ -145,12 +163,18 @@ async def get_all_agents(page, limit, sort, filter, user):
             },
             "created_time": 1,
             "campaigns": {
-                "$filter": {
-                    "input": "$campaigns",
-                    "as": "campaign",
-                    "cond": {"$in": ["$$campaign", campaigns]}
+                "$cond": {
+                    "if": {"$eq": [user.is_admin(), False]},
+                    "then": {
+                        "$filter": {
+                            "input": "$campaigns",
+                            "as": "campaign",
+                            "cond": {"$in": ["$$campaign", user_campaigns]}
+                        }
+                    },
+                    "else": "$campaigns"
                 }
-            } if not user.is_admin() else 1,
+            },
             "credentials": 1,
             "custom_fields": 1,
             "lead_price_override": 1,
@@ -162,12 +186,12 @@ async def get_all_agents(page, limit, sort, filter, user):
         {"$skip": (page - 1) * limit},
         {"$limit": limit}
     ]
+
     agent_collection = get_agent_collection()
     agents = await agent_collection.aggregate(pipeline).to_list(None)
-    if filter:
-        total = await agent_collection.count_documents(filter)
-    else:
-        total = await agent_collection.count_documents({})
+
+    total = await agent_collection.count_documents(filter)
+
     return agents, total
 
 

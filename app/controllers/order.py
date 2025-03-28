@@ -90,14 +90,35 @@ async def create_order(order: OrderModel, user: UserModel, products: list = None
 
 
 async def get_all_orders(page, limit, sort, filter):
-    if "id" in filter:
-        filter = {"_id": {"$in": [ObjectId(id) for id in filter["id"]]}}
+    # Extract date filters first
+    date_gte = None
+    date_lte = None
+
+    if filter:
+        if "date_gte" in filter:
+            date_gte = datetime.datetime.strptime(filter.pop("date_gte"), "%Y-%m-%dT%H:%M:%S.%fZ")
+        if "date_lte" in filter:
+            date_lte = datetime.datetime.strptime(filter.pop("date_lte"), "%Y-%m-%dT%H:%M:%S.%fZ")
+
+        if "id" in filter:
+            filter = {"_id": {"$in": [ObjectId(id) for id in filter["id"]]}}
+
+    if date_gte or date_lte:
+        if "date" not in filter:
+            filter["date"] = {}
+        if date_gte:
+            filter["date"]["$gte"] = date_gte
+        if date_lte:
+            filter["date"]["$lte"] = date_lte
+
     order_collection = get_order_collection()
     orders = await order_collection.find(filter).sort([sort]).skip((page - 1) * limit).limit(limit).to_list(limit)
+
     if filter:
         total = await order_collection.count_documents(filter)
     else:
         total = await order_collection.count_documents({})
+
     return orders, total
 
 
@@ -471,10 +492,12 @@ async def get_remaining_credit(order: OrderModel, campaign: CampaignModel):
 
 
 async def get_credit_reallocation_info(order_id: str):
+    from app.controllers.agent import get_agent
     from app.controllers.campaign import get_campaigns_by_admin_id, get_one_campaign
     order = await get_one_order(str(order_id))
     order_campaign = await get_one_campaign(str(order.campaign_id))
     order = await get_one_order(str(order_id))
+    order_agent = await get_agent(str(order.agent_id))
     remaining_credit = await get_remaining_credit(order, order_campaign)
     sister_campaigns = await get_campaigns_by_admin_id(order_campaign.admin_id)
     response = {
@@ -482,7 +505,7 @@ async def get_credit_reallocation_info(order_id: str):
             {
                 "id": str(campaign.id),
                 "name": campaign.name
-            } for campaign in sister_campaigns
+            } for campaign in sister_campaigns if campaign.id in order_agent.campaigns
         ],
         "remaining_credit": remaining_credit
     }

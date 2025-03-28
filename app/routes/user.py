@@ -400,6 +400,9 @@ async def list_users(page: int = 1, limit: int = 10, sort: str = "name=ASC", fil
                 filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in filter["campaigns"]]}
             else:
                 filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in user.campaigns]}
+        else:
+            if "campaigns" in filter:
+                filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in filter["campaigns"]]}
         sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
         users, total = await user_controller.get_all_users(page=page, limit=limit, sort=sort, filter=filter, user=user)
         return {

@@ -245,27 +245,42 @@ async def get_user_balance_by_agent_id(id: str):
 
 async def get_all_users(page, limit, sort, filter, user):
     user_collection = get_user_collection()
-    pipeline = []
+
+    # Initialize the match conditions list
+    match_conditions = []
+    campaigns = None
 
     if filter:
-        pipeline.append({"$match": filter})
+        if not user.is_admin() and "campaigns" in filter:
+            campaigns = filter["campaigns"].get("$in", [])
+
+        match_conditions.append(filter)
+
     if not user.is_admin():
-        campaigns = filter["campaigns"]["$in"]
+        # If campaigns weren't already set from the filter
+        if not campaigns:
+            campaigns = [bson.ObjectId(c) for c in user.campaigns] if user.campaigns else []
 
-    if "q" in filter:
-        query_value = filter["q"]
-        pipeline.append(
-            {"$match": {
-                "$or": [
-                    {"name": {"$regex": query_value, "$options": "i"}},
-                    {"email": {"$regex": query_value, "$options": "i"}},
-                    {"phone": {"$regex": query_value, "$options": "i"}},
-                ]
-            }}
-        )
-        filter.pop("q")
+    if filter and "q" in filter:
+        query_value = filter.pop("q")
+        match_conditions.append({
+            "$or": [
+                {"name": {"$regex": query_value, "$options": "i"}},
+                {"email": {"$regex": query_value, "$options": "i"}},
+                {"phone": {"$regex": query_value, "$options": "i"}},
+            ]
+        })
 
-    pipeline.extend([
+    if match_conditions:
+        if len(match_conditions) == 1:
+            match_stage = {"$match": match_conditions[0]}
+        else:
+            match_stage = {"$match": {"$and": match_conditions}}
+    else:
+        match_stage = {"$match": {}}
+
+    pipeline = [
+        match_stage,
         {"$project": {
             "_id": 1,
             "name": 1,
@@ -275,21 +290,30 @@ async def get_all_users(page, limit, sort, filter, user):
             "agent_id": 1,
             "balance": 1,
             "permissions": 1,
+            "created_time": 1,
             "campaigns": {
                 "$filter": {
                     "input": "$campaigns",
                     "as": "campaign",
                     "cond": {"$in": ["$$campaign", campaigns]}
                 }
-            } if not user.is_admin() else 1,
+            } if not user.is_admin() and campaigns else 1,
             "email_verified": 1,
         }},
         {"$sort": {sort[0]: sort[1]}},
         {"$skip": (page - 1) * limit},
         {"$limit": limit}
-    ])
+    ]
+
     users = await user_collection.aggregate(pipeline).to_list(None)
-    total = await user_collection.count_documents(filter)
+
+    count_filter = {}
+    if filter:
+        count_filter.update(filter)
+    if not user.is_admin() and campaigns:
+        count_filter["campaigns"] = {"$in": campaigns}
+
+    total = await user_collection.count_documents(count_filter)
     return users, total
 
 
