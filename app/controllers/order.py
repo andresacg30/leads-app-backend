@@ -9,10 +9,12 @@ from pymongo import ReturnDocument
 from typing import List, Dict, Optional
 from motor.core import AgnosticCollection
 
+from app.background_jobs.order import schedule_order_priority_end
+from app.background_jobs.job import cancel_job
 from app.db import Database
 from app.models.agent import AgentModel
 from app.models.campaign import CampaignModel
-from app.models.order import OrderModel, UpdateOrderModel
+from app.models.order import OrderModel, UpdateOrderModel, OrderPriorityDetails
 from app.models.transaction import TransactionModel
 from app.models.user import UserModel
 from app.tools import emails, constants
@@ -24,6 +26,10 @@ logger = logging.getLogger(__name__)
 def get_order_collection() -> AgnosticCollection:
     db = Database.get_db()
     return db["order"]
+
+
+class OrderPermissionError(Exception):
+    pass
 
 
 class OrderNotFoundError(Exception):
@@ -375,7 +381,13 @@ async def check_order_amounts_and_close(order: OrderModel):
     if await order.fresh_lead_completed >= order.fresh_lead_amount and await order.second_chance_lead_completed >= order.second_chance_lead_amount:
         order.status = "closed"
         order.completed_date = datetime.datetime.utcnow()
-        await update_order(str(order.id), order)
+        if order.priority.active:
+            orders_after_cancel_prioritization = await cancel_orders_prioritization([order.id])
+            order_not_prioritized = orders_after_cancel_prioritization[0]
+            order.priority = order_not_prioritized.priority
+            await update_order(str(order.id), order)
+        else:
+            await update_order(str(order.id), order)
     else:
         await update_order(str(order.id), order)
 
@@ -598,3 +610,49 @@ async def reallocate_credit(
         await reprocess_second_chance_leads(new_order, agent, user)
 
     return str(created_order.inserted_id)
+
+
+async def prioritize_orders(ids: List[ObjectId], order_priority: OrderPriorityDetails, user: UserModel):
+    order_collection = get_order_collection()
+    orders_in_db = await order_collection.find({"_id": {"$in": [id for id in ids]}}).to_list(None)
+    orders = [OrderModel(**order) for order in orders_in_db]
+    for order in orders:
+        if order.campaign_id not in user.campaigns:
+            raise OrderPermissionError(f"User does not have access to this order {order.id}")
+        order.priority = order_priority
+        order.priority.start_time = datetime.datetime.utcnow()
+        if order_priority.duration > 0:
+            time_delta_duration = datetime.timedelta(seconds=order_priority.duration)
+            order.priority.end_time = order.priority.start_time + time_delta_duration
+        order.priority.prioritized_by = user.id
+        await update_order(str(order.id), order)
+    if order_priority.duration > 0:
+        await schedule_order_priority_end(ids, time_delta_duration)
+    return orders
+
+
+async def cancel_orders_prioritization(ids: List[ObjectId]):
+    order_collection = get_order_collection()
+    orders_in_db = await order_collection.find({"_id": {"$in": [id for id in ids]}}).to_list(None)
+    orders = [OrderModel(**order) for order in orders_in_db]
+    updated_orders = []
+    canceled_batch_job = False
+    for order in orders:
+        order.past_prioritizations.append(order.priority)
+        if not canceled_batch_job:  # Might have been canceled in the batch
+            if order.priority.end_time is None:
+                order.priority.end_time = datetime.datetime.utcnow()
+            if datetime.datetime.utcnow() <= order.priority.end_time:
+                cancel_job(order.priority.task_id)
+                canceled_batch_job = True
+        order.priority = OrderPriorityDetails(
+            duration=0,
+            start_time=None,
+            end_time=None,
+            active=False,
+            prioritized_by=None,
+            task_id=None
+        )
+        await update_order(str(order.id), order)
+        updated_orders.append(order)
+    return updated_orders

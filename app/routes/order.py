@@ -8,10 +8,38 @@ from fastapi import APIRouter, Body, Request, status, HTTPException, Depends, Re
 from app.auth.jwt_bearer import get_current_user
 from app.controllers import order as order_controller
 from app.models.user import UserModel
-from app.models.order import OrderModel, UpdateOrderModel, OrderCollection
+from app.models.order import OrderModel, UpdateOrderModel, OrderCollection, OrderPriorityDetails
 
 
 router = APIRouter(prefix="/api/order", tags=["order"])
+
+
+@router.post(
+    "/prioritize-orders/{ids}",
+    response_description="Prioritize orders",
+    response_model_by_alias=False
+)
+async def prioritize_order(ids: str, order_priority: OrderPriorityDetails = Body(...), user: UserModel = Depends(get_current_user)):
+    """
+    Prioritize a list of orders with the specified priority details.
+    """
+    try:
+        if not user.is_admin():
+            if not user.campaigns:
+                raise HTTPException(status_code=404, detail="User does not have access to this order")
+        ids_list = ids.split(",")
+        ids_list = [bson.ObjectId(id) for id in ids_list]
+        if order_priority.duration == 0 and not order_priority.active:
+            await order_controller.cancel_orders_prioritization(ids_list)
+            return "Canceled prioritization successfully"
+        await order_controller.prioritize_orders(ids_list, order_priority, user)
+        return "Prioritized orders successfully"
+    except order_controller.OrderNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Order {ids} not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except order_controller.OrderPermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
 
 @router.get(
