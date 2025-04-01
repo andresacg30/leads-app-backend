@@ -679,3 +679,40 @@ async def get_sign_ups_in_time_frame(campaign_id, created_time_gte, created_time
     }
     sign_ups = await agent_collection.find(query).to_list(None)
     return sign_ups
+
+
+async def get_agents_with_prioritized_orders(campaign_id):
+    agent_collection = get_agent_collection()
+    pipeline = [
+        {"$match": {"campaigns": campaign_id}},
+        {"$lookup": {
+            "from": "order",
+            "localField": "_id",
+            "foreignField": "agent_id",
+            "as": "orders"
+        }},
+        {"$unwind": {
+            "path": "$orders",
+            "preserveNullAndEmptyArrays": True
+        }},
+        {"$match": {
+            "orders.status": "open",
+            "orders.campaign_id": campaign_id,
+            "orders.priority.active": True
+        }},
+        {"$project": {
+            "first_name": 1,
+            "last_name": 1,
+            "email": 1,
+            "phone": 1,
+            "states_with_license": 1,
+            "CRM": 1,
+            "campaigns": 1,
+            "daily_lead_limit": 1,
+            "lead_price_override": 1,
+            "second_chance_lead_price_override": 1,
+        }}
+    ]
+    agents_in_db = await agent_collection.aggregate(pipeline).to_list(None)
+    agents = [AgentModel(**agent) for agent in agents_in_db]
+    return agents

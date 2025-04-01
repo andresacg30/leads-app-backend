@@ -479,17 +479,34 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
     lead_collection = get_lead_collection()
     campaign = await campaign_controller.get_one_campaign(lead.campaign_id)
     lead_price = campaign.price_per_lead
-    agents_with_open_orders = await agent_controller.get_agents_with_open_orders(campaign_id=lead.campaign_id, lead=lead)
-    if not agents_with_open_orders:
-        logger.warning(f"No agents with balance found for lead {lead_id}")
-        return
-    logger.info(f"Agents with open orders: {[agent.first_name + ' ' + agent.last_name for agent in agents_with_open_orders]}")
-    eligible_agents = await get_eligible_agents_for_lead(agents_with_open_orders, lead)
-    if not eligible_agents:
-        logger.warning(f"No agents licensed in {lead.state} with balance found for lead {lead_id}")
-        return
-    logger.info(f"Eligible agents: {[agent.first_name + ' ' + agent.last_name for agent in eligible_agents]}")
+    agents_with_prioritized_orders = await agent_controller.get_agents_with_prioritized_orders(campaign_id=lead.campaign_id)
+    if not agents_with_prioritized_orders:
+        logger.warning(f"No agents with prioritized orders found for lead {lead_id}")
+    logger.info(f"Agents with prioritized orders: {[agent.first_name + ' ' + agent.last_name for agent in agents_with_prioritized_orders]}")
+
+    eligible_prioritized_agents = []
+    if agents_with_prioritized_orders:
+        eligible_prioritized_agents = await get_eligible_prioritized_agents_for_lead(agents_with_prioritized_orders, lead)
+        logger.info(f"Eligible prioritized agents: {[agent.first_name + ' ' + agent.last_name for agent in eligible_prioritized_agents]}")
+
+    if eligible_prioritized_agents:
+        eligible_agents = eligible_prioritized_agents
+        logger.info(f"Using prioritized agents pool for lead {lead_id}")
+    else:
+        agents_with_open_orders = await agent_controller.get_agents_with_open_orders(campaign_id=lead.campaign_id, lead=lead)
+        if not agents_with_open_orders:
+            logger.warning(f"No agents with open orders found for lead {lead_id}")
+            return
+        logger.info(f"Agents with open orders: {[agent.first_name + ' ' + agent.last_name for agent in agents_with_open_orders]}")
+
+        eligible_agents = await get_eligible_agents_for_lead(agents_with_open_orders, lead)
+        if not eligible_agents:
+            logger.warning(f"No eligible agents found for lead {lead_id} in state {lead.state}")
+            return
+
+    logger.info(f"Final eligible agents: {[agent.first_name + ' ' + agent.last_name for agent in eligible_agents]}")
     agent_to_distribute: AgentModel = choose_agent(agents=eligible_agents, distribution_type="random")
+
     if agent_to_distribute:
         if agent_to_distribute.lead_price_override:
             lead_price = agent_to_distribute.lead_price_override
@@ -527,8 +544,8 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
                 )
             )
             logger.info(f"Lead {lead_id} assigned to agent {agent_to_distribute.id}")
-
-    logger.info(f"Lead {lead_id} not assigned to any agent")
+    else:
+        logger.info(f"Lead {lead_id} not assigned to any agent")
 
 
 async def push_lead_to_crm(agent_to_distribute: AgentModel, lead: lead_model.LeadModel):
@@ -752,6 +769,19 @@ async def get_eligible_agents_for_lead(agents: List[AgentModel], lead: lead_mode
                 continue
             if await agent.todays_lead_count(lead.campaign_id) >= daily_limit:
                 continue
+        if formatted_lead_state in agent.states_with_license:
+            if lead.is_second_chance:
+                if lead.buyer_id == agent.id:
+                    continue
+                eligible_agents.append(agent)
+            eligible_agents.append(agent)
+    return eligible_agents
+
+
+async def get_eligible_prioritized_agents_for_lead(agents: List[AgentModel], lead: lead_model.LeadModel) -> List[AgentModel]:
+    formatted_lead_state = formatter.format_state_to_abbreviation(lead.state)
+    eligible_agents = []
+    for agent in agents:
         if formatted_lead_state in agent.states_with_license:
             if lead.is_second_chance:
                 if lead.buyer_id == agent.id:
