@@ -78,7 +78,7 @@ class UpdateOrderModel(BaseModel):
     fresh_lead_amount: Optional[int]
     second_chance_lead_completed: Optional[int]
     second_chance_lead_amount: Optional[int]
-    order_total: int = Optional[int]
+    order_total: float = Optional[int]
     priority: OrderPriorityDetails = Optional[OrderPriorityDetails]
     past_prioritizations: List[OrderPriorityDetails] = Optional[List[OrderPriorityDetails]]
     rules: dict = Optional[dict]
