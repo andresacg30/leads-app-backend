@@ -250,7 +250,7 @@ async def reset_password_otp(request: Request, email: str = Body(..., embed=True
     except user_controller.UserNotFoundError:
         user_exists = None
     if not user_exists:
-        logging.warning(f"User with email {email} not found", function="reset_password_otp")
+        logger.warning(f"User with email {email} not found", extra={'function': 'reset_password_otp'})
         return {"message": "Password reset code sent successfully"}
 
     user_exists.otp_code = _create_otp_code()
