@@ -617,8 +617,9 @@ async def prioritize_orders(ids: List[ObjectId], order_priority: OrderPriorityDe
     orders_in_db = await order_collection.find({"_id": {"$in": [id for id in ids]}}).to_list(None)
     orders = [OrderModel(**order) for order in orders_in_db]
     for order in orders:
-        if order.campaign_id not in user.campaigns:
-            raise OrderPermissionError(f"User does not have access to this order {order.id}")
+        if not user.is_admin():
+            if order.campaign_id not in user.campaigns:
+                raise OrderPermissionError(f"User does not have access to this order {order.id}")
         order.priority = order_priority
         order.priority.start_time = datetime.datetime.utcnow()
         if order_priority.duration > 0:
