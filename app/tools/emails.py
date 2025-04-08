@@ -225,3 +225,26 @@ def send_cancellation_email_to_agency(emails, user_name, campaign_name, amount, 
         template=rendered_html,
         text=rendered_text
     )
+
+
+def send_negative_balance_email(emails, user_name, amount):
+    with open("app/templates/negative-account-balance.html") as negative_balance_html:
+        negative_balance_template = Template(negative_balance_html.read())
+        rendered_html = negative_balance_template.render(
+            user_name=user_name,
+            amount=amount
+        )
+
+    with open("app/templates/negative-account-balance.txt") as negative_balance_text:
+        negative_balance_text = negative_balance_text.read()
+        rendered_text = negative_balance_template.render(
+            user_name=user_name,
+            amount=amount
+        )
+
+    send_batch_email(
+        to_addresses=emails,
+        subject=f"Agent {user_name} has a Negative Balance",
+        template=rendered_html,
+        text=rendered_text
+    )

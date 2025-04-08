@@ -1,0 +1,9 @@
+Negative Balance Notification
+
+LEADCONEX
+
+User: {{ user_name }}'s account balance has dropped below zero.
+
+Current Balance: ${{ amount }}
+
+© LeadConex. All rights reserved.
