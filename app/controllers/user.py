@@ -172,12 +172,21 @@ async def update_user_balance(user_id, campaign_id, amount):
     if not user:
         raise UserNotFoundError(f"User with id {user_id} not found")
     balance = user.get("balance", [])
+    transaction_campaign = None
     for campaign in balance:
         if campaign["campaign_id"] == campaign_id:
             campaign["balance"] += amount
+            transaction_campaign = campaign
             break
     else:
         balance.append({"campaign_id": campaign_id, "balance": amount})
+    if transaction_campaign["balance"] < 0:
+        admin_emails = await get_users_by_field(permissions=["admin"])
+        emails.send_negative_balance_email(
+            emails=[user.email for user in admin_emails],
+            user_name=user["name"],
+            amount=transaction_campaign["balance"]
+        )
     await user_collection.update_one({"_id": bson.ObjectId(user_id)}, {"$set": {"balance": balance}})
 
 
