@@ -178,8 +178,10 @@ async def update_user_balance(user_id, campaign_id, amount):
             campaign["balance"] += amount
             transaction_campaign = campaign
             break
-    else:
-        balance.append({"campaign_id": campaign_id, "balance": amount})
+    if not transaction_campaign:
+        new_campaign = {"campaign_id": campaign_id, "balance": amount}
+        balance.append(new_campaign)
+        transaction_campaign = new_campaign
     if transaction_campaign["balance"] < 0:
         admin_emails = await get_users_by_field(permissions=["admin"])
         emails.send_negative_balance_email(
