@@ -6,6 +6,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.auth.jwt_bearer import JWTBearer
 from app.routes import agent, job, lead, campaign, payment, user, transaction, order, webhook, dashboard
+from app.routes.lead import public_lead_router
 from settings import get_settings
 
 import app.controllers.user as user_controller
@@ -33,6 +34,9 @@ app.add_middleware(
 app.include_router(transaction.router)
 app.include_router(webhook.router)
 app.include_router(user.router, tags=["user"], prefix="/api/user")
+
+app.include_router(public_lead_router)
+
 app.include_router(agent.router, dependencies=[Depends(token_listener)])
 app.include_router(lead.router, dependencies=[Depends(token_listener)])
 app.include_router(payment.router, dependencies=[Depends(token_listener)])

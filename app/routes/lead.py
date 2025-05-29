@@ -1,7 +1,7 @@
 import bson
 import json
 
-from fastapi import APIRouter, Body, status, HTTPException, Depends
+from fastapi import APIRouter, Body, Query, status, HTTPException, Depends
 from fastapi.responses import Response
 from typing import Optional, Dict, List
 
@@ -9,12 +9,17 @@ import app.controllers.lead as lead_controller
 
 from app.auth.jwt_bearer import get_current_user
 from app.background_jobs import lead as lead_background_jobs
-from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection
+from app.models.lead import LeadModel, UpdateLeadModel, LeadCollection, DuplicateCheckResponse
 from app.models.user import UserModel
 from app.tools import mappings, formatters
 
 
 router = APIRouter(prefix="/api/lead", tags=["lead"])
+
+public_lead_router = APIRouter(
+    prefix="/api/lead",
+    tags=["lead"]
+)
 
 
 @router.post(
@@ -285,6 +290,35 @@ async def list_leads(page: int = 1, limit: int = 10, sort: str = "created_time=D
         return {"data": list(lead.to_json() for lead in LeadCollection(data=leads).data), "total": total}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+
+@public_lead_router.get(
+        "/check-duplicate-public",
+        response_description='Check if a lead is a duplicate, publicly accessible',
+        response_model=DuplicateCheckResponse,
+        summary='Publicly check for lead duplication'
+)
+async def check_duplicate_public_route(
+    email: str = Query(..., description="Email of the lead to check for duplication", example="test@example.com"),
+    campaign_id: str = Query(..., description="Campaign ID to check against", example="5f9c0a9e9c6d4b1e9c6d4b1e"),
+):
+    """
+    Check if a lead is a duplicate based on email and campaign ID.
+    This endpoint is publicly accessible.
+    """
+    if not email or not campaign_id:
+        raise HTTPException(status_code=400, detail="Email and campaign_id are required")
+    
+    if "@" not in email or "." not in email:
+        raise HTTPException(status_code=400, detail="Invalid email format")
+    
+    try:
+        result = await lead_controller.check_lead_duplication_public(email, campaign_id)
+        return result
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while checking for duplicates: {str(e)}")
 
 
 def _parse_filter(filter_str: Optional[str]) -> Optional[Dict]:

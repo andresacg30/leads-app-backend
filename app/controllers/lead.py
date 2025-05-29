@@ -1089,3 +1089,36 @@ async def reprocess_second_chance_leads(order: OrderModel, agent: AgentModel, us
         campaign,
         user
     )
+
+
+async def check_lead_duplication_public(email: str, campaign_id_str: str) -> dict:
+    """
+    Checks if a lead with the given email and campaign ID is a duplicate based on creation time (within last 30 days).
+    """
+    lead_collection = get_lead_collection()
+
+    try:
+        campaign_obj_id = ObjectId(campaign_id_str)
+    except Exception:
+        return {"duplicate": False}
+    
+    query = {
+        "email": email.lower(),
+        "campaign_id": campaign_obj_id
+    }
+    lead_data = await lead_collection.find_one(query)
+
+    if not lead_data:
+        return {"duplicate": False}
+    
+    created_time = lead_data.get("created_time")
+
+    if not isinstance(created_time, datetime):
+        return {"duplicate": False}
+    
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+    if created_time >= thirty_days_ago:
+        return {"duplicate": True}
+    else:
+        return {"duplicate": False}
