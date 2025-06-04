@@ -763,7 +763,7 @@ async def get_eligible_agents_for_lead(agents: List[AgentModel], lead: lead_mode
     formatted_lead_state = formatter.format_state_to_abbreviation(lead.state)
     eligible_agents = []
     for agent in agents:
-        if not lead.is_second_chance:
+        if not lead.is_second_chance and str(lead.campaign_id) != "6668b634a88f8e5a8dde197c":
             daily_limit = await agent.campaign_daily_limit(lead.campaign_id)
             if not daily_limit:
                 continue
