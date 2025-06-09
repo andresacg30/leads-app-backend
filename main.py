@@ -11,6 +11,12 @@ from settings import get_settings
 
 import app.controllers.user as user_controller
 
+import google.cloud.logging
+
+
+client = google.cloud.logging.Client()
+
+client.setup_logging()
 
 app = FastAPI(
     title="LeadConex API"
