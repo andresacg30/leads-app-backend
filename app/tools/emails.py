@@ -1,9 +1,25 @@
 from jinja2 import Template
 
 from app.integrations.mailgun import send_single_email, send_batch_email
+from app.tools.email_blacklist import blacklist
 
+def is_blacklisted(email):
+    """
+    Check if the email is in the blacklist.
+    """
+    return email.lower() in (e.lower() for e in blacklist)
+
+def filter_blacklisted(emails):
+    """
+    Filter out blacklisted emails from the provided list.
+    """
+    return [e for e in emails if not is_blacklisted(e)]
 
 def send_verify_code_email(first_name, email, otp_code):
+    if is_blacklisted(email):
+        print(f"Email {email} is blacklisted. Not sending verification email.")
+        return
+    
     with open("app/templates/otp-code.html") as activate_account_html:
         activate_account_template = Template(activate_account_html.read())
         rendered_html = activate_account_template.render(
@@ -27,6 +43,10 @@ def send_verify_code_email(first_name, email, otp_code):
 
 
 def send_one_time_purchase_receipt(receipt_url, email, user_name, amount):
+    if is_blacklisted(email):
+        print(f"Email {email} is blacklisted. Not sending receipt email.")
+        return
+    
     with open("app/templates/one-time-purchase-receipt.html") as receipt_html:
         receipt_template = Template(receipt_html.read())
         rendered_html = receipt_template.render(
@@ -50,6 +70,10 @@ def send_one_time_purchase_receipt(receipt_url, email, user_name, amount):
 
 
 def send_stripe_onboarding_email(email, user_name, onboarding_url, campaign):
+    if is_blacklisted(email):
+        print(f"Email {email} is blacklisted. Not sending onboarding email.")
+        return
+    
     with open("app/templates/stripe-onboarding.html") as stripe_onboarding_html:
         stripe_onboarding_template = Template(stripe_onboarding_html.read())
         rendered_html = stripe_onboarding_template.render(
@@ -75,6 +99,12 @@ def send_stripe_onboarding_email(email, user_name, onboarding_url, campaign):
 
 
 def send_error_to_admin(error_message):
+    admin_emails = ["andres@johnwetmore.com", "angelo@johnwetmore.com", "leadconex@gmail.com"]
+    filtered_emails = filter_blacklisted(admin_emails)
+    if not filtered_emails:
+        print("All admin emails are blacklisted. Not sending error email.")
+        return
+    
     with open("app/templates/error-to-admin.html") as error_html:
         error_template = Template(error_html.read())
         rendered_html = error_template.render(
@@ -88,7 +118,7 @@ def send_error_to_admin(error_message):
         )
 
     send_batch_email(
-        to_addresses=["andres@johnwetmore.com", "angelo@johnwetmore.com", "leadconex@gmail.com"],
+        to_addresses=filtered_emails,
         subject="LeadConex Error",
         template=rendered_html,
         text=rendered_text
@@ -96,6 +126,10 @@ def send_error_to_admin(error_message):
 
 
 def send_welcome_email(email):
+    if is_blacklisted(email):
+        print(f"Email {email} is blacklisted. Not sending welcome email.")
+        return
+    
     with open("app/templates/agent/welcome-email.html") as welcome_html:
         welcome_template = Template(welcome_html.read())
         rendered_html = welcome_template.render()
@@ -113,6 +147,11 @@ def send_welcome_email(email):
 
 
 def send_new_sign_up_email(emails, campaign_name, agent_name, agent_email, agent_phone, agent_states_with_license, agent_answers):
+    filtered_emails = filter_blacklisted(emails)
+    if not filtered_emails:
+        print("All recipient emails are blacklisted. Not sending new sign up email.")
+        return
+    
     with open("app/templates/agency/new-sign-up.html") as new_sign_up_html:
         new_sign_up_template = Template(new_sign_up_html.read())
         rendered_html = new_sign_up_template.render(
@@ -135,7 +174,7 @@ def send_new_sign_up_email(emails, campaign_name, agent_name, agent_email, agent
         )
 
     send_batch_email(
-        to_addresses=emails,
+        to_addresses=filtered_emails,
         subject="New Agent Sign Up",
         template=rendered_html,
         text=rendered_text
@@ -143,6 +182,11 @@ def send_new_sign_up_email(emails, campaign_name, agent_name, agent_email, agent
 
 
 def send_new_order_email(emails, campaign, type, amount, lead_amount, second_chance_lead_amount, agent_name):
+    filtered_emails = filter_blacklisted(emails)
+    if not filtered_emails:
+        print("All recipient emails are blacklisted. Not sending new order email.")
+        return
+    
     with open("app/templates/agency/new-order.html") as new_order_html:
         new_order_template = Template(new_order_html.read())
         rendered_html = new_order_template.render(
@@ -166,7 +210,7 @@ def send_new_order_email(emails, campaign, type, amount, lead_amount, second_cha
         )
 
     send_batch_email(
-        to_addresses=emails,
+        to_addresses=filtered_emails,
         subject="New Order",
         template=rendered_html,
         text=rendered_text
@@ -174,6 +218,10 @@ def send_new_order_email(emails, campaign, type, amount, lead_amount, second_cha
 
 
 def send_cancellation_email_to_agent(email, user_name, campaign_name, amount, cancellation_date):
+    if is_blacklisted(email):
+        print(f"Email {email} is blacklisted. Not sending cancellation email to agent.")
+        return
+    
     with open("app/templates/agent/subscription-cancelled.html") as cancelation_html:
         cancelation_template = Template(cancelation_html.read())
         rendered_html = cancelation_template.render(
@@ -201,6 +249,11 @@ def send_cancellation_email_to_agent(email, user_name, campaign_name, amount, ca
 
 
 def send_cancellation_email_to_agency(emails, user_name, campaign_name, amount, cancellation_date):
+    filtered_emails = filter_blacklisted(emails)
+    if not filtered_emails:
+        print("All recipient emails are blacklisted. Not sending cancellation email to agency.")
+        return
+    
     with open("app/templates/agency/subscription-cancelled.html") as cancelation_html:
         cancelation_template = Template(cancelation_html.read())
         rendered_html = cancelation_template.render(
@@ -220,7 +273,7 @@ def send_cancellation_email_to_agency(emails, user_name, campaign_name, amount, 
         )
 
     send_batch_email(
-        to_addresses=emails,
+        to_addresses=filtered_emails,
         subject=f"Agent {user_name} has Canceled their Subscription",
         template=rendered_html,
         text=rendered_text
@@ -228,6 +281,11 @@ def send_cancellation_email_to_agency(emails, user_name, campaign_name, amount, 
 
 
 def send_negative_balance_email(emails, user_name, amount):
+    filtered_emails = filter_blacklisted(emails)
+    if not filtered_emails:
+        print("All recipient emails are blacklisted. Not sending negative balance email.")
+        return
+    
     with open("app/templates/negative-account-balance.html") as negative_balance_html:
         negative_balance_template = Template(negative_balance_html.read())
         rendered_html = negative_balance_template.render(
@@ -243,7 +301,7 @@ def send_negative_balance_email(emails, user_name, amount):
         )
 
     send_batch_email(
-        to_addresses=emails,
+        to_addresses=filtered_emails,
         subject=f"Agent {user_name} has a Negative Balance",
         template=rendered_html,
         text=rendered_text
