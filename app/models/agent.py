@@ -72,23 +72,53 @@ class CRMModel(BaseModel):
         integration_details = values.get('integration_details', {})
         if isinstance(integration_details, dict):
             integration_details = clean_nan_values(integration_details)
-
-            for campaign_id, details in integration_details.items():
-                if isinstance(details, dict) and 'SID' in details:
-                    fresh_details = {
-                        "auth_token": details.get('auth_token', ''),
-                        "sid": details['SID'],
-                        "type": 'fresh'
-                    }
-                    second_chance_details = {
-                        "auth_token": details.get('second_chance_auth_token', ''),
-                        "sid": details.get('second_chance_sid', ''),
-                        "type": 'second_chance'
-                    }
-                    values['integration_details'][campaign_id] = [
-                        fresh_details,
-                        second_chance_details
+            # Flat keys for Ringy and GoHighLevel
+            ringy_keys = {'SID', 'Auth Token', 'Second Chance SID', 'Second Chance Auth Token'}
+            gohighlevel_keys = {'API Key', 'Google Sheet ID'}
+            # If it's a Ringy flat dict
+            if set(integration_details.keys()) & ringy_keys:
+                integration_details = {
+                    "default": [
+                        {
+                            "auth_token": integration_details.get('Auth Token', ''),
+                            "sid": integration_details.get('SID', ''),
+                            "type": "fresh"
+                        },
+                        {
+                            "auth_token": integration_details.get('Second Chance Auth Token', ''),
+                            "sid": integration_details.get('Second Chance SID', ''),
+                            "type": "second_chance"
+                        }
                     ]
+                }
+            # If it's a GoHighLevel flat dict
+            elif set(integration_details.keys()) & gohighlevel_keys:
+                integration_details = {
+                    "default": [
+                        {
+                            "api_key": integration_details.get('API Key', ''),
+                            "type": "gohighlevel"
+                        }
+                    ]
+                }
+            else:
+                # Existing logic for campaign_id keys
+                for campaign_id, details in integration_details.items():
+                    if isinstance(details, dict) and 'SID' in details:
+                        fresh_details = {
+                            "auth_token": details.get('auth_token', ''),
+                            "sid": details['SID'],
+                            "type": 'fresh'
+                        }
+                        second_chance_details = {
+                            "auth_token": details.get('second_chance_auth_token', ''),
+                            "sid": details.get('second_chance_sid', ''),
+                            "type": 'second_chance'
+                        }
+                        integration_details[campaign_id] = [
+                            fresh_details,
+                            second_chance_details
+                        ]
         values['integration_details'] = integration_details
         return values
 
