@@ -71,65 +71,42 @@ class CRMModel(BaseModel):
                 return None
             return obj
 
-        integration_details = values.get('integration_details', {})
-        if isinstance(integration_details, dict):
-            integration_details = clean_nan_values(integration_details)
+        integration_details = values.get('integration_details')
+
+        # If details are missing or not a dictionary, reset to empty to prevent errors
+        if not isinstance(integration_details, dict):
+            values['integration_details'] = {}
+            return values
+
+        integration_details = clean_nan_values(integration_details)
+        
+        # Check for and discard old flat structures that are no longer supported
+        flat_legacy_keys = {'SID', 'Auth Token', 'API Key', 'Google Sheet ID', 'username'}
+        if set(integration_details.keys()) & flat_legacy_keys:
+            values['integration_details'] = {}
+            return values
+
+        # Process the expected campaign-nested structure
+        new_campaign_details = {}
+        for campaign_id, details in integration_details.items():
             
-            # --- START: Legacy Flat Dictionary Migration ---
-            ringy_keys = {'SID', 'Auth Token', 'Second Chance SID', 'Second Chance Auth Token'}
-            gohighlevel_keys = {'API Key'} # Simplified this key set
+            # The value for a campaign MUST be a list. If not, skip it.
+            # This handles the 'list_type' error for "Google Sheet ID", "username", etc.
+            if not isinstance(details, list):
+                continue
 
-            if set(integration_details.keys()) & ringy_keys:
-                integration_details = {
-                    "default": [
-                        {
-                            "auth_token": integration_details.get('Auth Token', ''),
-                            "sid": integration_details.get('SID', ''),
-                            "type": "fresh"
-                        },
-                        {
-                            "auth_token": integration_details.get('Second Chance Auth Token', ''),
-                            "sid": integration_details.get('Second Chance SID', ''),
-                            "type": "second_chance"
-                        }
-                    ]
-                }
-            elif set(integration_details.keys()) & gohighlevel_keys:
-                integration_details = {
-                    "default": [
-                        {
-                            "api_key": integration_details.get('API Key', ''),
-                            "type": "gohighlevel"
-                        }
-                    ]
-                }
-            # --- END: Legacy Flat Dictionary Migration ---
-            else:
-                # --- START: Legacy Campaign Dictionary Migration (THE FIX) ---
-                for campaign_id, details in integration_details.items():
-                    if isinstance(details, dict):
-                        # Explicitly check for Ringy legacy format
-                        if 'SID' in details:
-                            fresh_details = {
-                                "auth_token": details.get('auth_token', ''),
-                                "sid": details.get('SID', ''),
-                                "type": 'fresh'
-                            }
-                            second_chance_details = {
-                                "auth_token": details.get('second_chance_auth_token', ''),
-                                "sid": details.get('second_chance_sid', ''),
-                                "type": 'second_chance'
-                            }
-                            integration_details[campaign_id] = [fresh_details, second_chance_details]
-                        # ADD THIS BLOCK: Explicitly check for GoHighLevel legacy format
-                        elif 'api_key' in details:
-                            integration_details[campaign_id] = [{
-                                "api_key": details.get('api_key', ''),
-                                "type": 'gohighlevel'
-                            }]
-                # --- END: Legacy Campaign Dictionary Migration ---
+            # It's a list. Now, clean the items inside it.
+            cleaned_list = []
+            for item in details:
+                # Each item must be a dict with a valid 'type' to be kept.
+                # This handles the 'union_tag_invalid' error.
+                if isinstance(item, dict) and item.get('type') in ('fresh', 'second_chance', 'gohighlevel'):
+                    cleaned_list.append(item)
 
-        values['integration_details'] = integration_details
+            if cleaned_list:
+                new_campaign_details[campaign_id] = cleaned_list
+        
+        values['integration_details'] = new_campaign_details
         return values
 
 
