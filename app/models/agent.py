@@ -23,18 +23,18 @@ class IntegrationDetail(BaseModel):
     
 
 class RingyFreshIntegration(BaseModel):
-    auth_token: str
-    sid: str
-    type: Literal['fresh']
+    auth_token: Optional[str] = str
+    sid: Optional[str] = str
+    type: Optional[str] = Literal['fresh']
 
 class RingySecondChanceIntegration(BaseModel):
-    auth_token: str
-    sid: str
-    type: Literal['second_chance']
+    auth_token: Optional[str] = str
+    sid: Optional[str] = str
+    type: Optional[str] = Literal['second_chance']
 
 class GoHighLevelIntegration(BaseModel):
-    api_key: str
-    type: Literal['gohighlevel']
+    api_key: Optional[str] = str
+    type: Optional[str] = Literal['gohighlevel']
 
 
 AnyIntegrationDetail = Union[RingyFreshIntegration, RingySecondChanceIntegration, GoHighLevelIntegration]
