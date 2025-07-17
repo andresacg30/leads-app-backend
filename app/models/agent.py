@@ -3,7 +3,7 @@ import math
 from bson import ObjectId
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator
 from pydantic import validator, field_validator
-from typing import List, Optional, Dict, Union, Literal
+from typing import List, Optional, Dict, Union, Literal, Annotated
 
 from app.models.user import BalanceModel
 from app.tools.modifiers import PyObjectId
@@ -23,25 +23,27 @@ class IntegrationDetail(BaseModel):
     
 
 class RingyFreshIntegration(BaseModel):
-    auth_token: Optional[str] = str
-    sid: Optional[str] = str
-    type: Optional[str] = Literal['fresh']
+    auth_token: Optional[str] = None
+    sid: Optional[str] = None
+    type: Literal['fresh']
 
 class RingySecondChanceIntegration(BaseModel):
-    auth_token: Optional[str] = str
-    sid: Optional[str] = str
-    type: Optional[str] = Literal['second_chance']
+    auth_token: Optional[str] = None
+    sid: Optional[str] = None
+    type: Literal['second_chance']
 
 class GoHighLevelIntegration(BaseModel):
-    api_key: Optional[str] = str
-    type: Optional[str] = Literal['gohighlevel']
+    api_key: Optional[str] = None
+    type: Literal['gohighlevel']
 
 
 AnyIntegrationDetail = Union[RingyFreshIntegration, RingySecondChanceIntegration, GoHighLevelIntegration]
 
+DiscriminatedIntegrationDetail = Annotated[AnyIntegrationDetail, Field(discriminator="type")]
+
 
 class IntegrationDetailsUpdate(BaseModel):
-    integration_details: List[AnyIntegrationDetail]
+    integration_details: List[DiscriminatedIntegrationDetail]
     crm_name: str
 
     def to_json(self):
@@ -56,7 +58,7 @@ class CRMModel(BaseModel):
     """
     name: Optional[str] = Field(default=None)
     url: Optional[str] = Field(default=None)
-    integration_details: Optional[Dict[str, List[AnyIntegrationDetail]]] = Field(default_factory=dict)
+    integration_details: Optional[Dict[str, List[DiscriminatedIntegrationDetail]]] = Field(default_factory=dict)
 
     @root_validator(pre=True)
     def handle_integration_details(cls, values):
@@ -72,10 +74,11 @@ class CRMModel(BaseModel):
         integration_details = values.get('integration_details', {})
         if isinstance(integration_details, dict):
             integration_details = clean_nan_values(integration_details)
-            # Flat keys for Ringy and GoHighLevel
+            
+            # --- START: Legacy Flat Dictionary Migration ---
             ringy_keys = {'SID', 'Auth Token', 'Second Chance SID', 'Second Chance Auth Token'}
-            gohighlevel_keys = {'API Key', 'Google Sheet ID'}
-            # If it's a Ringy flat dict
+            gohighlevel_keys = {'API Key'} # Simplified this key set
+
             if set(integration_details.keys()) & ringy_keys:
                 integration_details = {
                     "default": [
@@ -91,7 +94,6 @@ class CRMModel(BaseModel):
                         }
                     ]
                 }
-            # If it's a GoHighLevel flat dict
             elif set(integration_details.keys()) & gohighlevel_keys:
                 integration_details = {
                     "default": [
@@ -101,26 +103,35 @@ class CRMModel(BaseModel):
                         }
                     ]
                 }
+            # --- END: Legacy Flat Dictionary Migration ---
             else:
-                # Existing logic for campaign_id keys
+                # --- START: Legacy Campaign Dictionary Migration (THE FIX) ---
                 for campaign_id, details in integration_details.items():
-                    if isinstance(details, dict) and 'SID' in details:
-                        fresh_details = {
-                            "auth_token": details.get('auth_token', ''),
-                            "sid": details['SID'],
-                            "type": 'fresh'
-                        }
-                        second_chance_details = {
-                            "auth_token": details.get('second_chance_auth_token', ''),
-                            "sid": details.get('second_chance_sid', ''),
-                            "type": 'second_chance'
-                        }
-                        integration_details[campaign_id] = [
-                            fresh_details,
-                            second_chance_details
-                        ]
+                    if isinstance(details, dict):
+                        # Explicitly check for Ringy legacy format
+                        if 'SID' in details:
+                            fresh_details = {
+                                "auth_token": details.get('auth_token', ''),
+                                "sid": details.get('SID', ''),
+                                "type": 'fresh'
+                            }
+                            second_chance_details = {
+                                "auth_token": details.get('second_chance_auth_token', ''),
+                                "sid": details.get('second_chance_sid', ''),
+                                "type": 'second_chance'
+                            }
+                            integration_details[campaign_id] = [fresh_details, second_chance_details]
+                        # ADD THIS BLOCK: Explicitly check for GoHighLevel legacy format
+                        elif 'api_key' in details:
+                            integration_details[campaign_id] = [{
+                                "api_key": details.get('api_key', ''),
+                                "type": 'gohighlevel'
+                            }]
+                # --- END: Legacy Campaign Dictionary Migration ---
+
         values['integration_details'] = integration_details
         return values
+
 
     model_config = ConfigDict(
         populate_by_name=True,
