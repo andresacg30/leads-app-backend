@@ -34,50 +34,14 @@ hash_helper = CryptContext(schemes=["bcrypt"])
 logger = logging.getLogger(__name__)
 
 
-@router.post(
-    "/update-integration-details/{campaign_id}",
-    response_description="Update user integration details",
-    response_model_by_alias=False
-)
-async def update_user_integration_details(campaign_id: str, request: IntegrationDetailsUpdate, user: UserModel = Depends(get_current_user)):
-    """
-    Update the integration details for the user's campaigns.
-    """
-    if not user.is_admin():
-        if not user.campaigns:
-            raise HTTPException(status_code=404, detail="User does not have access to this campaign")
-    if user.is_admin():
-        campaigns = await campaign_controller.get_campaign_collection().find().to_list(None)
-        campaign_ids = [bson.ObjectId(campaign["_id"]) for campaign in campaigns]
-        user.campaigns = campaign_ids
-    if bson.ObjectId(campaign_id) not in user.campaigns:
-        raise HTTPException(status_code=404, detail="User does not have access to this campaign")
-    await user_controller.update_user_integration_details(
-        user_id=user.id,
-        campaign_id=campaign_id,
-        integration_details=request.integration_details,
-        crm_name=request.crm_name)
-    return {"message": "Integration details updated successfully"}
+# --- ALL SPECIFIC 'GET' ROUTES ARE NOW AT THE TOP ---
 
-
-@router.get(
-    "/get-user-integration-details/{campaign_id}",
-    response_description="Get user integration details",
-    response_model_by_alias=False
-)
-async def get_user_integration_details(campaign_id: str, user: UserModel = Depends(get_current_user)):
+@router.get("/all-integration-summary")
+async def get_all_integration_summary(user: UserModel = Depends(get_current_user)):
     """
-    Get the integration details for the user's campaigns.
+    Get a summary of all integration details for the user's agent across all campaigns.
     """
-    if not user.is_admin():
-        if not user.campaigns:
-            raise HTTPException(status_code=404, detail="User does not have access to this campaign")
-    if user.is_admin():
-        campaigns = await campaign_controller.get_campaign_collection().find().to_list(None)
-        campaign_ids = [bson.ObjectId(campaign["_id"]) for campaign in campaigns]
-        user.campaigns = campaign_ids
-    integration_details = await user_controller.get_user_integration_details(user_id=user.id, campaign_id=campaign_id)
-    return {"data": integration_details}
+    return await user_controller.get_all_integration_summary(user)
 
 
 @router.get(
@@ -136,13 +100,6 @@ async def get_stripe_account_status(user: UserModel = Depends(get_current_user))
         return {"status": "error", "message": str(e)}
 
 
-@router.post("/onboard-new-campaign")
-async def onboard_new_campaign(request: Request, email: str = Body(..., embed=True)):
-    print("Onboarding new campaign")
-    _, stripe_onboarding_url = await stripe_integration.create_stripe_connect_account(email)
-    return stripe_onboarding_url
-
-
 @router.get("/get-current-balance")
 async def get_user_balance(user: UserModel = Depends(get_current_user)):
     user = await user_controller.get_user_by_field(email=user.email)
@@ -156,6 +113,73 @@ async def get_user_balance(user: UserModel = Depends(get_current_user)):
             "balance": campaign.balance
         })
     return response
+
+@router.get(
+    "",
+    response_description="Get all users",
+    response_model_by_alias=False
+)
+async def list_users(page: int = 1, limit: int = 10, sort: str = "name=ASC", filter: str = None, user: UserModel = Depends(get_current_user)):
+    """
+    List all of the user data in the database within the specified page and limit.
+    """
+    if sort.split('=')[1] not in ["ASC", "DESC"]:
+        raise HTTPException(status_code=400, detail="Invalid sort parameter")
+    try:
+        filter = ast.literal_eval(filter) if filter else None
+        if not user.is_admin():
+            if not user.campaigns:
+                raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+            if "campaigns" in filter:
+                filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in filter["campaigns"]]}
+            else:
+                filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in user.campaigns]}
+        else:
+            if "campaigns" in filter:
+                filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in filter["campaigns"]]}
+        sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
+        users, total = await user_controller.get_all_users(page=page, limit=limit, sort=sort, filter=filter, user=user)
+        return {
+            "data": list(user.to_json() for user in UserCollection(data=users).data),
+            "total": total
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# --- ALL 'POST' ROUTES ---
+
+@router.post(
+    "/update-integration-details/{campaign_id}",
+    response_description="Update user integration details",
+    response_model_by_alias=False
+)
+async def update_user_integration_details(campaign_id: str, request: IntegrationDetailsUpdate, user: UserModel = Depends(get_current_user)):
+    """
+    Update the integration details for the user's campaigns.
+    """
+    if not user.is_admin():
+        if not user.campaigns:
+            raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+    if user.is_admin():
+        campaigns = await campaign_controller.get_campaign_collection().find().to_list(None)
+        campaign_ids = [bson.ObjectId(campaign["_id"]) for campaign in campaigns]
+        user.campaigns = campaign_ids
+    if bson.ObjectId(campaign_id) not in user.campaigns:
+        raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+    await user_controller.update_user_integration_details(
+        user_id=user.id,
+        campaign_id=campaign_id,
+        integration_details=request.integration_details,
+        crm_name=request.crm_name)
+    return {"message": "Integration details updated successfully"}
+
+
+@router.post("/onboard-new-campaign")
+async def onboard_new_campaign(request: Request, email: str = Body(..., embed=True)):
+    print("Onboarding new campaign")
+    _, stripe_onboarding_url = await stripe_integration.create_stripe_connect_account(email)
+    return stripe_onboarding_url
 
 
 @router.post("/verify-otp")
@@ -292,21 +316,6 @@ async def refresh_token(refresh_request: RefreshTokenRequest = Body(...)):
         raise HTTPException(status_code=403, detail="Invalid refresh token")
 
 
-@router.get("/{id}")
-async def show_user(id: str, request_user: UserModel = Depends(get_current_user)):
-    try:
-        if not request_user.is_admin():
-            if not request_user.campaigns:
-                raise HTTPException(status_code=404, detail="User does not have access to this campaign")
-        user = await user_controller.get_user(bson.ObjectId(id))
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        user.campaigns = list(filter(lambda campaign: campaign in request_user.campaigns, user.campaigns))
-        return user.to_json()
-    except user_controller.UserNotFoundError:
-        raise HTTPException(status_code=404, detail="User not found")
-
-
 @router.post("/get-many")
 async def get_many_users(request: Request, user_ids: list = Body(...)):
     try:
@@ -361,6 +370,61 @@ async def user_signup(request: Request, user=Body(...)):
     return {"id": str(created_user.id)}
 
 
+@router.post(
+    "/get-campaign-questions"
+)
+async def get_questions(request: Request, agency_codes: List[str] = Body(..., embed=True)):
+    """
+    Get the custom sign up questions for a campaign.
+    """
+    agency_code = agency_codes[0]
+    campaign: CampaignModel = await campaign_controller.get_campaign_by_sign_up_code(agency_code)
+    if not campaign:
+        logger.warning(f"Campaign with sign up code {agency_code} not found", extra={'function': 'get_questions'})
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    questions = [question for question in campaign.custom_sign_up_questions if question]
+    return {"questions": questions}
+
+
+# --- DYNAMIC 'GET' ROUTES ARE NOW AT THE BOTTOM ---
+
+@router.get(
+    "/get-user-integration-details/{campaign_id}",
+    response_description="Get user integration details",
+    response_model_by_alias=False
+)
+async def get_user_integration_details(campaign_id: str, user: UserModel = Depends(get_current_user)):
+    """
+    Get the integration details for the user's campaigns.
+    """
+    if not user.is_admin():
+        if not user.campaigns:
+            raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+    if user.is_admin():
+        campaigns = await campaign_controller.get_campaign_collection().find().to_list(None)
+        campaign_ids = [bson.ObjectId(campaign["_id"]) for campaign in campaigns]
+        user.campaigns = campaign_ids
+    integration_details = await user_controller.get_user_integration_details(user_id=user.id, campaign_id=campaign_id)
+    return {"data": integration_details}
+
+
+@router.get("/{id}")
+async def show_user(id: str, request_user: UserModel = Depends(get_current_user)):
+    try:
+        if not request_user.is_admin():
+            if not request_user.campaigns:
+                raise HTTPException(status_code=404, detail="User does not have access to this campaign")
+        user = await user_controller.get_user(bson.ObjectId(id))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        user.campaigns = list(filter(lambda campaign: campaign in request_user.campaigns, user.campaigns))
+        return user.to_json()
+    except user_controller.UserNotFoundError:
+        raise HTTPException(status_code=404, detail="User not found")
+
+
+# --- HELPER FUNCTIONS ---
+
 def _create_otp_code():
     return ''.join(random.choices(string.digits, k=6))
 
@@ -378,52 +442,3 @@ async def _login_with_otp(user_credentials: UserSignIn):
         return tokens
     else:
         raise HTTPException(status_code=403, detail="Invalid OTP code")
-
-
-@router.get(
-    "",
-    response_description="Get all users",
-    response_model_by_alias=False
-)
-async def list_users(page: int = 1, limit: int = 10, sort: str = "name=ASC", filter: str = None, user: UserModel = Depends(get_current_user)):
-    """
-    List all of the user data in the database within the specified page and limit.
-    """
-    if sort.split('=')[1] not in ["ASC", "DESC"]:
-        raise HTTPException(status_code=400, detail="Invalid sort parameter")
-    try:
-        filter = ast.literal_eval(filter) if filter else None
-        if not user.is_admin():
-            if not user.campaigns:
-                raise HTTPException(status_code=404, detail="User does not have access to this campaign")
-            if "campaigns" in filter:
-                filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in filter["campaigns"]]}
-            else:
-                filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in user.campaigns]}
-        else:
-            if "campaigns" in filter:
-                filter["campaigns"] = {"$in": [bson.ObjectId(campaign_id) for campaign_id in filter["campaigns"]]}
-        sort = [sort.split('=')[0], 1 if sort.split('=')[1] == "ASC" else -1]
-        users, total = await user_controller.get_all_users(page=page, limit=limit, sort=sort, filter=filter, user=user)
-        return {
-            "data": list(user.to_json() for user in UserCollection(data=users).data),
-            "total": total
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post(
-    "/get-campaign-questions"
-)
-async def get_questions(request: Request, agency_codes: List[str] = Body(..., embed=True)):
-    """
-    Get the custom sign up questions for a campaign.
-    """
-    agency_code = agency_codes[0]
-    campaign: CampaignModel = await campaign_controller.get_campaign_by_sign_up_code(agency_code)
-    if not campaign:
-        logger.warning(f"Campaign with sign up code {agency_code} not found", extra={'function': 'get_questions'})
-        raise HTTPException(status_code=404, detail="Campaign not found")
-    questions = [question for question in campaign.custom_sign_up_questions if question]
-    return {"questions": questions}

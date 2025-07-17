@@ -3,7 +3,7 @@ import math
 from bson import ObjectId
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field, root_validator
 from pydantic import validator, field_validator
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Union, Literal
 
 from app.models.user import BalanceModel
 from app.tools.modifiers import PyObjectId
@@ -20,10 +20,28 @@ class IntegrationDetail(BaseModel):
             "sid": self.sid,
             "type": self.type
         }
+    
+
+class RingyFreshIntegration(BaseModel):
+    auth_token: str
+    sid: str
+    type: Literal['fresh']
+
+class RingySecondChanceIntegration(BaseModel):
+    auth_token: str
+    sid: str
+    type: Literal['second_chance']
+
+class GoHighLevelIntegration(BaseModel):
+    api_key: str
+    type: Literal['gohighlevel']
+
+
+AnyIntegrationDetail = Union[RingyFreshIntegration, RingySecondChanceIntegration, GoHighLevelIntegration]
 
 
 class IntegrationDetailsUpdate(BaseModel):
-    integration_details: List
+    integration_details: List[AnyIntegrationDetail]
     crm_name: str
 
     def to_json(self):
@@ -38,7 +56,7 @@ class CRMModel(BaseModel):
     """
     name: Optional[str] = Field(default=None)
     url: Optional[str] = Field(default=None)
-    integration_details: Optional[Dict[str, Union[List[IntegrationDetail], Dict[str, str], str, float, None]]] = Field(default=None)
+    integration_details: Optional[Dict[str, List[AnyIntegrationDetail]]] = Field(default_factory=dict)
 
     @root_validator(pre=True)
     def handle_integration_details(cls, values):
@@ -57,17 +75,19 @@ class CRMModel(BaseModel):
 
             for campaign_id, details in integration_details.items():
                 if isinstance(details, dict) and 'SID' in details:
+                    fresh_details = {
+                        "auth_token": details.get('auth_token', ''),
+                        "sid": details['SID'],
+                        "type": 'fresh'
+                    }
+                    second_chance_details = {
+                        "auth_token": details.get('second_chance_auth_token', ''),
+                        "sid": details.get('second_chance_sid', ''),
+                        "type": 'second_chance'
+                    }
                     values['integration_details'][campaign_id] = [
-                        IntegrationDetail(
-                            auth_token=details.get('Auth Token', ''),
-                            sid=details.get('SID', ''),
-                            type='fresh'
-                        ),
-                        IntegrationDetail(
-                            auth_token=details.get('Second Chance Auth Token', ''),
-                            sid=details.get('Second Chance SID', ''),
-                            type='second_chance'
-                        )
+                        fresh_details,
+                        second_chance_details
                     ]
         values['integration_details'] = integration_details
         return values
@@ -109,7 +129,7 @@ class CRMModel(BaseModel):
         }
     )
 
-    def get_campaign_integration_details(self, campaign_id: str) -> Dict[str, Any]:
+    def get_campaign_integration_details(self, campaign_id: str) -> List[AnyIntegrationDetail]:
         """
         Retrieve the integration details for a specific campaign.
 
@@ -121,7 +141,7 @@ class CRMModel(BaseModel):
         """
         return self.integration_details.get(campaign_id, {})
 
-    def update_integration_details(self, campaign_id: str, details: Dict[str, Any]) -> None:
+    def update_integration_details(self, campaign_id: str, details: List[AnyIntegrationDetail]) -> None:
         """
         Update the integration details for a specific campaign.
 

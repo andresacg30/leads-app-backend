@@ -35,6 +35,8 @@ class LeadModel(BaseModel):
     campaign_id: PyObjectId = Field(...)
     is_second_chance: bool = Field(default=False)
     custom_fields: Optional[dict] = Field(default=None)
+    campaign_name: Optional[str] = Field(default=None)
+    lead_type: Optional[str] = 'fresh'
 
     @validator('phone', pre=True, always=True)
     def ensure_phone_is_str(cls, v):
