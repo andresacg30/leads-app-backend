@@ -1,5 +1,4 @@
 import asyncio
-import math
 from typing import List
 import bson
 import datetime
@@ -13,15 +12,15 @@ from motor.core import AgnosticCollection
 
 from app.auth import jwt_handler
 from app.db import Database
-from app.integrations.ringy import Ringy
 from app.models.order import OrderModel
 from app.models.transaction import TransactionModel
 from app.resources import user_connections
 from app.controllers import agent as agent_controller
 from app.controllers import campaign as campaign_controller
 from app.integrations import stripe as stripe_controller
-from app.models.agent import AgentModel
+from app.models.agent import AgentModel, RingyFreshIntegration, RingySecondChanceIntegration, GoHighLevelIntegration
 from app.models.campaign import CampaignModel
+from app.models.user import UserModel
 from app.models import user as user_model
 from app.tools import jwt_helper, emails
 from app.tools.constants import OTP_EXPIRATION
@@ -460,6 +459,10 @@ async def update_user_integration_details(user_id, campaign_id, integration_deta
     user_in_db = await user_collection.find_one({"_id": bson.ObjectId(user_id)})
     user = user_model.UserModel(**user_in_db)
     agent = await agent_controller.get_agent(user.agent_id)
+
+    is_switching_crm = agent.CRM.name and agent.CRM.name != crm_name
+    if is_switching_crm:
+        agent.CRM.integration_details = {}
     agent.CRM.name = crm_name
     agent.CRM.update_integration_details(campaign_id, integration_details)
     updated_agent = await agent_controller.update_agent(id=user.agent_id, agent=agent)
@@ -614,3 +617,35 @@ async def get_user(id: bson.ObjectId):
         raise UserNotFoundError(f"User with id {id} not found")
     user = user_model.UserModel(**user_in_db)
     return user
+
+
+async def get_all_integration_summary(user: UserModel):
+
+    if not user.agent_id:
+        return {"success": True, "data": {"has_ringy": False, "has_gohighlevel": False}}
+    
+    agent = await agent_controller.get_agent(user.agent_id)
+    if not agent or not agent.CRM or not agent.CRM.integration_details:
+        return {"success": True, "data": {"has_ringy": False, "has_gohighlevel": False}}
+    
+    has_ringy = False
+    has_gohighlevel = False
+
+    for campaign_id, details_list in agent.CRM.integration_details.items():
+        if not details_list:
+            continue
+        for detail in details_list:
+            if isinstance(detail, (RingyFreshIntegration, RingySecondChanceIntegration)):
+                has_ringy = True
+            elif isinstance(detail, GoHighLevelIntegration):
+                has_gohighlevel = True
+        
+        if has_ringy and has_gohighlevel:
+            break
+    return {
+        "success": True,
+        "data": {
+            "has_ringy": has_ringy,
+            "has_gohighlevel": has_gohighlevel
+        }
+    }

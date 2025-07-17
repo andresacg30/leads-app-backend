@@ -10,14 +10,15 @@ from motor.core import AgnosticCollection
 
 
 from app.db import Database
-from app.integrations import crm_chooser
+from app.integrations import get_crm as crm_chooser
 from app.background_jobs import lead as lead_background_jobs
 from app.models import lead as lead_model
-from app.models.agent import AgentModel
+from app.models.agent import AgentModel, GoHighLevelIntegration
 from app.models.campaign import CampaignModel
 from app.models.order import OrderModel
 from app.models.transaction import TransactionModel
 from app.models.user import UserModel
+from app.controllers import campaign as campaign_controller
 from app.tools import formatters as formatter
 from app.tools import constants
 from app.tools import validators as validator
@@ -137,7 +138,7 @@ async def create_lead(lead: lead_model.LeadModel):
     else:
         lead.custom_fields["invalid"] = "no"
     new_lead = await lead_collection.insert_one(
-        lead.model_dump(by_alias=True, exclude=["id"], mode="python")
+        lead.model_dump(by_alias=True, exclude=["id", "campaign_name"], mode="python")
     )
     if lead.custom_fields.get("invalid") == "yes":
         return new_lead
@@ -548,50 +549,53 @@ async def assign_lead_to_agent(lead: lead_model.LeadModel, lead_id: str):
         logger.info(f"Lead {lead_id} not assigned to any agent")
 
 
-async def push_lead_to_crm(agent_to_distribute: AgentModel, lead: lead_model.LeadModel):
+async def push_lead_to_crm(agent: AgentModel, lead: lead_model.LeadModel):
+    """
+    Pushes a lead to the agent's configured CRM.
+    """
+    if not (agent.CRM and agent.CRM.name):
+        logger.info(f"Agent {agent.id} does not have a CRM configured. Skipping CRM push for lead {lead.id}.")
+        return
+    
     try:
-        agent_crm = crm_chooser(agent_to_distribute.CRM.name)
-    except ValueError as e:
-        logger.error(f"Error choosing CRM for agent {agent_to_distribute.id}: {str(e)}. Sending lead to LC")
-        agent_crm = None
-    if agent_crm and agent_to_distribute.CRM.integration_details:
-        agent_integration_details = agent_to_distribute.CRM.integration_details.get(str(lead.campaign_id))
-        if agent_integration_details:
-            logger.info(f"CRM integration details found for agent {agent_to_distribute.id}: {agent_to_distribute.CRM.name} for campaign {lead.campaign_id}")
-            try:
-                fresh_creds = next(cred for cred in agent_integration_details if cred["type"] == 'fresh')
-                fresh_creds.pop('type')
-            except Exception:
-                fresh_creds = next(cred for cred in agent_integration_details if cred.type == 'fresh')
-                fresh_creds = fresh_creds.to_json()
-            agent_crm = agent_crm(
-                integration_details=fresh_creds
-            )
-            agent_crm.push_lead(lead.crm_json())
-            logger.info(f"Lead {lead.id} pushed to CRM for agent {agent_to_distribute.id}")
+        crm = crm_chooser(agent.CRM.name)
+        integration_details = agent.CRM.get_campaign_integration_details(str(lead.campaign_id))
+        campaign = await campaign_controller.get_one_campaign(lead.campaign_id)
+        
+        campaign_name_for_tag = campaign.name if campaign else "Unknown Campaign"
+
+        if not integration_details:
+            logger.warning(f"No integration details found for agent {agent.id} and campaign {lead.campaign_id}. Skipping CRM push for lead {lead.id}.")
+            return
+        
+        if agent.CRM.name == "Ringy":
+            lead_type = "second_chance" if lead.is_second_chance else "fresh"
+            ringy_detail = next((d for d in integration_details if d.type == lead_type), None)
+            if ringy_detail:
+                ringy_crm_instance = crm(integration_details=ringy_detail.model_dump())
+                ringy_crm_instance.push_lead(lead.crm_json())
+            else:
+                logger.warning(f"No Ringy integration details found for agent {agent.id} and campaign {lead.campaign_id}. Skipping CRM push for lead {lead.id}.")
+        
+        elif agent.CRM.name == "GoHighLevel":
+            gohighlevel_detail = next((d for d in integration_details if isinstance(d, GoHighLevelIntegration)), None)
+            if gohighlevel_detail:
+                api_key_to_use = gohighlevel_detail.api_key
+
+                if api_key_to_use:
+                    await crm.send_lead(lead, api_key_to_use, campaign_name_for_tag)
+                else:
+                    logger.warning(f"No API key found for GoHighLevel integration for agent {agent.id} and campaign {lead.campaign_id}. Skipping CRM push for lead {lead.id}.")
+
+    except Exception as e:
+        logger.error(f"Error in push_lead_to_crm for agent {agent.id}, lead {lead.id}: {e}", exc_info=True)
 
 
 async def push_second_chance_lead_to_crm(agent_to_distribute: AgentModel, lead: lead_model.LeadModel):
-    try:
-        agent_crm = crm_chooser(agent_to_distribute.CRM.name)
-    except ValueError as e:
-        logger.error(f"Error choosing CRM for agent {agent_to_distribute.id}: {str(e)}. Sending lead to LC")
-        agent_crm = None
-    if agent_crm and agent_to_distribute.CRM.integration_details:
-        agent_integration_details = agent_to_distribute.CRM.integration_details.get(str(lead.campaign_id))
-        if agent_integration_details:
-            logger.info(f"CRM integration details found for agent {agent_to_distribute.id}: {agent_to_distribute.CRM.name} for campaign {lead.campaign_id}")
-            try:
-                second_chance_creds = next(cred for cred in agent_integration_details if cred["type"] == 'second_chance')
-                second_chance_creds.pop('type')
-            except Exception:
-                second_chance_creds = next(cred for cred in agent_integration_details if cred.type == 'second_chance')
-                second_chance_creds = second_chance_creds.to_json()
-            agent_crm = agent_crm(
-                integration_details=second_chance_creds
-            )
-            agent_crm.push_lead(lead.crm_json())
-            logger.info(f"Second chance lead {lead.id} pushed to CRM for agent {agent_to_distribute.id}")
+    """
+    Pushes a second chance lead to the agent's configured CRM.
+    """
+    await push_lead_to_crm(agent_to_distribute, lead)
 
 
 def choose_agent(agents, distribution_type):
@@ -889,11 +893,11 @@ async def get_unsold_leads(campaigns):
         ]
     }
 
-    invalid_query = {
-        "campaign_id": {"$in": campaigns},
-        "created_time": {"$gte": three_months_ago},
-        "custom_fields.invalid": "yes"
-    }
+    # invalid_query = {
+    #     "campaign_id": {"$in": campaigns},
+    #     "created_time": {"$gte": three_months_ago},
+    #     "custom_fields.invalid": "yes"
+    # }
 
     fresh_unsold_in_db = await lead_collection.find(fresh_unsold_query).to_list(None)
     fresh_unsold = [lead_model.LeadModel(**lead).to_json() for lead in fresh_unsold_in_db]

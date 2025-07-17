@@ -22,6 +22,7 @@ class CampaignModel(BaseModel):
     price_per_second_chance_lead: Optional[float] = Field(default=None)
     duplication_cutoff_days: Optional[int] = Field(default=None)
     custom_sign_up_questions: List = Field(default_factory=list)
+    gohighlevel_api_key: Optional[str] = Field(default=None)
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
