@@ -766,8 +766,9 @@ async def send_second_chance_leads_to_agent(lead_ids: list, agent: AgentModel, c
 async def get_eligible_agents_for_lead(agents: List[AgentModel], lead: lead_model.LeadModel) -> List[AgentModel]:
     formatted_lead_state = formatter.format_state_to_abbreviation(lead.state)
     eligible_agents = []
+    daily_cap_blacklist = ["6668b634a88f8e5a8dde197c", "6668b634a88f8e5a8dde197d"]
     for agent in agents:
-        if not lead.is_second_chance and str(lead.campaign_id) != "6668b634a88f8e5a8dde197c":
+        if not lead.is_second_chance and str(lead.campaign_id) not in daily_cap_blacklist:
             daily_limit = await agent.campaign_daily_limit(lead.campaign_id)
             if not daily_limit:
                 continue
